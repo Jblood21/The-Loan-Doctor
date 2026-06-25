@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #07111d;
+    color: #e9f1fa;
+    font-family: 'Manrope', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  input, select, textarea, button { font-family: inherit; }
+  input[type=number]::-webkit-inner-spin-button { opacity: 0; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: rgba(140,165,195,.22); border-radius: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  @keyframes lp-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes lp-spin { to { transform: rotate(360deg); } }
+  .num { font-family: 'Space Grotesk', monospace; font-feature-settings: 'tnum' 1; }
+</style>
+</helmet>
+
+<div style="min-height:100vh;">
+
+  <!-- ============ LOGIN ============ -->
+  <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex; min-height:100vh; animation:lp-fade .4s ease;">
+    <div style="flex:1.05; position:relative; overflow:hidden; background:linear-gradient(155deg,#0a1a2e 0%,#0c2238 55%,#0a3340 100%); display:flex; flex-direction:column; justify-content:space-between; padding:56px 56px 48px;">
+      <div style="position:absolute; inset:0; background-image:radial-gradient(circle at 18% 22%, rgba(47,128,237,.22), transparent 42%),radial-gradient(circle at 82% 78%, rgba(45,212,191,.16), transparent 45%); pointer-events:none;"></div>
+      <div style="position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px); background-size:46px 46px; mask-image:linear-gradient(to bottom right, black, transparent 80%); pointer-events:none;"></div>
+      <div style="position:relative; display:flex; align-items:center; gap:13px;">
+        <div style="width:42px; height:42px; border-radius:11px; background:linear-gradient(135deg,#2f80ed,#2dd4bf); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 24px rgba(45,212,191,.28);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#07111d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h3l2 5 4-12 2 7h4"/></svg>
+        </div>
+        <span style="font-family:'Space Grotesk'; font-size:23px; font-weight:700; letter-spacing:-.4px;">Loan<span style="color:#2dd4bf;">Dr.</span></span>
+      </div>
+      <div style="position:relative;">
+        <div style="font-family:'Space Grotesk'; font-size:46px; line-height:1.08; font-weight:700; letter-spacing:-1.5px; max-width:480px;">Every loan scenario, side by side in seconds.</div>
+        <p style="margin:22px 0 0; color:#9db4cb; font-size:16px; line-height:1.6; max-width:430px;">The comparison workspace built for loan officers — model Conventional, FHA, VA, USDA, ARM and reverse mortgages, then hand your borrower a clean breakdown.</p>
+        <div style="display:flex; gap:28px; margin-top:34px;">
+          <div><div class="num" style="font-size:26px; font-weight:600; color:#2dd4bf;">6</div><div style="font-size:12.5px; color:#7d96ae; margin-top:2px;">scenarios at once</div></div>
+          <div><div class="num" style="font-size:26px; font-weight:600; color:#2dd4bf;">5</div><div style="font-size:12.5px; color:#7d96ae; margin-top:2px;">loan programs</div></div>
+          <div><div class="num" style="font-size:26px; font-weight:600; color:#2dd4bf;">1</div><div style="font-size:12.5px; color:#7d96ae; margin-top:2px;">click to export</div></div>
+        </div>
+      </div>
+      <div style="position:relative; font-size:12.5px; color:#5f788f;">Equal Housing Lender · For licensed mortgage professionals</div>
+    </div>
+
+    <div style="flex:.95; display:flex; align-items:center; justify-content:center; padding:40px; background:#091522;">
+      <div style="width:100%; max-width:380px; animation:lp-fade .5s ease;">
+        <h1 style="font-family:'Space Grotesk'; font-size:28px; font-weight:600; margin:0 0 6px; letter-spacing:-.6px;">Welcome back</h1>
+        <p style="margin:0 0 30px; color:#8ba0b6; font-size:14.5px;">Sign in to your loan officer workspace.</p>
+
+        <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">Email</label>
+        <input type="email" value="{{ loginEmail }}" onInput="{{ onLoginEmail }}" placeholder="you@lender.com" style="width:100%; height:48px; padding:0 16px; margin-bottom:18px; background:#0c1c2e; border:1px solid #21364d; border-radius:11px; color:#e9f1fa; font-size:15px; outline:none;" style-focus="border-color:#2f80ed; box-shadow:0 0 0 3px rgba(47,128,237,.18);">
+
+        <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">Password</label>
+        <input type="password" value="{{ loginPass }}" onInput="{{ onLoginPass }}" placeholder="••••••••" style="width:100%; height:48px; padding:0 16px; margin-bottom:14px; background:#0c1c2e; border:1px solid #21364d; border-radius:11px; color:#e9f1fa; font-size:15px; outline:none;" style-focus="border-color:#2f80ed; box-shadow:0 0 0 3px rgba(47,128,237,.18);">
+
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; font-size:13px;">
+          <label style="display:flex; align-items:center; gap:8px; color:#9db4cb; cursor:pointer;"><input type="checkbox" style="accent-color:#2dd4bf; width:15px; height:15px;"> Remember me</label>
+          <a style="color:#5fa8f5; text-decoration:none; cursor:pointer;">Forgot password?</a>
+        </div>
+
+        <button onClick="{{ doLogin }}" style="width:100%; height:50px; border:none; border-radius:12px; background:linear-gradient(135deg,#2f80ed,#2dd4bf); color:#07111d; font-size:15.5px; font-weight:700; cursor:pointer; letter-spacing:.2px;" style-hover="filter:brightness(1.06);" style-active="transform:translateY(1px);">Sign in</button>
+
+        <div style="text-align:center; margin-top:22px; font-size:13.5px; color:#8ba0b6;">New here? <a style="color:#5fa8f5; text-decoration:none; cursor:pointer; font-weight:600;">Create an account</a></div>
+
+        <div style="margin-top:28px; padding:13px 15px; background:rgba(47,128,237,.08); border:1px solid rgba(47,128,237,.2); border-radius:11px; font-size:12.5px; color:#8fb4dd; line-height:1.5;">Demo build — any credentials sign you in. Backend auth is stubbed for Claude Code.</div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ APP SHELL ============ -->
+  <sc-if value="{{ authed }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex; min-height:100vh;">
+
+    <!-- Sidebar -->
+    <aside style="width:236px; flex-shrink:0; background:#0a1726; border-right:1px solid rgba(140,165,195,.1); display:flex; flex-direction:column; padding:22px 16px; position:sticky; top:0; height:100vh;">
+      <div style="display:flex; align-items:center; gap:11px; padding:6px 8px 22px;">
+        <div style="width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,#2f80ed,#2dd4bf); display:flex; align-items:center; justify-content:center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#07111d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h3l2 5 4-12 2 7h4"/></svg>
+        </div>
+        <span style="font-family:'Space Grotesk'; font-size:19px; font-weight:700; letter-spacing:-.4px;">Loan<span style="color:#2dd4bf;">Dr.</span></span>
+      </div>
+
+      <div style="font-size:11px; font-weight:700; letter-spacing:.8px; color:#5f788f; padding:6px 10px 8px;">WORKSPACE</div>
+      <nav style="display:flex; flex-direction:column; gap:3px;">
+        <button onClick="{{ go.compare }}" style="{{ nav.compare }}" style-hover="background:rgba(140,165,195,.07);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Compare Loans</button>
+        <button onClick="{{ go.hecm }}" style="{{ nav.hecm }}" style-hover="background:rgba(140,165,195,.07);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg>Reverse (HECM)</button>
+        <button onClick="{{ go.preapproval }}" style="{{ nav.preapproval }}" style-hover="background:rgba(140,165,195,.07);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>Pre-Approval</button>
+        <button onClick="{{ go.tools }}" style="{{ nav.tools }}" style-hover="background:rgba(140,165,195,.07);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6 2 2 6-6a4 4 0 0 0 5.4-5.4l-2.3 2.3-1.7-1.7 2.3-2.3z"/></svg>Tools</button>
+        <button onClick="{{ go.help }}" style="{{ nav.help }}" style-hover="background:rgba(140,165,195,.07);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg>Help Center</button>
+      </nav>
+
+      <div style="font-size:11px; font-weight:700; letter-spacing:.8px; color:#5f788f; padding:20px 10px 8px;">ADMIN</div>
+      <nav style="display:flex; flex-direction:column; gap:3px;">
+        <button onClick="{{ go.admin }}" style="{{ nav.admin }}" style-hover="background:rgba(140,165,195,.07);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</button>
+      </nav>
+
+      <div style="margin-top:auto; display:flex; flex-direction:column; gap:3px; padding-top:16px; border-top:1px solid rgba(140,165,195,.1);">
+        <button onClick="{{ openSettings }}" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border:none; background:none; color:#9db4cb; font-size:14px; font-weight:500; border-radius:9px; cursor:pointer; text-align:left;" style-hover="background:rgba(140,165,195,.07);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+        <button onClick="{{ logout }}" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border:none; background:none; color:#9db4cb; font-size:14px; font-weight:500; border-radius:9px; cursor:pointer; text-align:left;" style-hover="background:rgba(248,113,113,.1); color:#f87171;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out</button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main style="flex:1; min-width:0; max-height:100vh; overflow-y:auto;">
+      <div style="max-width:1180px; margin:0 auto; padding:34px 40px 80px;">
+
+        <!-- COMPARE -->
+        <sc-if value="{{ isCompare }}" hint-placeholder-val="{{ true }}">
+        <div style="animation:lp-fade .35s ease;">
+          <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:26px;">
+            <div>
+              <h1 style="font-family:'Space Grotesk'; font-size:27px; font-weight:600; margin:0; letter-spacing:-.6px;">Loan Comparison</h1>
+              <p style="margin:6px 0 0; color:#8ba0b6; font-size:14px;">Model up to six scenarios and compare them side by side.</p>
+            </div>
+            <div style="display:flex; gap:9px;">
+              <button onClick="{{ openSettings }}" style="height:40px; padding:0 16px; border:1px solid #21364d; background:#0e2032; color:#cdddec; border-radius:10px; font-size:13.5px; font-weight:600; cursor:pointer;" style-hover="border-color:#2f80ed;">My Scenarios</button>
+              <button style="height:40px; padding:0 16px; border:1px solid #21364d; background:#0e2032; color:#cdddec; border-radius:10px; font-size:13.5px; font-weight:600; cursor:pointer;" style-hover="border-color:#2f80ed;">Export</button>
+              <button style="height:40px; padding:0 18px; border:none; background:linear-gradient(135deg,#2f80ed,#2dd4bf); color:#07111d; border-radius:10px; font-size:13.5px; font-weight:700; cursor:pointer;" style-hover="filter:brightness(1.06);">Save</button>
+            </div>
+          </div>
+
+          <!-- Scenario tabs -->
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:22px; border-bottom:1px solid rgba(140,165,195,.12); padding-bottom:0;">
+            <sc-for list="{{ scenarioTabs }}" as="tab" hint-placeholder-count="2">
+              <button onClick="{{ tab.onClick }}" style="{{ tab.style }}">{{ tab.name }}</button>
+            </sc-for>
+            <button onClick="{{ addScenario }}" title="Add scenario" style="width:34px; height:34px; margin-bottom:8px; border:1px dashed #2f4663; background:none; color:#7d96ae; border-radius:9px; font-size:20px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;" style-hover="border-color:#2dd4bf; color:#2dd4bf;">+</button>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1.35fr 1fr; gap:24px; align-items:start;">
+
+            <!-- LEFT: form -->
+            <div style="background:#0c1b2c; border:1px solid rgba(140,165,195,.1); border-radius:16px; padding:24px;">
+
+              <!-- transaction + borrowers -->
+              <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:22px;">
+                <div style="display:inline-flex; background:#091523; border:1px solid #1c2f45; border-radius:11px; padding:4px;">
+                  <sc-for list="{{ txnTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="font-size:13px; color:#8ba0b6; font-weight:500;">Borrowers</span>
+                  <div style="display:inline-flex; background:#091523; border:1px solid #1c2f45; border-radius:10px; padding:4px;">
+                    <sc-for list="{{ borrowerTabs }}" as="b" hint-placeholder-count="2"><button onClick="{{ b.onClick }}" style="{{ b.style }}">{{ b.label }}</button></sc-for>
+                  </div>
+                </div>
+              </div>
+
+              <!-- loan type tabs -->
+              <div style="display:flex; gap:7px; margin-bottom:10px; flex-wrap:wrap;">
+                <sc-for list="{{ loanTypeTabs }}" as="t" hint-placeholder-count="5"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for>
+              </div>
+              <!-- program tabs -->
+              <div style="display:flex; gap:7px; margin-bottom:24px; flex-wrap:wrap;">
+                <sc-for list="{{ programTabs }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for>
+              </div>
+
+              <div style="height:1px; background:rgba(140,165,195,.1); margin:0 0 22px;"></div>
+
+              <div style="font-size:12px; font-weight:700; letter-spacing:.7px; color:#6f8aa3; margin-bottom:16px;">LOAN DETAILS</div>
+
+              <!-- fields -->
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px 18px;">
+                <sc-for list="{{ loanFields }}" as="f" hint-placeholder-count="4">
+                  <div style="{{ f.wrapStyle }}">
+                    <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">{{ f.label }}</label>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <div style="position:relative; flex:1;">
+                        <sc-if value="{{ f.prefix }}" hint-placeholder-val=""><span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#6f8aa3; font-size:14px;">{{ f.prefix }}</span></sc-if>
+                        <input type="number" value="{{ f.value }}" onInput="{{ f.onInput }}" class="num" style="{{ f.inputStyle }}" style-focus="border-color:#2f80ed; box-shadow:0 0 0 3px rgba(47,128,237,.16);">
+                        <sc-if value="{{ f.suffix }}" hint-placeholder-val=""><span style="position:absolute; right:14px; top:50%; transform:translateY(-50%); color:#6f8aa3; font-size:14px;">{{ f.suffix }}</span></sc-if>
+                      </div>
+                      <sc-if value="{{ f.pct }}" hint-placeholder-val=""><div style="position:relative; width:92px;"><input type="number" value="{{ f.pctValue }}" onInput="{{ f.onPct }}" class="num" style="width:100%; height:46px; padding:0 30px 0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none;" style-focus="border-color:#2f80ed; box-shadow:0 0 0 3px rgba(47,128,237,.16);"><span style="position:absolute; right:13px; top:50%; transform:translateY(-50%); color:#6f8aa3; font-size:14px;">%</span></div></sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+
+                <!-- term -->
+                <div>
+                  <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">Loan Term</label>
+                  <select value="{{ s.term }}" onChange="{{ onTerm }}" style="width:100%; height:46px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none; cursor:pointer;">
+                    <option value="30">30 Years</option><option value="20">20 Years</option><option value="15">15 Years</option><option value="10">10 Years</option>
+                  </select>
+                </div>
+                <!-- credit -->
+                <div>
+                  <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">Credit Score</label>
+                  <select value="{{ s.credit }}" onChange="{{ onCredit }}" style="width:100%; height:46px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none; cursor:pointer;">
+                    <option value="800">800–850 · Exceptional</option><option value="760">760–799 · Excellent</option><option value="740">740–759 · Very Good</option><option value="700">700–739 · Good</option><option value="660">660–699 · Fair</option><option value="620">620–659 · Poor</option><option value="580">580–619 · Very Poor</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="height:1px; background:rgba(140,165,195,.1); margin:24px 0 20px;"></div>
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div style="font-size:12px; font-weight:700; letter-spacing:.7px; color:#6f8aa3;">RATE BUYDOWN &amp; CREDITS</div>
+                <span style="font-size:11.5px; color:#5f788f; background:rgba(140,165,195,.08); padding:3px 9px; border-radius:20px;">optional</span>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-top:16px;">
+                <sc-for list="{{ creditFields }}" as="f" hint-placeholder-count="3">
+                  <div>
+                    <label style="display:block; font-size:12.5px; font-weight:600; color:#9db4cb; margin-bottom:7px;">{{ f.label }}</label>
+                    <div style="position:relative;"><span style="position:absolute; left:13px; top:50%; transform:translateY(-50%); color:#6f8aa3; font-size:13.5px;">$</span><input type="number" value="{{ f.value }}" onInput="{{ f.onInput }}" class="num" style="width:100%; height:44px; padding:0 12px 0 26px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:14.5px; outline:none;" style-focus="border-color:#2f80ed;"></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <!-- RIGHT: results -->
+            <div style="position:sticky; top:20px; display:flex; flex-direction:column; gap:16px;">
+              <div style="background:linear-gradient(160deg,#0e2740,#0c1d30); border:1px solid rgba(45,212,191,.22); border-radius:16px; padding:24px; overflow:hidden; position:relative;">
+                <div style="position:absolute; top:-40px; right:-40px; width:140px; height:140px; background:radial-gradient(circle,rgba(45,212,191,.18),transparent 70%);"></div>
+                <div style="font-size:12.5px; color:#8fb8c9; font-weight:600; letter-spacing:.3px;">{{ r.typeLabel }} · Estimated Monthly Payment</div>
+                <div class="num" style="font-size:46px; font-weight:600; letter-spacing:-1.5px; margin:8px 0 2px; color:#fff;">{{ r.totalMonthly }}</div>
+                <div style="font-size:13px; color:#8ba0b6;">{{ r.subline }}</div>
+                <div style="display:flex; flex-direction:column; gap:1px; margin-top:20px;">
+                  <sc-for list="{{ r.rows }}" as="row" hint-placeholder-count="5">
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(140,165,195,.08);">
+                      <span style="font-size:13.5px; color:#9db4cb;">{{ row.label }}</span>
+                      <span class="num" style="font-size:14.5px; font-weight:500; color:{{ row.color }};">{{ row.value }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="background:#0c1b2c; border:1px solid rgba(140,165,195,.1); border-radius:16px; padding:20px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                  <span style="font-size:13px; font-weight:700; color:#cdddec;">Cash to Close</span>
+                  <span class="num" style="font-size:18px; font-weight:600; color:#2dd4bf;">{{ r.cashToClose }}</span>
+                </div>
+                <sc-for list="{{ r.closeRows }}" as="row" hint-placeholder-count="3">
+                  <div style="display:flex; align-items:center; justify-content:space-between; padding:7px 0; font-size:13px;">
+                    <span style="color:#8ba0b6;">{{ row.label }}</span><span class="num" style="color:#cdddec;">{{ row.value }}</span>
+                  </div>
+                </sc-for>
+                <div style="margin-top:14px; padding:11px 13px; background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.2); border-radius:10px; font-size:11.5px; color:#d9b777; line-height:1.5;">MIP/PMI, APR &amp; total-interest figures are placeholder estimates — wire exact formulas in Claude Code.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isHecm }}" hint-placeholder-val="">
+        <div style="animation:lp-fade .35s ease;">
+          <div style="margin-bottom:26px;">
+            <div style="display:inline-flex; align-items:center; gap:8px; padding:5px 12px; background:rgba(45,212,191,.1); border:1px solid rgba(45,212,191,.22); border-radius:20px; font-size:12px; font-weight:600; color:#2dd4bf; margin-bottom:14px;">Reverse Mortgage · HECM</div>
+            <h1 style="font-family:'Space Grotesk'; font-size:27px; font-weight:600; margin:0; letter-spacing:-.6px;">HECM Calculator</h1>
+            <p style="margin:6px 0 0; color:#8ba0b6; font-size:14px;">Estimate principal limit and payout options for borrowers 62+.</p>
+          </div>
+          <div style="display:grid; grid-template-columns:1.35fr 1fr; gap:24px; align-items:start;">
+            <div style="background:#0c1b2c; border:1px solid rgba(140,165,195,.1); border-radius:16px; padding:24px;">
+              <div style="font-size:12px; font-weight:700; letter-spacing:.7px; color:#6f8aa3; margin-bottom:16px;">BORROWER &amp; PROPERTY</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px 18px;">
+                <sc-for list="{{ hecmFields }}" as="f" hint-placeholder-count="4">
+                  <div>
+                    <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">{{ f.label }}</label>
+                    <div style="position:relative;">
+                      <sc-if value="{{ f.prefix }}" hint-placeholder-val=""><span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#6f8aa3; font-size:14px;">{{ f.prefix }}</span></sc-if>
+                      <input type="number" value="{{ f.value }}" onInput="{{ f.onInput }}" class="num" style="{{ f.inputStyle }}" style-focus="border-color:#2f80ed; box-shadow:0 0 0 3px rgba(47,128,237,.16);">
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="height:1px; background:rgba(140,165,195,.1); margin:24px 0 20px;"></div>
+              <div style="font-size:12px; font-weight:700; letter-spacing:.7px; color:#6f8aa3; margin-bottom:14px;">PAYOUT OPTION</div>
+              <div style="display:flex; gap:9px; flex-wrap:wrap;">
+                <sc-for list="{{ payoutTabs }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for>
+              </div>
+            </div>
+            <div style="position:sticky; top:20px; display:flex; flex-direction:column; gap:16px;">
+              <div style="background:linear-gradient(160deg,#0e2740,#0c1d30); border:1px solid rgba(45,212,191,.22); border-radius:16px; padding:24px;">
+                <div style="font-size:12.5px; color:#8fb8c9; font-weight:600;">Available to Borrower (est.)</div>
+                <div class="num" style="font-size:42px; font-weight:600; letter-spacing:-1.5px; margin:8px 0 2px; color:#fff;">{{ hecmR.available }}</div>
+                <div style="font-size:13px; color:#8ba0b6;">{{ hecmR.sub }}</div>
+                <div style="display:flex; flex-direction:column; gap:1px; margin-top:20px;">
+                  <sc-for list="{{ hecmR.rows }}" as="row" hint-placeholder-count="4">
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(140,165,195,.08);">
+                      <span style="font-size:13.5px; color:#9db4cb;">{{ row.label }}</span>
+                      <span class="num" style="font-size:14.5px; font-weight:500; color:{{ row.color }};">{{ row.value }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="margin-top:16px; padding:11px 13px; background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.2); border-radius:10px; font-size:11.5px; color:#d9b777; line-height:1.5;">Principal-limit factors are simplified estimates — wire HUD PLF tables in Claude Code.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ isPreApproval }}" hint-placeholder-val="">
+        <div style="animation:lp-fade .35s ease;">
+          <div style="margin-bottom:24px;">
+            <div style="display:inline-flex; align-items:center; gap:8px; padding:5px 12px; background:rgba(47,128,237,.12); border:1px solid rgba(47,128,237,.25); border-radius:20px; font-size:12px; font-weight:600; color:#5fa8f5; margin-bottom:14px;">Generator</div>
+            <h1 style="font-family:'Space Grotesk'; font-size:27px; font-weight:600; margin:0; letter-spacing:-.6px;">Pre-Approval Letter</h1>
+            <p style="margin:6px 0 0; color:#8ba0b6; font-size:14px;">Pull a borrower from your LOS or an existing scenario, then generate a branded letter.</p>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1.05fr; gap:24px; align-items:start;">
+            <div style="background:#0c1b2c; border:1px solid rgba(140,165,195,.1); border-radius:16px; padding:24px;">
+              <div style="font-size:12px; font-weight:700; letter-spacing:.7px; color:#6f8aa3; margin-bottom:12px;">DATA SOURCE</div>
+              <div style="display:inline-flex; background:#091523; border:1px solid #1c2f45; border-radius:11px; padding:4px; margin-bottom:22px;">
+                <sc-for list="{{ pa.sourceTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for>
+              </div>
+
+              <sc-if value="{{ pa.isScenario }}" hint-placeholder-val="">
+              <div style="margin-bottom:22px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">Choose a saved scenario</label>
+                <select value="{{ pa.scenarioIdx }}" onChange="{{ pa.onScenario }}" style="width:100%; height:46px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none; cursor:pointer;">
+                  <sc-for list="{{ pa.scenarioOptions }}" as="o" hint-placeholder-count="1"><option value="{{ o.value }}">{{ o.label }}</option></sc-for>
+                </select>
+                <div style="margin-top:10px; font-size:12.5px; color:#7d96ae;">Loan details are pulled live from the selected scenario.</div>
+              </div>
+              </sc-if>
+
+              <sc-if value="{{ pa.isLos }}" hint-placeholder-val="">
+              <div style="margin-bottom:22px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">LOS provider</label>
+                <select value="{{ pa.losProvider }}" onChange="{{ pa.onProvider }}" style="width:100%; height:46px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none; cursor:pointer; margin-bottom:14px;">
+                  <option value="arive">Arive</option><option value="encompass">ICE / Encompass</option><option value="calyx">Calyx Point</option><option value="byte">BytePro</option>
+                </select>
+                <sc-if value="{{ pa.losDisconnected }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:18px; background:#091523; border:1px dashed #2f4663; border-radius:12px; text-align:center;">
+                  <div style="font-size:13.5px; color:#9db4cb; margin-bottom:12px;">Connect to pull borrowers directly from your pipeline.</div>
+                  <button onClick="{{ pa.connectLos }}" style="height:42px; padding:0 20px; border:none; background:linear-gradient(135deg,#2f80ed,#2dd4bf); color:#07111d; border-radius:10px; font-size:13.5px; font-weight:700; cursor:pointer;">Connect to LOS</button>
+                </div>
+                </sc-if>
+                <sc-if value="{{ pa.losConnected }}" hint-placeholder-val="">
+                <div>
+                  <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:rgba(52,211,153,.1); border:1px solid rgba(52,211,153,.25); border-radius:10px; margin-bottom:12px;">
+                    <span style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:#34d399;"><span style="width:8px; height:8px; border-radius:50%; background:#34d399;"></span>Connected</span>
+                    <button onClick="{{ pa.disconnectLos }}" style="background:none; border:none; color:#8ba0b6; font-size:12.5px; cursor:pointer; text-decoration:underline;">Disconnect</button>
+                  </div>
+                  <input value="{{ pa.losQuery }}" onInput="{{ pa.onLosQuery }}" placeholder="Search borrower by name or loan #" style="width:100%; height:44px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:14px; outline:none; margin-bottom:12px;">
+                  <div style="display:flex; flex-direction:column; gap:8px;">
+                    <sc-for list="{{ pa.losResults }}" as="b" hint-placeholder-count="2">
+                      <div style="display:flex; align-items:center; justify-content:space-between; padding:11px 14px; background:#0e2032; border:1px solid #21364d; border-radius:10px;">
+                        <div><div style="font-size:13.5px; font-weight:600; color:#e9f1fa;">{{ b.name }}</div><div style="font-size:12px; color:#8ba0b6;">{{ b.meta }}</div></div>
+                        <button onClick="{{ b.onUse }}" style="height:32px; padding:0 14px; border:1px solid #2f80ed; background:rgba(47,128,237,.12); color:#5fa8f5; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer;">Use</button>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                </sc-if>
+              </div>
+              </sc-if>
+
+              <div style="height:1px; background:rgba(140,165,195,.1); margin:0 0 20px;"></div>
+              <div style="display:flex; flex-direction:column; gap:16px;">
+                <div>
+                  <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">Borrower Name(s)</label>
+                  <input value="{{ pa.borrowerName }}" onInput="{{ pa.onBorrower }}" placeholder="Michael &amp; Laura Thompson" style="width:100%; height:46px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none;">
+                </div>
+                <div>
+                  <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">Property Address (optional)</label>
+                  <input value="{{ pa.propertyAddress }}" onInput="{{ pa.onAddress }}" placeholder="123 Main St, City, ST 12345" style="width:100%; height:46px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none;">
+                </div>
+                <div>
+                  <label style="display:block; font-size:13px; font-weight:600; color:#aebfd1; margin-bottom:8px;">Letter Valid For</label>
+                  <select value="{{ pa.expDays }}" onChange="{{ pa.onExp }}" style="width:100%; height:46px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none; cursor:pointer;">
+                    <option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex; gap:10px; margin-top:22px;">
+                <button style="flex:1; height:46px; border:none; background:linear-gradient(135deg,#2f80ed,#2dd4bf); color:#07111d; border-radius:11px; font-size:14px; font-weight:700; cursor:pointer;">Download PDF</button>
+                <button style="height:46px; padding:0 18px; border:1px solid #21364d; background:#0e2032; color:#cdddec; border-radius:11px; font-size:14px; font-weight:600; cursor:pointer;">Email</button>
+              </div>
+              <div style="margin-top:14px; padding:11px 13px; background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.2); border-radius:10px; font-size:11.5px; color:#d9b777; line-height:1.5;">LOS integration &amp; PDF export are stubbed — wire your provider's API and a PDF service in Claude Code.</div>
+            </div>
+
+            <div style="position:sticky; top:20px;">
+              <div style="background:#eef1f5; border-radius:16px; padding:6px; box-shadow:0 20px 50px rgba(0,0,0,.35);">
+                <div style="background:#fff; border-radius:11px; padding:38px 36px; color:#1b2733; min-height:540px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid #0c2238; padding-bottom:18px; margin-bottom:22px;">
+                    <div>
+                      <div style="font-family:'Space Grotesk'; font-size:20px; font-weight:700; color:#0c2238;">ABC Mortgage</div>
+                      <div style="font-size:11.5px; color:#5b6b7b; margin-top:3px;">123 Main Street, Suite 100 · New York, NY 10001</div>
+                      <div style="font-size:11.5px; color:#5b6b7b;">(800) 555-1234 · NMLS #123456</div>
+                    </div>
+                    <div style="width:46px; height:46px; border-radius:11px; background:linear-gradient(135deg,#2f80ed,#2dd4bf); display:flex; align-items:center; justify-content:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h3l2 5 4-12 2 7h4"/></svg></div>
+                  </div>
+                  <div style="font-size:12.5px; color:#5b6b7b; margin-bottom:18px;">{{ pa.letter.today }}</div>
+                  <div style="font-size:18px; font-weight:700; color:#0c2238; margin-bottom:14px;">Pre-Approval Letter</div>
+                  <p style="margin:0 0 13px; font-size:13.5px; color:#1b2733; line-height:1.7;">Dear {{ pa.letter.borrower }},</p>
+                  <p style="margin:0 0 16px; font-size:13.5px; color:#1b2733; line-height:1.7;">Congratulations! Based on a review of your credit, income, and assets, you have been <strong>pre-approved</strong> for a {{ pa.letter.type }} mortgage loan under the following terms:</p>
+                  <div style="background:#f4f6f9; border-radius:10px; padding:16px 20px; margin:0 0 18px;">
+                    <sc-for list="{{ pa.letterRows }}" as="row" hint-placeholder-count="5">
+                      <div style="display:flex; justify-content:space-between; padding:7px 0; font-size:13px; border-bottom:1px solid #e3e8ee;"><span style="color:#5b6b7b;">{{ row.label }}</span><span class="num" style="font-weight:600; color:#0c2238;">{{ row.value }}</span></div>
+                    </sc-for>
+                  </div>
+                  <p style="margin:0 0 16px; font-size:13.5px; color:#1b2733; line-height:1.7;">This pre-approval is valid through <strong>{{ pa.letter.expDate }}</strong> and is subject to property appraisal, title review, and final underwriting verification.</p>
+                  <p style="margin:0 0 4px; font-size:13.5px; color:#1b2733;">Sincerely,</p>
+                  <div style="font-family:'Space Grotesk'; font-size:17px; color:#0c2238; font-style:italic; margin-top:4px;">John Smith</div>
+                  <div style="font-size:12px; color:#5b6b7b;">Loan Officer · NMLS #123456 · ABC Mortgage</div>
+                  <div style="margin-top:18px; padding-top:14px; border-top:1px solid #e3e8ee; font-size:10px; color:#9aa7b4; line-height:1.5;">Equal Housing Lender. This is not a commitment to lend. All loans are subject to credit approval, verification of information, and satisfactory appraisal.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isTools }}" hint-placeholder-val="">
+        <div style="animation:lp-fade .35s ease;">
+          <div style="margin-bottom:26px;">
+            <h1 style="font-family:'Space Grotesk'; font-size:27px; font-weight:600; margin:0; letter-spacing:-.6px;">Tools</h1>
+            <p style="margin:6px 0 0; color:#8ba0b6; font-size:14px;">Quick calculators to round out your borrower conversation.</p>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+            <sc-for list="{{ toolsList }}" as="t" hint-placeholder-count="6">
+              <div style="background:#0c1b2c; border:1px solid rgba(140,165,195,.1); border-radius:14px; padding:22px; cursor:pointer; transition:border-color .15s, transform .15s;" style-hover="border-color:rgba(45,212,191,.4); transform:translateY(-2px);">
+                <div style="width:42px; height:42px; border-radius:11px; background:{{ t.bg }}; display:flex; align-items:center; justify-content:center; margin-bottom:16px; color:{{ t.fg }};">{{ t.iconEl }}</div>
+                <div style="font-size:15.5px; font-weight:600; color:#e9f1fa; margin-bottom:6px;">{{ t.title }}</div>
+                <div style="font-size:13px; color:#8ba0b6; line-height:1.5;">{{ t.desc }}</div>
+                <div style="display:inline-flex; align-items:center; gap:5px; margin-top:14px; font-size:13px; font-weight:600; color:#2dd4bf;">Open <span style="font-size:15px;">→</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ isHelp }}" hint-placeholder-val="">
+        <div style="animation:lp-fade .35s ease; max-width:760px;">
+          <div style="margin-bottom:22px;">
+            <h1 style="font-family:'Space Grotesk'; font-size:27px; font-weight:600; margin:0; letter-spacing:-.6px;">Help Center</h1>
+            <p style="margin:6px 0 0; color:#8ba0b6; font-size:14px;">Guides, FAQs, and support for LoanDr.</p>
+          </div>
+          <input placeholder="Search help articles…" style="width:100%; height:48px; padding:0 16px; margin-bottom:26px; background:#0c1b2c; border:1px solid #21364d; border-radius:11px; color:#e9f1fa; font-size:15px; outline:none;" style-focus="border-color:#2f80ed;">
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <sc-for list="{{ faqs }}" as="f" hint-placeholder-count="5">
+              <div style="background:#0c1b2c; border:1px solid rgba(140,165,195,.1); border-radius:12px; overflow:hidden;">
+                <button onClick="{{ f.toggle }}" style="width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px; background:none; border:none; color:#e9f1fa; font-size:14.5px; font-weight:600; cursor:pointer; text-align:left;">{{ f.q }}<span style="color:#2dd4bf; font-size:18px; flex-shrink:0;">{{ f.sign }}</span></button>
+                <sc-if value="{{ f.open }}" hint-placeholder-val=""><div style="padding:0 18px 18px; font-size:13.5px; color:#9db4cb; line-height:1.6;">{{ f.a }}</div></sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <div style="margin-top:24px; background:linear-gradient(160deg,#0e2740,#0c1d30); border:1px solid rgba(45,212,191,.2); border-radius:14px; padding:22px; display:flex; align-items:center; justify-content:space-between; gap:20px;">
+            <div><div style="font-size:16px; font-weight:600; color:#fff;">Still need help?</div><div style="font-size:13.5px; color:#8ba0b6; margin-top:4px;">Reach our support team — we usually reply within a business day.</div></div>
+            <button style="height:44px; padding:0 22px; border:none; background:linear-gradient(135deg,#2f80ed,#2dd4bf); color:#07111d; border-radius:11px; font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap;">Contact Support</button>
+          </div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ isAdmin }}" hint-placeholder-val="">
+        <div style="animation:lp-fade .35s ease;">
+          <div style="margin-bottom:24px;">
+            <h1 style="font-family:'Space Grotesk'; font-size:27px; font-weight:600; margin:0; letter-spacing:-.6px;">Admin Dashboard</h1>
+            <p style="margin:6px 0 0; color:#8ba0b6; font-size:14px;">Monitor usage, manage accounts, and review collected data.</p>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px;">
+            <sc-for list="{{ adminStats }}" as="st" hint-placeholder-count="4">
+              <div style="background:#0c1b2c; border:1px solid rgba(140,165,195,.1); border-radius:14px; padding:20px;">
+                <div style="font-size:12.5px; color:#8ba0b6; font-weight:600;">{{ st.label }}</div>
+                <div class="num" style="font-size:30px; font-weight:600; color:#fff; margin:8px 0 4px; letter-spacing:-.5px;">{{ st.value }}</div>
+                <div style="font-size:12px; font-weight:600; color:{{ st.deltaColor }};">{{ st.delta }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="background:#0c1b2c; border:1px solid rgba(140,165,195,.1); border-radius:16px; overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid rgba(140,165,195,.1);">
+              <span style="font-size:15px; font-weight:600;">Users</span>
+              <input placeholder="Search users…" style="height:36px; width:220px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:9px; color:#e9f1fa; font-size:13px; outline:none;">
+            </div>
+            <div style="display:grid; grid-template-columns:1.6fr 2fr 1.2fr 1fr 0.9fr; padding:12px 22px; font-size:11.5px; font-weight:700; letter-spacing:.5px; color:#6f8aa3; border-bottom:1px solid rgba(140,165,195,.08);">
+              <span>NAME</span><span>EMAIL</span><span>COMPANY</span><span>SCENARIOS</span><span>STATUS</span>
+            </div>
+            <sc-for list="{{ adminUsers }}" as="u" hint-placeholder-count="5">
+              <div style="display:grid; grid-template-columns:1.6fr 2fr 1.2fr 1fr 0.9fr; align-items:center; padding:14px 22px; border-bottom:1px solid rgba(140,165,195,.06); font-size:13.5px;">
+                <span style="display:flex; align-items:center; gap:10px; color:#e9f1fa; font-weight:600;"><span style="width:30px; height:30px; border-radius:8px; background:{{ u.avBg }}; display:flex; align-items:center; justify-content:center; font-size:12px; color:#07111d; font-weight:700;">{{ u.initials }}</span>{{ u.name }}</span>
+                <span style="color:#9db4cb;">{{ u.email }}</span>
+                <span style="color:#9db4cb;">{{ u.company }}</span>
+                <span class="num" style="color:#cdddec;">{{ u.scenarios }}</span>
+                <span><span style="padding:4px 11px; border-radius:20px; font-size:11.5px; font-weight:600; background:{{ u.statusBg }}; color:{{ u.statusFg }};">{{ u.status }}</span></span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+    </main>
+
+    <!-- Settings slide-over -->
+    <sc-if value="{{ settingsOpen }}" hint-placeholder-val="">
+    <div>
+      <div onClick="{{ closeSettings }}" style="position:fixed; inset:0; background:rgba(4,9,15,.6); backdrop-filter:blur(2px); z-index:40;"></div>
+      <div style="position:fixed; top:0; right:0; bottom:0; width:440px; max-width:92vw; background:#0a1726; border-left:1px solid rgba(140,165,195,.12); z-index:41; overflow-y:auto; animation:lp-fade .25s ease; box-shadow:-20px 0 60px rgba(0,0,0,.4);">
+        <div style="position:sticky; top:0; background:#0a1726; display:flex; align-items:center; justify-content:space-between; padding:22px 24px; border-bottom:1px solid rgba(140,165,195,.1); z-index:1;">
+          <h2 style="font-family:'Space Grotesk'; font-size:20px; font-weight:600; margin:0;">Settings</h2>
+          <button onClick="{{ closeSettings }}" style="width:34px; height:34px; border:none; background:rgba(140,165,195,.08); color:#9db4cb; border-radius:9px; font-size:20px; cursor:pointer;" style-hover="background:rgba(248,113,113,.12); color:#f87171;">×</button>
+        </div>
+        <div style="padding:24px;">
+          <div style="display:flex; gap:14px; align-items:center; padding:14px 16px; background:#0e2032; border:1px solid rgba(140,165,195,.1); border-radius:12px; margin-bottom:22px;">
+            <div style="width:44px; height:44px; border-radius:11px; background:linear-gradient(135deg,#2f80ed,#2dd4bf); display:flex; align-items:center; justify-content:center; font-weight:700; color:#07111d; font-size:16px;">JS</div>
+            <div><div style="font-weight:600; font-size:14.5px;">John Smith</div><div style="font-size:12.5px; color:#8ba0b6;">NMLS #123456 · ABC Mortgage</div></div>
+          </div>
+          <sc-for list="{{ settingsSections }}" as="sec" hint-placeholder-count="3">
+            <div style="margin-bottom:24px;">
+              <div style="font-size:14px; font-weight:700; color:#e9f1fa; margin-bottom:4px;">{{ sec.title }}</div>
+              <div style="font-size:12.5px; color:#8ba0b6; margin-bottom:14px;">{{ sec.note }}</div>
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                <sc-for list="{{ sec.fields }}" as="fld" hint-placeholder-count="3">
+                  <div>
+                    <label style="display:block; font-size:12.5px; font-weight:600; color:#9db4cb; margin-bottom:6px;">{{ fld.label }}</label>
+                    <input placeholder="{{ fld.ph }}" style="width:100%; height:42px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:14px; outline:none;" style-focus="border-color:#2f80ed;">
+                  </div>
+                </sc-for>
+              </div>
+              <button style="margin-top:14px; height:40px; padding:0 18px; border:none; background:linear-gradient(135deg,#2f80ed,#2dd4bf); color:#07111d; border-radius:10px; font-size:13.5px; font-weight:700; cursor:pointer;">{{ sec.cta }}</button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:860}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'login',
+    authed: false,
+    settingsOpen: false,
+    loginEmail: '',
+    loginPass: '',
+    active: 0,
+    scenarios: [ Component.blank('Scenario 1') ],
+    hecm: { age: 62, value: 500000, mortgage: 0, payout: 'lump', rate: 6.5 },
+    openFaq: -1,
+    preApproval: { source: 'scenario', scenarioIdx: 0, losProvider: 'arive', losConnected: false, losQuery: '', borrowerName: 'Michael & Laura Thompson', propertyAddress: '', expDays: 90 }
+  };
+
+  static blank(name) {
+    return { name, transaction: 'purchase', borrowers: '1', loanType: 'conventional', program: 'standard',
+      homePrice: 300000, downPayment: 30000, downPct: 10, rate: 6.5, term: '30', credit: '700',
+      lenderCredit: 0, sellerCredit: 0, otherCredits: 0 };
+  }
+
+  fmt(n) { return '$' + Math.round(n || 0).toLocaleString('en-US'); }
+  fmt2(n) { return '$' + (Math.round((n || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  cur() { return this.state.scenarios[this.state.active]; }
+  patch(obj) {
+    this.setState(s => {
+      const sc = s.scenarios.slice();
+      sc[s.active] = { ...sc[s.active], ...obj };
+      return { scenarios: sc };
+    });
+  }
+
+  setField(field, raw) {
+    const v = raw === '' ? '' : parseFloat(raw);
+    const c = this.cur();
+    if (field === 'downPayment') {
+      const pct = c.homePrice > 0 ? (v / c.homePrice) * 100 : 0;
+      this.patch({ downPayment: v, downPct: Math.round(pct * 100) / 100 });
+    } else if (field === 'downPct') {
+      this.patch({ downPct: v, downPayment: Math.round((c.homePrice * (v || 0)) / 100) });
+    } else if (field === 'homePrice') {
+      this.patch({ homePrice: v, downPayment: Math.round((v * (c.downPct || 0)) / 100) });
+    } else {
+      this.patch({ [field]: v });
+    }
+  }
+
+  tab(active, kind) {
+    if (kind === 'scenario') {
+      return `padding:11px 18px; margin-bottom:-1px; border:none; background:none; font-size:14px; font-weight:600; cursor:pointer; border-bottom:2px solid ${active ? '#2dd4bf' : 'transparent'}; color:${active ? '#fff' : '#8ba0b6'};`;
+    }
+    if (kind === 'seg') {
+      return `padding:9px 18px; border:none; border-radius:8px; font-size:13.5px; font-weight:600; cursor:pointer; background:${active ? 'linear-gradient(135deg,#2f80ed,#2dd4bf)' : 'transparent'}; color:${active ? '#07111d' : '#9db4cb'};`;
+    }
+    if (kind === 'seg-sm') {
+      return `width:38px; padding:8px 0; border:none; border-radius:7px; font-size:13.5px; font-weight:600; cursor:pointer; background:${active ? 'linear-gradient(135deg,#2f80ed,#2dd4bf)' : 'transparent'}; color:${active ? '#07111d' : '#9db4cb'};`;
+    }
+    if (kind === 'pill') {
+      return `padding:8px 15px; border:1px solid ${active ? 'transparent' : '#21364d'}; border-radius:9px; font-size:13px; font-weight:600; cursor:pointer; background:${active ? 'rgba(45,212,191,.14)' : '#091523'}; color:${active ? '#2dd4bf' : '#8ba0b6'};`;
+    }
+    if (kind === 'pill-sm') {
+      return `padding:7px 13px; border:1px solid ${active ? 'transparent' : '#1c2f45'}; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; background:${active ? 'rgba(47,128,237,.14)' : 'transparent'}; color:${active ? '#5fa8f5' : '#7d96ae'};`;
+    }
+  }
+
+  navStyle(active) {
+    return `display:flex; align-items:center; gap:12px; padding:10px 12px; border:none; border-radius:9px; font-size:14px; font-weight:${active ? '600' : '500'}; cursor:pointer; text-align:left; background:${active ? 'rgba(47,128,237,.14)' : 'none'}; color:${active ? '#5fb0f5' : '#9db4cb'};`;
+  }
+
+  inputStyle() {
+    return 'width:100%; height:46px; padding:0 14px 0 26px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none;';
+  }
+
+  results() {
+    const c = this.cur();
+    const loanAmt = Math.max(0, (c.homePrice || 0) - (c.downPayment || 0));
+    const r = (c.rate || 0) / 100 / 12;
+    const n = (parseInt(c.term) || 30) * 12;
+    const pi = r > 0 ? loanAmt * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1) : loanAmt / n;
+    const ltv = c.homePrice > 0 ? (loanAmt / c.homePrice) * 100 : 0;
+    const taxes = (c.homePrice || 0) * 0.0125 / 12;
+    const ins = (c.homePrice || 0) * 0.0035 / 12;
+    let mi = 0;
+    if (c.loanType === 'conventional' && ltv > 80) mi = loanAmt * 0.006 / 12;
+    if (c.loanType === 'fha') mi = loanAmt * 0.0055 / 12;
+    if (c.loanType === 'usda') mi = loanAmt * 0.0035 / 12;
+    const total = pi + taxes + ins + mi;
+    const labels = { conventional: 'Conventional', fha: 'FHA', va: 'VA', usda: 'USDA', arm: 'ARM' };
+    const closing = loanAmt * 0.03;
+    const credits = (c.lenderCredit || 0) + (c.sellerCredit || 0) + (c.otherCredits || 0);
+    const cashToClose = Math.max(0, (c.downPayment || 0) + closing - credits);
+    return {
+      typeLabel: labels[c.loanType] || 'Loan',
+      totalMonthly: this.fmt2(total),
+      subline: `${this.fmt(loanAmt)} loan · ${(c.rate || 0)}% · ${c.term} yr · ${Math.round(ltv)}% LTV`,
+      rows: [
+        { label: 'Principal & Interest', value: this.fmt2(pi), color: '#e9f1fa' },
+        { label: 'Property Taxes (est.)', value: this.fmt2(taxes), color: '#cdddec' },
+        { label: 'Homeowners Insurance (est.)', value: this.fmt2(ins), color: '#cdddec' },
+        { label: mi > 0 ? 'Mortgage Insurance (est.)' : 'Mortgage Insurance', value: mi > 0 ? this.fmt2(mi) : 'None', color: mi > 0 ? '#d9b777' : '#5f9e7a' }
+      ],
+      cashToClose: this.fmt(cashToClose),
+      closeRows: [
+        { label: 'Down Payment', value: this.fmt(c.downPayment || 0) },
+        { label: 'Est. Closing Costs (3%)', value: this.fmt(closing) },
+        { label: 'Credits Applied', value: '–' + this.fmt(credits) }
+      ]
+    };
+  }
+
+  hecmPatch(field, raw) {
+    const v = raw === '' ? '' : parseFloat(raw);
+    this.setState(s => ({ hecm: { ...s.hecm, [field]: v } }));
+  }
+  hecmResults() {
+    const hc = this.state.hecm;
+    const plf = Math.min(0.75, 0.40 + Math.max(0, (hc.age || 62) - 62) * 0.006);
+    const maxClaim = Math.min(hc.value || 0, 1149825);
+    const pl = maxClaim * plf;
+    const available = Math.max(0, pl - (hc.mortgage || 0));
+    return {
+      available: this.fmt(available),
+      sub: 'Age ' + (hc.age || 62) + ' · ' + (plf * 100).toFixed(1) + '% PLF · ' + this.payoutLabel(hc.payout),
+      rows: [
+        { label: 'Max Claim Amount', value: this.fmt(maxClaim), color: '#cdddec' },
+        { label: 'Principal Limit Factor', value: (plf * 100).toFixed(1) + '%', color: '#cdddec' },
+        { label: 'Gross Principal Limit', value: this.fmt(pl), color: '#e9f1fa' },
+        { label: 'Less Existing Mortgage', value: '\u2013' + this.fmt(hc.mortgage || 0), color: '#d9b777' }
+      ]
+    };
+  }
+  payoutLabel(k) { return { lump: 'Lump Sum', tenure: 'Tenure', line: 'Line of Credit' }[k] || 'Lump Sum'; }
+  icon(paths) {
+    return React.createElement('svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+      ...paths.map((p, i) => React.createElement('path', { key: i, d: p })));
+  }
+
+  renderVals() {
+    const st = this.state;
+    const c = this.cur();
+    const segActive = (cond) => cond;
+    const go = {};
+    ['compare', 'hecm', 'preapproval', 'tools', 'help', 'admin'].forEach(k => { go[k] = () => this.setState({ screen: k }); });
+    const nav = {};
+    ['compare', 'hecm', 'preapproval', 'tools', 'help', 'admin'].forEach(k => { nav[k] = this.navStyle(st.screen === k); });
+
+    const scenarioTabs = st.scenarios.map((sc, i) => ({
+      name: sc.name, style: this.tab(i === st.active, 'scenario'),
+      onClick: () => this.setState({ active: i })
+    }));
+
+    const txnTabs = [['purchase', 'Purchase'], ['refinance', 'Refinance']].map(([k, l]) => ({
+      label: l, style: this.tab(c.transaction === k, 'seg'), onClick: () => this.patch({ transaction: k })
+    }));
+    const borrowerTabs = [['1', '1'], ['2', '2']].map(([k, l]) => ({
+      label: l, style: this.tab(c.borrowers === k, 'seg-sm'), onClick: () => this.patch({ borrowers: k })
+    }));
+    const loanTypeTabs = [['conventional', 'Conventional'], ['fha', 'FHA'], ['va', 'VA'], ['usda', 'USDA'], ['arm', 'ARM']].map(([k, l]) => ({
+      label: l, style: this.tab(c.loanType === k, 'pill'), onClick: () => this.patch({ loanType: k })
+    }));
+    const programTabs = [['standard', 'Standard'], ['homeready', 'HomeReady'], ['homepossible', 'Home Possible'], ['firsttime', 'First-Time Buyer']].map(([k, l]) => ({
+      label: l, style: this.tab(c.program === k, 'pill-sm'), onClick: () => this.patch({ program: k })
+    }));
+
+    const numInput = 'width:100%; height:46px; padding:0 14px 0 26px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none;';
+    const loanFields = [
+      { label: c.transaction === 'refinance' ? 'Home Value' : 'Purchase Price', prefix: '$', suffix: '', value: c.homePrice, onInput: e => this.setField('homePrice', e.target.value), inputStyle: numInput, wrapStyle: '', pct: '' },
+      { label: 'Down Payment', prefix: '$', suffix: '', value: c.downPayment, onInput: e => this.setField('downPayment', e.target.value), inputStyle: numInput, wrapStyle: '', pct: 'yes', pctValue: c.downPct, onPct: e => this.setField('downPct', e.target.value) },
+      { label: 'Interest Rate', prefix: '', suffix: '%', value: c.rate, onInput: e => this.setField('rate', e.target.value), inputStyle: 'width:100%; height:46px; padding:0 34px 0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none;', wrapStyle: '', pct: '' },
+      { label: 'Loan Amount (auto)', prefix: '$', suffix: '', value: Math.max(0, (c.homePrice || 0) - (c.downPayment || 0)), onInput: () => {}, inputStyle: numInput + 'opacity:.7;', wrapStyle: '', pct: '' }
+    ];
+    const creditFields = [
+      { label: 'Lender Credit', value: c.lenderCredit, onInput: e => this.setField('lenderCredit', e.target.value) },
+      { label: 'Seller Credit', value: c.sellerCredit, onInput: e => this.setField('sellerCredit', e.target.value) },
+      { label: 'Other Credits', value: c.otherCredits, onInput: e => this.setField('otherCredits', e.target.value) }
+    ];
+
+    const settingsSections = [
+      { title: 'My Account', note: 'Your info for documents and contact details.', cta: 'Save Loan Officer Info',
+        fields: [{ label: 'Your Name', ph: 'John Smith' }, { label: 'Company', ph: 'ABC Mortgage' }, { label: 'Phone', ph: '(555) 123-4567' }, { label: 'NMLS #', ph: '123456' }] },
+      { title: 'Lender Information', note: "Your institution's details for branding.", cta: 'Save Lender Info',
+        fields: [{ label: 'Lender Name', ph: 'First National Bank' }, { label: 'Lender NMLS #', ph: '123456' }, { label: 'Website', ph: 'www.example.com' }] },
+      { title: 'Dual Branding', note: 'Add a real-estate agent to generated documents.', cta: 'Save Agent Info',
+        fields: [{ label: 'Agent Name', ph: 'Jane Doe' }, { label: 'Brokerage', ph: 'ABC Realty' }, { label: 'Phone', ph: '(555) 987-6543' }] }
+    ];
+
+    const hc = st.hecm;
+    const hcNum = 'width:100%; height:46px; padding:0 14px 0 26px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none;';
+    const hcPlain = 'width:100%; height:46px; padding:0 14px; background:#091523; border:1px solid #21364d; border-radius:10px; color:#e9f1fa; font-size:15px; outline:none;';
+    const hecmFields = [
+      { label: 'Youngest Borrower Age', prefix: '', value: hc.age, onInput: e => this.hecmPatch('age', e.target.value), inputStyle: hcPlain },
+      { label: 'Home Value', prefix: '$', value: hc.value, onInput: e => this.hecmPatch('value', e.target.value), inputStyle: hcNum },
+      { label: 'Existing Mortgage Balance', prefix: '$', value: hc.mortgage, onInput: e => this.hecmPatch('mortgage', e.target.value), inputStyle: hcNum },
+      { label: 'Expected Rate (%)', prefix: '', value: hc.rate, onInput: e => this.hecmPatch('rate', e.target.value), inputStyle: hcPlain }
+    ];
+    const payoutTabs = [['lump', 'Lump Sum'], ['tenure', 'Tenure'], ['line', 'Line of Credit']].map(([k, l]) => ({ label: l, style: this.tab(hc.payout === k, 'pill'), onClick: () => this.setState(s => ({ hecm: { ...s.hecm, payout: k } })) }));
+
+    const toolsList = [
+      { title: 'Affordability', desc: 'How much home a borrower can afford by income and DTI.', bg: 'rgba(47,128,237,.14)', fg: '#5fa8f5', iconEl: this.icon(['M3 21h18', 'M5 21V8l7-5 7 5v13', 'M9 21v-6h6v6']) },
+      { title: 'Rent vs. Buy', desc: 'Break-even timeline comparing renting to owning.', bg: 'rgba(45,212,191,.14)', fg: '#2dd4bf', iconEl: this.icon(['M3 12l9-9 9 9', 'M5 10v10h14V10']) },
+      { title: 'Amortization', desc: 'Full payment schedule with principal and interest split.', bg: 'rgba(167,139,250,.14)', fg: '#a78bfa', iconEl: this.icon(['M3 3v18h18', 'M7 14l3-3 3 3 5-6']) },
+      { title: 'DTI Calculator', desc: 'Front- and back-end debt-to-income ratios.', bg: 'rgba(251,191,36,.14)', fg: '#fbbf24', iconEl: this.icon(['M12 2v20', 'M2 12h20']) },
+      { title: 'Refi Break-Even', desc: 'Months to recoup closing costs on a refinance.', bg: 'rgba(52,211,153,.14)', fg: '#34d399', iconEl: this.icon(['M21 12a9 9 0 1 1-3-6.7', 'M21 3v6h-6']) },
+      { title: 'Extra Payment', desc: 'Interest saved and payoff time with extra principal.', bg: 'rgba(248,113,113,.14)', fg: '#f87171', iconEl: this.icon(['M12 1v22', 'M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6']) }
+    ];
+
+    const faqData = [
+      ['How do I add another scenario?', 'Click the + button next to the scenario tabs. You can compare up to six scenarios at once.'],
+      ['Can I switch a loan to a refinance?', 'Yes \u2014 use the Purchase / Refinance toggle at the top of the loan form. The relevant fields update automatically.'],
+      ['How is mortgage insurance calculated?', 'LoanDr. estimates PMI/MIP from loan type and LTV. Exact lender factors can be wired up for your backend.'],
+      ['Where do I set my branding?', 'Open Settings from the sidebar to add loan-officer, lender, and dual-branding details used on documents.'],
+      ['Can I generate a pre-approval letter?', 'Yes \u2014 open Pre-Approval, pull a borrower from your LOS or an existing scenario, and generate a branded letter.']
+    ];
+    const faqs = faqData.map((f, i) => ({ q: f[0], a: f[1], open: st.openFaq === i, sign: st.openFaq === i ? '\u2013' : '+', toggle: () => this.setState(s => ({ openFaq: s.openFaq === i ? -1 : i })) }));
+
+    const adminStats = [
+      { label: 'Total Users', value: '1,284', delta: '+38 this week', deltaColor: '#34d399' },
+      { label: 'Scenarios Saved', value: '7,932', delta: '+412 this week', deltaColor: '#34d399' },
+      { label: 'Active Today', value: '196', delta: '+12% vs. last week', deltaColor: '#34d399' },
+      { label: 'Pre-Approvals', value: '543', delta: '+27 this week', deltaColor: '#34d399' }
+    ];
+    const auData = [
+      ['Sarah Chen', 'sarah.chen@summitlend.com', 'Summit Lending', 42, 'Active'],
+      ['Marcus Webb', 'm.webb@bayfinance.com', 'Bay Finance', 18, 'Active'],
+      ['Elena Ruiz', 'elena@homefirstmtg.com', 'HomeFirst Mortgage', 7, 'Trial'],
+      ['David Okafor', 'd.okafor@apexloans.com', 'Apex Loans', 63, 'Active'],
+      ['Priya Patel', 'priya.patel@northstarfg.com', 'Northstar Funding', 29, 'Inactive']
+    ];
+    const avPal = ['linear-gradient(135deg,#2f80ed,#2dd4bf)', 'linear-gradient(135deg,#a78bfa,#f0abfc)', 'linear-gradient(135deg,#fbbf24,#fb923c)', 'linear-gradient(135deg,#34d399,#2dd4bf)', 'linear-gradient(135deg,#f87171,#fbbf24)'];
+    const stMap = { Active: ['rgba(52,211,153,.16)', '#34d399'], Trial: ['rgba(251,191,36,.16)', '#fbbf24'], Inactive: ['rgba(140,165,195,.14)', '#8ba0b6'] };
+    const adminUsers = auData.map((u, i) => ({ name: u[0], email: u[1], company: u[2], scenarios: u[3], status: u[4], initials: u[0].split(' ').map(x => x[0]).join(''), avBg: avPal[i % avPal.length], statusBg: stMap[u[4]][0], statusFg: stMap[u[4]][1] }));
+
+    const pap = st.preApproval;
+    const paSrc = st.scenarios[Math.min(pap.scenarioIdx, st.scenarios.length - 1)] || st.scenarios[0];
+    const paLoan = Math.max(0, (paSrc.homePrice || 0) - (paSrc.downPayment || 0));
+    const expDate = new Date(Date.now() + (parseInt(pap.expDays) || 90) * 86400000);
+    const typeLabels = { conventional: 'Conventional', fha: 'FHA', va: 'VA', usda: 'USDA', arm: 'ARM' };
+    const pa = {
+      sourceTabs: [['scenario', 'From a Scenario'], ['los', 'From your LOS']].map(([k, l]) => ({ label: l, style: this.tab(pap.source === k, 'seg'), onClick: () => this.setState(s => ({ preApproval: { ...s.preApproval, source: k } })) })),
+      isScenario: pap.source === 'scenario',
+      isLos: pap.source === 'los',
+      scenarioOptions: st.scenarios.map((s, i) => ({ label: (s.name || ('Scenario ' + (i + 1))) + ' \u00b7 ' + this.fmt(Math.max(0, (s.homePrice || 0) - (s.downPayment || 0))), value: i })),
+      scenarioIdx: pap.scenarioIdx,
+      onScenario: e => this.setState(s => ({ preApproval: { ...s.preApproval, scenarioIdx: parseInt(e.target.value) } })),
+      losProvider: pap.losProvider,
+      losConnected: pap.losConnected,
+      losQuery: pap.losQuery,
+      onProvider: e => this.setState(s => ({ preApproval: { ...s.preApproval, losProvider: e.target.value } })),
+      onLosQuery: e => this.setState(s => ({ preApproval: { ...s.preApproval, losQuery: e.target.value } })),
+      connectLos: () => this.setState(s => ({ preApproval: { ...s.preApproval, losConnected: true } })),
+      disconnectLos: () => this.setState(s => ({ preApproval: { ...s.preApproval, losConnected: false } })),
+      borrowerName: pap.borrowerName,
+      onBorrower: e => this.setState(s => ({ preApproval: { ...s.preApproval, borrowerName: e.target.value } })),
+      propertyAddress: pap.propertyAddress,
+      onAddress: e => this.setState(s => ({ preApproval: { ...s.preApproval, propertyAddress: e.target.value } })),
+      expDays: pap.expDays,
+      onExp: e => this.setState(s => ({ preApproval: { ...s.preApproval, expDays: e.target.value } })),
+      losDisconnected: !pap.losConnected,
+      losResults: [
+        { name: 'Michael & Laura Thompson', meta: 'Loan #LN-20471 \u00b7 $425,000', onUse: () => this.setState(s => ({ preApproval: { ...s.preApproval, borrowerName: 'Michael & Laura Thompson', propertyAddress: '48 Birchwood Ln, Madison, WI 53703' } })) },
+        { name: 'Aisha Bennett', meta: 'Loan #LN-20493 \u00b7 $310,000', onUse: () => this.setState(s => ({ preApproval: { ...s.preApproval, borrowerName: 'Aisha Bennett', propertyAddress: '210 Cedar St, Austin, TX 78702' } })) }
+      ],
+      letterRows: [
+        { label: 'Loan Type', value: typeLabels[paSrc.loanType] || 'Conventional' },
+        { label: 'Purchase Price', value: this.fmt(paSrc.homePrice || 0) },
+        { label: 'Loan Amount', value: this.fmt(paLoan) },
+        { label: 'Down Payment', value: this.fmt(paSrc.downPayment || 0) },
+        { label: 'Interest Rate', value: (paSrc.rate || 0) + '%' },
+        { label: 'Loan Term', value: paSrc.term + '-year fixed' }
+      ],
+      letter: {
+        borrower: pap.borrowerName || '\u2014',
+        address: pap.propertyAddress || (paSrc.transaction === 'refinance' ? 'Subject property on file' : 'Property to be determined'),
+        price: this.fmt(paSrc.homePrice || 0),
+        loan: this.fmt(paLoan),
+        down: this.fmt(paSrc.downPayment || 0),
+        rate: (paSrc.rate || 0) + '%',
+        term: paSrc.term + '-year',
+        type: typeLabels[paSrc.loanType] || 'Conventional',
+        expDate: expDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        today: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      }
+    };
+
+    return {
+      isLogin: !st.authed,
+      authed: st.authed,
+      settingsOpen: st.settingsOpen,
+      isCompare: st.screen === 'compare', isHecm: st.screen === 'hecm', isPreApproval: st.screen === 'preapproval', isTools: st.screen === 'tools', isHelp: st.screen === 'help', isAdmin: st.screen === 'admin',
+      loginEmail: st.loginEmail, loginPass: st.loginPass,
+      onLoginEmail: e => this.setState({ loginEmail: e.target.value }),
+      onLoginPass: e => this.setState({ loginPass: e.target.value }),
+      doLogin: () => this.setState({ authed: true, screen: 'compare' }),
+      logout: () => this.setState({ authed: false, screen: 'login' }),
+      go, nav,
+      openSettings: () => this.setState({ settingsOpen: true }),
+      closeSettings: () => this.setState({ settingsOpen: false }),
+      s: c,
+      scenarioTabs, txnTabs, borrowerTabs, loanTypeTabs, programTabs,
+      loanFields, creditFields,
+      onTerm: e => this.patch({ term: e.target.value }),
+      onCredit: e => this.patch({ credit: e.target.value }),
+      addScenario: () => this.setState(s => s.scenarios.length >= 6 ? {} : { scenarios: [...s.scenarios, Component.blank('Scenario ' + (s.scenarios.length + 1))], active: s.scenarios.length }),
+      r: this.results(),
+      settingsSections,
+      hecmFields, payoutTabs, hecmR: this.hecmResults(),
+      toolsList, faqs, adminStats, adminUsers, pa
+    };
+  }
+}
+</script>
+</body>
+</html>

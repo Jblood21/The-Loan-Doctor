@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body {
+  background: #07111d;
+  color: #e9f1fa;
+  font-family: 'Manrope', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+/* hide number-input spinners — fields use explicit $/% adornments instead */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 165, 195, 0.22);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* tabular figures for all numbers (matches the design's .num) */
+.num {
+  font-family: 'Space Grotesk', monospace;
+  font-feature-settings: 'tnum' 1;
+}
+
+@layer components {
+  /* the spacious 46px input that fixed the old "smushed" fields */
+  .field {
+    @apply h-[46px] w-full rounded-[10px] border border-border-input bg-input px-[14px] text-[15px] text-text-primary outline-none transition-shadow;
+  }
+  .field:focus {
+    border-color: #2f80ed;
+    box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.16);
+  }
+  .field-lg {
+    @apply h-12 rounded-[11px] px-4 text-[15px];
+  }
+  .field-lg:focus {
+    box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.18);
+  }
+  .label {
+    @apply mb-2 block text-[13px] font-semibold text-text-label;
+  }
+  .section-label {
+    @apply text-[12px] font-bold uppercase tracking-[0.7px] text-text-dim;
+  }
+}
