@@ -146,6 +146,7 @@ your backend.
 
 ## Going live on the web
 
-When you've finished testing and are happy with it, I'll walk you through hosting this as
-a real public website — domain, a hosted database, deploying the API and the static front
-end, secrets, and HTTPS. Just say the word.
+The app is set up to deploy as a **single service** (the Express server serves the built
+frontend and the API from one origin), so you get one public URL. A free, near‑one‑click
+path on Render — plus a portable `Dockerfile` for other hosts — is documented in
+**[DEPLOYMENT.md](DEPLOYMENT.md)**.

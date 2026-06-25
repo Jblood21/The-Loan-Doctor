@@ -1,6 +1,10 @@
 // LoanDr. API server — Express + JSON store + JWT auth.
+// In production it also serves the built frontend (single-service deploy).
 
 import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -37,8 +41,21 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/los', losRoutes);
 app.use('/api/preapproval', preApprovalRoutes);
 
-// 404 + error handlers
+// Unknown API routes → JSON 404 (before the static SPA fallback).
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
+
+// Serve the built frontend in production (single-service deploy). The Vite build
+// output lives at the repo root in dist/. Any non-/api path falls back to index.html
+// so client-side routes (/compare, /hecm, …) resolve on refresh / direct link.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distPath = path.resolve(__dirname, '..', '..', 'dist');
+if (process.env.SERVE_CLIENT !== 'false' && fs.existsSync(path.join(distPath, 'index.html'))) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
+  console.log(`  Serving frontend from ${distPath}`);
+}
+
+// Error handler (last).
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error(err);
