@@ -38,18 +38,19 @@ export function ltvPct(loan: number, homeValue: number): number {
 // Annual premium as a % of the loan amount. Values approximate national MI rate
 // cards (e.g. MGIC/Radian) and are intentionally centralized for easy override.
 // ---------------------------------------------------------------------------
+// Ordered ASCENDING by maxLtv so the tightest applicable band wins, e.g. LTV 90
+// maps to the 85.01–90 band, not 95.01–97. Each byCredit entry: [minScore, annualPct].
 const PMI_TABLE: { maxLtv: number; byCredit: [number, number][] }[] = [
-  // each byCredit entry: [minScore, annualPct]
-  { maxLtv: 97, byCredit: [[760, 0.41], [740, 0.55], [720, 0.7], [700, 0.87], [680, 1.1], [660, 1.36], [640, 1.6], [0, 1.84]] },
-  { maxLtv: 95, byCredit: [[760, 0.3], [740, 0.38], [720, 0.54], [700, 0.7], [680, 0.9], [660, 1.1], [640, 1.32], [0, 1.55]] },
-  { maxLtv: 90, byCredit: [[760, 0.19], [740, 0.23], [720, 0.3], [700, 0.38], [680, 0.52], [660, 0.66], [640, 0.78], [0, 0.94]] },
   { maxLtv: 85, byCredit: [[760, 0.14], [740, 0.16], [720, 0.19], [700, 0.21], [680, 0.27], [660, 0.34], [640, 0.38], [0, 0.46]] },
+  { maxLtv: 90, byCredit: [[760, 0.19], [740, 0.23], [720, 0.3], [700, 0.38], [680, 0.52], [660, 0.66], [640, 0.78], [0, 0.94]] },
+  { maxLtv: 95, byCredit: [[760, 0.3], [740, 0.38], [720, 0.54], [700, 0.7], [680, 0.9], [660, 1.1], [640, 1.32], [0, 1.55]] },
+  { maxLtv: 97, byCredit: [[760, 0.41], [740, 0.55], [720, 0.7], [700, 0.87], [680, 1.1], [660, 1.36], [640, 1.6], [0, 1.84]] },
 ];
 
 /** Conventional PMI annual rate (%) — 0 when LTV ≤ 80. */
 export function pmiAnnualPct(ltv: number, creditScore: number): number {
   if (ltv <= 80) return 0;
-  const band = PMI_TABLE.find((b) => ltv <= b.maxLtv) ?? PMI_TABLE[0];
+  const band = PMI_TABLE.find((b) => ltv <= b.maxLtv) ?? PMI_TABLE[PMI_TABLE.length - 1];
   for (const [minScore, pctVal] of band.byCredit) {
     if (creditScore >= minScore) return pctVal;
   }
