@@ -157,6 +157,12 @@ export default function Buydown({ open, onClose }: CalcProps) {
             <div className="text-[16px] font-bold">{rec.pick}</div>
             <div className="mt-1.5 text-[13px] leading-[1.55] text-text-soft">{rec.reason}</div>
           </div>
+
+          <div className="text-[11.5px] leading-[1.5] text-text-dim">
+            Guideline note: temporary-buydown funds are typically paid by the seller or lender within
+            interested-party-contribution limits, and agencies cap the structure (up to 3-2-1). Permanent points must be
+            bona fide discount points. Confirm program rules and IPC limits per loan.
+          </div>
         </div>
       </div>
     </Modal>

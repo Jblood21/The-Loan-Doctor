@@ -325,21 +325,157 @@ export function principalLimitFactor(age: number, expectedRatePct: number): numb
   });
 }
 
+export type HecmMode = 'refinance' | 'purchase';
+
+export interface HecmComputeInput {
+  mode: HecmMode;
+  age: number;
+  /** Appraised value (refinance) or purchase price (HECM for Purchase). */
+  homeValue: number;
+  existingMortgage: number;
+  otherDebts: number;
+  rate: number;
+  payout: string;
+}
+
 export interface HecmResult {
+  mode: HecmMode;
   plf: number;
   maxClaim: number;
   grossPrincipalLimit: number;
+  /** Existing mortgage + other liens/debts paid from proceeds (refinance). */
+  payoffTotal: number;
+  /** Net cash available to the borrower (refinance). */
   available: number;
+  /** Cash the borrower must bring (HECM for Purchase) = price − principal limit. */
+  requiredDownPayment: number;
   payoutLabel: string;
 }
 
-export function computeHecm(age: number, value: number, mortgage: number, rate: number, payout: string): HecmResult {
-  const plf = principalLimitFactor(age, rate);
-  const maxClaim = Math.min(value || 0, HECM_MAX_CLAIM);
+/**
+ * HECM principal limit + proceeds.
+ *  - refinance: available = principal limit − (existing mortgage + other debts to pay off)
+ *  - purchase (H4P): required down payment = purchase price − principal limit (borrower's investment;
+ *    the HECM covers the rest and there is no monthly mortgage payment).
+ * Max claim is capped at the FHA national lending limit.
+ */
+export function computeHecm(input: HecmComputeInput): HecmResult {
+  const plf = principalLimitFactor(input.age, input.rate);
+  const maxClaim = Math.min(input.homeValue || 0, HECM_MAX_CLAIM);
   const grossPrincipalLimit = maxClaim * plf;
-  const available = Math.max(0, grossPrincipalLimit - (mortgage || 0));
   const labels: Record<string, string> = { lump: 'Lump Sum', tenure: 'Tenure', line: 'Line of Credit' };
-  return { plf, maxClaim, grossPrincipalLimit, available, payoutLabel: labels[payout] || 'Lump Sum' };
+
+  if (input.mode === 'purchase') {
+    return {
+      mode: 'purchase',
+      plf,
+      maxClaim,
+      grossPrincipalLimit,
+      payoffTotal: 0,
+      available: 0,
+      requiredDownPayment: Math.max(0, (input.homeValue || 0) - grossPrincipalLimit),
+      payoutLabel: 'HECM for Purchase',
+    };
+  }
+
+  const payoffTotal = (input.existingMortgage || 0) + (input.otherDebts || 0);
+  return {
+    mode: 'refinance',
+    plf,
+    maxClaim,
+    grossPrincipalLimit,
+    payoffTotal,
+    available: Math.max(0, grossPrincipalLimit - payoffTotal),
+    requiredDownPayment: 0,
+    payoutLabel: labels[input.payout] || 'Lump Sum',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// VA entitlement (bonus / second-tier)
+// ---------------------------------------------------------------------------
+
+/** 2025 baseline conforming loan limit (one-unit), used as the default county loan limit. */
+export const VA_BASELINE_LIMIT = 806500;
+export const VA_BASIC_ENTITLEMENT = 36000;
+
+export interface VaEntitlementInput {
+  purchasePrice: number;
+  /** County one-unit loan limit (defaults to the national baseline). */
+  countyLoanLimit: number;
+  /** Veteran has full/restored entitlement (Blue Water Act: no county limit, no money down). */
+  fullEntitlement: boolean;
+  /** Prior VA loan balance still in use (used only when entitlement is partial). */
+  priorLoanAmount: number;
+  downPayment: number;
+  /** Subsequent VA use raises the funding fee on low-down loans. */
+  subsequentUse: boolean;
+  /** Funding-fee exempt (e.g. service-connected disability). */
+  fundingFeeExempt: boolean;
+}
+
+export interface VaEntitlementResult {
+  fullEntitlement: boolean;
+  maxGuaranty: number;
+  entitlementUsed: number;
+  availableEntitlement: number;
+  /** Max loan with no money down (partial entitlement) — Infinity when full entitlement. */
+  maxZeroDownLoan: number;
+  requiredDownPayment: number;
+  zeroDownEligible: boolean;
+  guarantyOnLoan: number;
+  fundingFeePct: number;
+  fundingFee: number;
+}
+
+/**
+ * VA second-tier (bonus) entitlement.
+ * The lender needs VA guaranty + borrower equity ≥ 25% of the price. With full/restored
+ * entitlement there is no county limit and no down payment (Blue Water Act, 2020). With
+ * partial entitlement, available guaranty = 25%×county limit − entitlement already used,
+ * the max no-down loan = available×4, and any shortfall to reach 25% must be covered by a
+ * down payment.
+ */
+export function vaEntitlement(input: VaEntitlementInput): VaEntitlementResult {
+  const price = input.purchasePrice || 0;
+  const down = input.downPayment || 0;
+  const downPct = price > 0 ? (down / price) * 100 : 0;
+  const fundingFeePct = input.fundingFeeExempt ? 0 : vaFundingFeePct(downPct, input.subsequentUse);
+  const loanAmount = Math.max(0, price - down);
+  const fundingFee = loanAmount * (fundingFeePct / 100);
+  const maxGuaranty = 0.25 * (input.countyLoanLimit || VA_BASELINE_LIMIT);
+
+  if (input.fullEntitlement) {
+    return {
+      fullEntitlement: true,
+      maxGuaranty,
+      entitlementUsed: 0,
+      availableEntitlement: maxGuaranty,
+      maxZeroDownLoan: Infinity,
+      requiredDownPayment: 0,
+      zeroDownEligible: true,
+      guarantyOnLoan: 0.25 * price,
+      fundingFeePct,
+      fundingFee,
+    };
+  }
+
+  const entitlementUsed = 0.25 * (input.priorLoanAmount || 0);
+  const availableEntitlement = Math.max(0, maxGuaranty - entitlementUsed);
+  const maxZeroDownLoan = availableEntitlement * 4;
+  const requiredDownPayment = Math.max(0, 0.25 * price - availableEntitlement);
+  return {
+    fullEntitlement: false,
+    maxGuaranty,
+    entitlementUsed,
+    availableEntitlement,
+    maxZeroDownLoan,
+    requiredDownPayment,
+    zeroDownEligible: requiredDownPayment <= 0,
+    guarantyOnLoan: Math.min(availableEntitlement, 0.25 * price),
+    fundingFeePct,
+    fundingFee,
+  };
 }
 
 // ---------------------------------------------------------------------------

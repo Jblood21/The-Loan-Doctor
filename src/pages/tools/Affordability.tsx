@@ -59,6 +59,10 @@ export default function Affordability({ open, onClose }: CalcProps) {
           <Row label="HOA" value={fmt(hoa)} />
           <Row label="Total Housing Payment" value={fmt(totalPayment)} color="text-brand-teal" />
           <Row label="Max Allowed by DTI" value={fmt(maxHousing)} />
+          <div className="mt-3 text-[12px] leading-[1.5] text-text-muted">
+            43% is the conservative QM default; agency AUS (DU/LPA) often allows up to ~50% back-end DTI, and FHA higher
+            with compensating factors. Adjust “Max DTI” to your program.
+          </div>
         </ResultPanel>
       </div>
     </Modal>

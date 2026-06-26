@@ -31,9 +31,14 @@ export interface Scenario {
 }
 
 export interface HecmInputs {
+  /** Traditional reverse refinance vs. HECM for Purchase. */
+  mode: 'refinance' | 'purchase';
   age: number;
+  /** Appraised home value (refinance) or purchase price (purchase). */
   value: number;
   mortgage: number;
+  /** Other liens/debts the borrower wants paid off from proceeds. */
+  otherDebts: number;
   payout: PayoutOption;
   rate: number;
 }

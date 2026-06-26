@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeftRight, BarChart3, Home, Percent, PlusCircle, RefreshCw, TrendingDown } from 'lucide-react';
+import { ArrowLeftRight, BarChart3, Home, Percent, PlusCircle, RefreshCw, ShieldCheck, TrendingDown } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import type { CalcProps } from './tools/_shared';
@@ -10,6 +10,7 @@ import DTI from './tools/DTI';
 import RefiBreakEven from './tools/RefiBreakEven';
 import ExtraPayment from './tools/ExtraPayment';
 import Buydown from './tools/Buydown';
+import VaEntitlement from './tools/VaEntitlement';
 
 interface Tool {
   key: string;
@@ -29,6 +30,7 @@ const TOOLS: Tool[] = [
   { key: 'refi', title: 'Refi Break-Even', desc: 'Months to recoup closing costs on a refinance.', bg: 'rgba(52,211,153,.14)', fg: '#34d399', icon: RefreshCw, Component: RefiBreakEven },
   { key: 'extra', title: 'Extra Payment', desc: 'Interest saved and payoff time with extra principal.', bg: 'rgba(248,113,113,.14)', fg: '#f87171', icon: PlusCircle, Component: ExtraPayment },
   { key: 'buydown', title: 'Rate Buydown', desc: 'Permanent points vs. a temporary buydown — and which is worth it.', bg: 'rgba(56,189,248,.14)', fg: '#38bdf8', icon: TrendingDown, Component: Buydown },
+  { key: 'va', title: 'VA Bonus Entitlement', desc: 'Second-tier entitlement, max $0-down loan, and required down payment.', bg: 'rgba(129,140,248,.14)', fg: '#818cf8', icon: ShieldCheck, Component: VaEntitlement },
 ];
 
 export default function Tools() {
