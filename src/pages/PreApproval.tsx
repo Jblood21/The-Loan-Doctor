@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, StubNote } from '@/components/ui/Badge';
 import { Card, SectionLabel, Divider } from '@/components/ui/Card';
@@ -9,8 +9,10 @@ import { Button } from '@/components/ui/Button';
 import { LogoMark } from '@/components/Logo';
 import { useScenarios } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
+import { useUI } from '@/context/UIContext';
 import { api } from '@/lib/api';
-import { computeScenario, loanTypeLabel } from '@/lib/finance';
+import { computeScenario } from '@/lib/finance';
+import { buildPreApprovalLetter } from '@/lib/letter';
 import { fmt, longDate } from '@/lib/format';
 import type { PreApprovalState } from '@/types';
 
@@ -36,6 +38,7 @@ const STUB_BORROWERS: Borrower[] = [
 export default function PreApproval() {
   const { scenarios } = useScenarios();
   const { settings } = useSettings();
+  const { openSettings } = useUI();
   const [pa, setPa] = useState<PreApprovalState>({
     source: 'scenario',
     scenarioIdx: 0,
@@ -47,12 +50,20 @@ export default function PreApproval() {
     expDays: '90',
   });
   const [losResults, setLosResults] = useState<Borrower[]>(STUB_BORROWERS);
+  const [includeAgent, setIncludeAgent] = useState(true);
   const set = (patch: Partial<PreApprovalState>) => setPa((s) => ({ ...s, ...patch }));
 
   const srcScenario = scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
-  const calc = computeScenario(srcScenario);
   const today = new Date();
-  const expDate = new Date(today.getTime() + parseInt(pa.expDays, 10) * 86400000);
+  const hasAgent = !!(settings.agentName && settings.agentName.trim());
+
+  const letter = buildPreApprovalLetter(srcScenario, settings, {
+    borrowerName: pa.borrowerName,
+    propertyAddress: pa.propertyAddress,
+    expDays: parseInt(pa.expDays, 10),
+    includeAgent,
+    now: today,
+  });
 
   // LOS borrower search (backend with stub fallback).
   useEffect(() => {
@@ -91,20 +102,13 @@ export default function PreApproval() {
     set({ losConnected: false });
   };
 
-  const terms = useMemo(
-    () => [
-      { label: 'Loan Type', value: loanTypeLabel(srcScenario.loanType) },
-      { label: 'Purchase Price', value: fmt(srcScenario.homePrice || 0) },
-      { label: 'Loan Amount', value: fmt(calc.baseLoan) },
-      { label: 'Down Payment', value: fmt(srcScenario.downPayment || 0) },
-      { label: 'Interest Rate', value: `${srcScenario.rate || 0}%` },
-      { label: 'Loan Term', value: `${srcScenario.term}-year fixed` },
-    ],
-    [srcScenario, calc.baseLoan],
-  );
-
   const downloadPdf = async () => {
     const payload = {
+      heading: letter.heading,
+      salutation: letter.salutation,
+      intro: letter.intro,
+      blurb: letter.blurb,
+      validity: letter.validity,
       borrowerName: pa.borrowerName || '—',
       propertyAddress: pa.propertyAddress,
       lender: {
@@ -113,10 +117,9 @@ export default function PreApproval() {
         phone: settings.lenderPhone || settings.phone,
         nmls: settings.lenderNmls || settings.nmls,
       },
-      officer: { name: settings.name, nmls: settings.nmls, company: settings.company },
-      type: loanTypeLabel(srcScenario.loanType),
-      terms,
-      expDate: longDate(expDate),
+      officer: { name: settings.name, nmls: settings.nmls, company: settings.company, phone: settings.phone },
+      agent: letter.agent,
+      terms: letter.terms,
       today: longDate(today),
     };
     try {
@@ -136,8 +139,8 @@ export default function PreApproval() {
   const emailLetter = () => {
     const subject = encodeURIComponent('Your Pre-Approval Letter');
     const body = encodeURIComponent(
-      `Hi ${pa.borrowerName},\n\nAttached is your pre-approval letter for a ${loanTypeLabel(srcScenario.loanType)} loan of ${fmt(
-        calc.baseLoan,
+      `Hi ${pa.borrowerName},\n\nAttached is your pre-approval letter for a ${computeScenario(srcScenario).typeLabel} loan of ${fmt(
+        computeScenario(srcScenario).baseLoan,
       )}.\n\nBest,\n${settings.name}`,
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
@@ -148,7 +151,7 @@ export default function PreApproval() {
       <PageHeader
         badge={<Badge tone="blue">Generator</Badge>}
         title="Pre-Approval Letter"
-        subtitle="Pull a borrower from your LOS or an existing scenario, then generate a branded letter."
+        subtitle="Pull a borrower from your LOS or an existing scenario, then generate a branded letter that adapts to the loan."
       />
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_1.05fr]">
@@ -173,10 +176,12 @@ export default function PreApproval() {
                 onChange={(e) => set({ scenarioIdx: parseInt(e.target.value, 10) })}
                 options={scenarios.map((s, i) => ({
                   value: i,
-                  label: `${s.name || `Scenario ${i + 1}`} · ${fmt(computeScenario(s).baseLoan)}`,
+                  label: `${s.name || `Scenario ${i + 1}`} · ${computeScenario(s).typeLabel} · ${fmt(computeScenario(s).baseLoan)}`,
                 }))}
               />
-              <div className="mt-2.5 text-[12.5px] text-[#7d96ae]">Loan details are pulled live from the selected scenario.</div>
+              <div className="mt-2.5 text-[12.5px] text-[#7d96ae]">
+                The letter’s wording adapts to this scenario — loan type, purchase vs. refinance, and borrower count.
+              </div>
             </div>
           )}
 
@@ -245,6 +250,11 @@ export default function PreApproval() {
             <div>
               <Label>Borrower Name(s)</Label>
               <TextField placeholder="Michael & Laura Thompson" value={pa.borrowerName} onChange={(e) => set({ borrowerName: e.target.value })} />
+              {srcScenario.borrowers === '2' && (
+                <div className="mt-1.5 text-[12px] text-text-muted">
+                  This scenario has two borrowers — enter both names (e.g. “Michael &amp; Laura Thompson”). The letter uses co-borrower wording.
+                </div>
+              )}
             </div>
             <div>
               <Label>Property Address (optional)</Label>
@@ -261,6 +271,40 @@ export default function PreApproval() {
                   { value: '90', label: '90 days' },
                 ]}
               />
+            </div>
+
+            {/* Dual branding */}
+            <div className="flex items-center justify-between rounded-[10px] border border-border-input bg-input px-3.5 py-3">
+              <div className="pr-3">
+                <div className="text-[13px] font-semibold text-text-label">Dual branding (real-estate agent)</div>
+                <div className="text-[12px] text-text-muted">
+                  {hasAgent ? (
+                    <>Co-brand with {settings.agentName}{settings.brokerage ? `, ${settings.brokerage}` : ''}</>
+                  ) : (
+                    <>
+                      No agent saved.{' '}
+                      <button onClick={openSettings} className="cursor-pointer border-none bg-transparent p-0 text-brand-blue-light underline">
+                        Add one in Settings
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              <button
+                role="switch"
+                aria-checked={includeAgent && hasAgent}
+                disabled={!hasAgent}
+                onClick={() => setIncludeAgent((v) => !v)}
+                className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors disabled:opacity-40 ${
+                  includeAgent && hasAgent ? 'bg-brand-blue' : 'bg-border-input'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
+                    includeAgent && hasAgent ? 'left-[22px]' : 'left-0.5'
+                  }`}
+                />
+              </button>
             </div>
           </div>
 
@@ -296,16 +340,12 @@ export default function PreApproval() {
               </div>
 
               <div className="mb-[18px] text-[12.5px] text-[#5b6b7b]">{longDate(today)}</div>
-              <div className="mb-3.5 text-[18px] font-bold text-[#0c2238]">Pre-Approval Letter</div>
-              <p className="mb-[13px] text-[13.5px] leading-[1.7]">Dear {pa.borrowerName || '—'},</p>
-              <p className="mb-4 text-[13.5px] leading-[1.7]">
-                Congratulations! Based on a review of your credit, income, and assets, you have been{' '}
-                <strong>pre-approved</strong> for a {loanTypeLabel(srcScenario.loanType)} mortgage loan
-                {pa.propertyAddress ? ` for the property at ${pa.propertyAddress}` : ''} under the following terms:
-              </p>
+              <div className="mb-3.5 text-[18px] font-bold text-[#0c2238]">{letter.heading}</div>
+              <p className="mb-[13px] text-[13.5px] leading-[1.7]">{letter.salutation}</p>
+              <p className="mb-4 text-[13.5px] leading-[1.7]">{letter.intro}</p>
 
               <div className="mb-[18px] rounded-[10px] bg-[#f4f6f9] px-5 py-4">
-                {terms.map((row) => (
+                {letter.terms.map((row) => (
                   <div key={row.label} className="flex justify-between border-b border-[#e3e8ee] py-[7px] text-[13px] last:border-0">
                     <span className="text-[#5b6b7b]">{row.label}</span>
                     <span className="num font-semibold text-[#0c2238]">{row.value}</span>
@@ -313,18 +353,33 @@ export default function PreApproval() {
                 ))}
               </div>
 
+              {letter.blurb && <p className="mb-4 text-[13.5px] leading-[1.7]">{letter.blurb}</p>}
               <p className="mb-4 text-[13.5px] leading-[1.7]">
-                This pre-approval is valid through <strong>{longDate(expDate)}</strong> and is subject to property
+                This pre-approval is valid through <strong>{letter.expDate}</strong> and is subject to property
                 appraisal, title review, and final underwriting verification.
               </p>
+
               <p className="mb-1 text-[13.5px]">Sincerely,</p>
-              <div className="mt-1 font-display text-[17px] italic text-[#0c2238]">{settings.name || 'John Smith'}</div>
-              <div className="text-[12px] text-[#5b6b7b]">
-                Loan Officer · NMLS #{settings.nmls || '123456'} · {settings.company || 'ABC Mortgage'}
-              </div>
-              {settings.agentName && (
-                <div className="mt-1 text-[12px] text-[#5b6b7b]">
-                  In partnership with {settings.agentName}{settings.brokerage ? `, ${settings.brokerage}` : ''}
+              <div className="mt-1 font-display text-[17px] italic text-[#0c2238]">{letter.signatureName}</div>
+              <div className="text-[12px] text-[#5b6b7b]">{letter.signatureLine}</div>
+
+              {/* Dual-branding block */}
+              {letter.agent && (
+                <div className="mt-5 grid grid-cols-2 gap-4 rounded-[10px] border border-[#e3e8ee] bg-[#f9fafb] px-5 py-4">
+                  <div>
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.6px] text-[#9aa7b4]">Your Loan Officer</div>
+                    <div className="text-[13px] font-semibold text-[#0c2238]">{settings.name || 'John Smith'}</div>
+                    <div className="text-[11.5px] text-[#5b6b7b]">NMLS #{settings.nmls || '123456'} · {settings.company || 'ABC Mortgage'}</div>
+                    {(settings.lenderPhone || settings.phone) && (
+                      <div className="text-[11.5px] text-[#5b6b7b]">{settings.lenderPhone || settings.phone}</div>
+                    )}
+                  </div>
+                  <div className="border-l border-[#e3e8ee] pl-4">
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.6px] text-[#9aa7b4]">Your Real Estate Agent</div>
+                    <div className="text-[13px] font-semibold text-[#0c2238]">{letter.agent.name}</div>
+                    {letter.agent.brokerage && <div className="text-[11.5px] text-[#5b6b7b]">{letter.agent.brokerage}</div>}
+                    {letter.agent.phone && <div className="text-[11.5px] text-[#5b6b7b]">{letter.agent.phone}</div>}
+                  </div>
                 </div>
               )}
 
