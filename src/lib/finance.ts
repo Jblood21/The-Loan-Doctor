@@ -341,3 +341,107 @@ export function computeHecm(age: number, value: number, mortgage: number, rate: 
   const labels: Record<string, string> = { lump: 'Lump Sum', tenure: 'Tenure', line: 'Line of Credit' };
   return { plf, maxClaim, grossPrincipalLimit, available, payoutLabel: labels[payout] || 'Lump Sum' };
 }
+
+// ---------------------------------------------------------------------------
+// Rate buydowns
+// ---------------------------------------------------------------------------
+
+/** Per-year reduction schedules for the common temporary buydown structures. */
+export const TEMP_BUYDOWN_STRUCTURES: Record<string, { label: string; reductions: number[] }> = {
+  '1-0': { label: '1-0', reductions: [1] },
+  '1-1': { label: '1-1', reductions: [1, 1] },
+  '2-1': { label: '2-1', reductions: [2, 1] },
+  '3-2-1': { label: '3-2-1', reductions: [3, 2, 1] },
+};
+
+export interface TempBuydownYear {
+  year: number;
+  rate: number;
+  monthly: number;
+  monthlySaved: number;
+  annualSaved: number;
+}
+
+export interface TempBuydownResult {
+  noteMonthly: number;
+  schedule: TempBuydownYear[];
+  /** Total escrow needed to fund the temporary buydown (paid by seller/lender/buyer). */
+  subsidyCost: number;
+  firstYearMonthly: number;
+  firstYearSavings: number;
+}
+
+/**
+ * Temporary buydown: the rate is reduced for the first N years, then snaps back to
+ * the note rate. The funded subsidy = the sum of monthly payment differences over the
+ * buydown period (the reduced payment is the standard note-amount/full-term payment at
+ * each reduced rate).
+ */
+export function temporaryBuydown(
+  loan: number,
+  noteRate: number,
+  termYears: number,
+  reductions: number[],
+): TempBuydownResult {
+  const noteMonthly = monthlyPayment(loan, noteRate, termYears);
+  let subsidyCost = 0;
+  const schedule: TempBuydownYear[] = reductions.map((red, i) => {
+    const rate = Math.max(0, noteRate - red);
+    const monthly = monthlyPayment(loan, rate, termYears);
+    const monthlySaved = noteMonthly - monthly;
+    const annualSaved = monthlySaved * 12;
+    subsidyCost += annualSaved;
+    return { year: i + 1, rate, monthly, monthlySaved, annualSaved };
+  });
+  return {
+    noteMonthly,
+    schedule,
+    subsidyCost,
+    firstYearMonthly: schedule[0]?.monthly ?? noteMonthly,
+    firstYearSavings: schedule[0]?.monthlySaved ?? 0,
+  };
+}
+
+export interface PermBuydownResult {
+  noteMonthly: number;
+  buydownMonthly: number;
+  monthlySavings: number;
+  /** Upfront cost in dollars (points % of loan). */
+  cost: number;
+  /** Months to recoup the cost from the lower payment. */
+  breakEvenMonths: number;
+  /** Interest saved over the full loan term. */
+  lifetimeInterestSaved: number;
+  /** Net benefit if the borrower keeps the loan for `holdYears` (savings − cost). */
+  netOverHold: number;
+}
+
+/**
+ * Permanent buydown (discount points): the borrower pays points upfront to permanently
+ * lower the rate for the life of the loan.
+ */
+export function permanentBuydown(
+  loan: number,
+  noteRate: number,
+  boughtRate: number,
+  termYears: number,
+  pointsPct: number,
+  holdYears: number,
+): PermBuydownResult {
+  const noteMonthly = monthlyPayment(loan, noteRate, termYears);
+  const buydownMonthly = monthlyPayment(loan, boughtRate, termYears);
+  const monthlySavings = noteMonthly - buydownMonthly;
+  const cost = (loan * pointsPct) / 100;
+  const breakEvenMonths = monthlySavings > 0 ? cost / monthlySavings : Infinity;
+  const noteInterest = amortizationSchedule(loan, noteRate, termYears).reduce((a, r) => a + r.interest, 0);
+  const buyInterest = amortizationSchedule(loan, boughtRate, termYears).reduce((a, r) => a + r.interest, 0);
+  return {
+    noteMonthly,
+    buydownMonthly,
+    monthlySavings,
+    cost,
+    breakEvenMonths,
+    lifetimeInterestSaved: noteInterest - buyInterest,
+    netOverHold: monthlySavings * holdYears * 12 - cost,
+  };
+}
