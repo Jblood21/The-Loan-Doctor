@@ -10,7 +10,7 @@ router.post('/pdf', requireAuth, (req, res) => {
     heading = 'Pre-Approval Letter',
     salutation,
     intro,
-    blurb = '',
+    highlights = [],
     validity,
     borrowerName = '—',
     propertyAddress = '',
@@ -76,8 +76,9 @@ router.post('/pdf', requireAuth, (req, res) => {
   });
   doc.moveDown(0.8);
 
-  if (blurb) {
-    doc.fillColor('#1b2733').font('Helvetica').fontSize(11).text(blurb, { lineGap: 3 });
+  if (Array.isArray(highlights) && highlights.length) {
+    doc.fillColor('#1b2733').font('Helvetica').fontSize(11);
+    highlights.forEach((h) => doc.text(`•  ${h}`, LEFT + 8, doc.y, { lineGap: 2, width: RIGHT - LEFT - 16 }));
     doc.moveDown(0.6);
   }
   doc.fillColor('#1b2733').font('Helvetica').fontSize(11).text(validityText, { lineGap: 3 });

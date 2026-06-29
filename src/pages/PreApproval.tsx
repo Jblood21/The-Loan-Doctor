@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, StubNote } from '@/components/ui/Badge';
 import { Card, SectionLabel, Divider } from '@/components/ui/Card';
@@ -12,7 +12,7 @@ import { useSettings } from '@/context/SettingsContext';
 import { useUI } from '@/context/UIContext';
 import { api } from '@/lib/api';
 import { computeScenario } from '@/lib/finance';
-import { buildPreApprovalLetter } from '@/lib/letter';
+import { buildPreApprovalLetter, LETTER_TEMPLATES, resolveTemplate } from '@/lib/letter';
 import { fmt, longDate } from '@/lib/format';
 import type { PreApprovalState } from '@/types';
 
@@ -57,13 +57,45 @@ export default function PreApproval() {
   const today = new Date();
   const hasAgent = !!(settings.agentName && settings.agentName.trim());
 
+  // Letter template + editable text.
+  const [templateId, setTemplateId] = useState('auto');
+  const [introText, setIntroText] = useState('');
+  const [highlightsText, setHighlightsText] = useState('');
+  const [customized, setCustomized] = useState(false);
+
+  // Default text for the chosen template + scenario.
+  const tpl = useMemo(
+    () => resolveTemplate(templateId, srcScenario, pa.propertyAddress),
+    [templateId, srcScenario, pa.propertyAddress],
+  );
+  // Seed the editable fields from the template until the user customizes them.
+  useEffect(() => {
+    if (customized) return;
+    setIntroText(tpl.intro);
+    setHighlightsText(tpl.highlights.join('\n'));
+  }, [tpl, customized]);
+
+  const parsedHighlights = highlightsText
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   const letter = buildPreApprovalLetter(srcScenario, settings, {
     borrowerName: pa.borrowerName,
     propertyAddress: pa.propertyAddress,
     expDays: parseInt(pa.expDays, 10),
     includeAgent,
     now: today,
+    templateId,
+    intro: introText || undefined,
+    highlights: parsedHighlights.length ? parsedHighlights : undefined,
   });
+
+  const onTemplateChange = (id: string) => {
+    setCustomized(false);
+    setTemplateId(id);
+  };
+  const resetTemplate = () => setCustomized(false);
 
   // LOS borrower search (backend with stub fallback).
   useEffect(() => {
@@ -107,7 +139,7 @@ export default function PreApproval() {
       heading: letter.heading,
       salutation: letter.salutation,
       intro: letter.intro,
-      blurb: letter.blurb,
+      highlights: letter.highlights,
       validity: letter.validity,
       borrowerName: pa.borrowerName || '—',
       propertyAddress: pa.propertyAddress,
@@ -246,6 +278,50 @@ export default function PreApproval() {
           )}
 
           <Divider className="mb-5" />
+
+          {/* Letter template + editable text */}
+          <div className="mb-5">
+            <div className="mb-2 flex items-center justify-between">
+              <SectionLabel>LETTER TEMPLATE</SectionLabel>
+              {customized && (
+                <button onClick={resetTemplate} className="cursor-pointer border-none bg-transparent text-[12px] font-semibold text-brand-blue-light underline">
+                  Reset to template
+                </button>
+              )}
+            </div>
+            <Select
+              value={templateId}
+              onChange={(e) => onTemplateChange(e.target.value)}
+              options={LETTER_TEMPLATES.map((t) => ({ value: t.id, label: t.label }))}
+            />
+            <div className="mt-1.5 text-[12px] text-text-muted">
+              {customized ? 'Editing custom text — Reset re-syncs with the template & scenario.' : 'Pick a program template, then edit the wording below to taste.'}
+            </div>
+
+            <Label className="mt-3.5">Intro paragraph</Label>
+            <textarea
+              value={introText}
+              onChange={(e) => {
+                setIntroText(e.target.value);
+                setCustomized(true);
+              }}
+              rows={4}
+              className="w-full resize-y rounded-[10px] border border-border-input bg-input p-3 text-[13px] leading-[1.6] text-text-primary outline-none transition-shadow focus:border-brand-blue focus:shadow-focus"
+            />
+
+            <Label className="mt-3">Highlights (one per line)</Label>
+            <textarea
+              value={highlightsText}
+              onChange={(e) => {
+                setHighlightsText(e.target.value);
+                setCustomized(true);
+              }}
+              rows={3}
+              className="w-full resize-y rounded-[10px] border border-border-input bg-input p-3 text-[13px] leading-[1.6] text-text-primary outline-none transition-shadow focus:border-brand-blue focus:shadow-focus"
+            />
+          </div>
+
+          <Divider className="mb-5" />
           <div className="flex flex-col gap-4">
             <div>
               <Label>Borrower Name(s)</Label>
@@ -353,7 +429,13 @@ export default function PreApproval() {
                 ))}
               </div>
 
-              {letter.blurb && <p className="mb-4 text-[13.5px] leading-[1.7]">{letter.blurb}</p>}
+              {letter.highlights.length > 0 && (
+                <ul className="mb-4 ml-[18px] list-disc text-[13px] leading-[1.7] text-[#1b2733] marker:text-[#2f80ed]">
+                  {letter.highlights.map((h, i) => (
+                    <li key={i}>{h}</li>
+                  ))}
+                </ul>
+              )}
               <p className="mb-4 text-[13.5px] leading-[1.7]">
                 This pre-approval is valid through <strong>{letter.expDate}</strong> and is subject to property
                 appraisal, title review, and final underwriting verification.
