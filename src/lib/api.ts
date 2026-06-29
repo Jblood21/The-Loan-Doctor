@@ -85,11 +85,12 @@ export const api = {
   adminStats: () => request<{ stats: { label: string; value: string; delta: string }[] }>('GET', '/admin/stats'),
   adminUsers: () => request<{ users: User[] }>('GET', '/admin/users'),
 
-  // LOS integration (stubbed providers)
-  losConnect: (provider: string) => request<{ connected: boolean; provider: string }>('POST', '/los/connect', { provider }),
+  // LOS integration — live when a provider (e.g. ARIVE) is configured, demo otherwise
+  losConnect: (provider: string) =>
+    request<{ connected: boolean; provider: string; mode: 'live' | 'demo' }>('POST', '/los/connect', { provider }),
   losDisconnect: (provider: string) => request<{ connected: boolean }>('POST', '/los/disconnect', { provider }),
   losSearch: (provider: string, query: string) =>
-    request<{ results: { name: string; meta: string; address: string }[] }>(
+    request<{ results: { name: string; meta: string; address: string }[]; mode: 'live' | 'demo' }>(
       'GET',
       `/los/borrowers?provider=${encodeURIComponent(provider)}&q=${encodeURIComponent(query)}`,
     ),
