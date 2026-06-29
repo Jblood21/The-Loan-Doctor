@@ -12,13 +12,45 @@
 // All rates are documented inline. Lender-specific factors are centralized here so a
 // backend can later override them per lender.
 
-import type { LoanType, Scenario } from '@/types';
+import type { ClosingCostItem, LoanType, Scenario } from '@/types';
 
 export const DEFAULT_TAX_RATE = 1.25; // %/yr of home value
 export const DEFAULT_INSURANCE_RATE = 0.35; // %/yr of home value
-export const DEFAULT_CLOSING_RATE = 0.03; // 3% of loan, rough estimate
+export const DEFAULT_CLOSING_RATE = 0.03; // 3% of loan, rough fallback estimate
 /** FHA national HECM max claim amount (2025 lending limit). */
 export const HECM_MAX_CLAIM = 1209750;
+
+// ---------------------------------------------------------------------------
+// Closing costs — itemized base + custom fees
+// ---------------------------------------------------------------------------
+
+let _feeSeq = 0;
+const feeId = () => `f${++_feeSeq}`;
+
+/** A starter set of common closing-cost line items the LO can edit/extend. */
+export function defaultClosingCosts(): ClosingCostItem[] {
+  return [
+    { id: feeId(), label: 'Origination Fee', basis: 'loan', value: 1.0 },
+    { id: feeId(), label: 'Underwriting / Processing', basis: 'flat', value: 1195 },
+    { id: feeId(), label: 'Appraisal', basis: 'flat', value: 650 },
+    { id: feeId(), label: 'Credit Report', basis: 'flat', value: 75 },
+    { id: feeId(), label: "Title – Lender's Policy", basis: 'flat', value: 650 },
+    { id: feeId(), label: 'Settlement / Closing Fee', basis: 'flat', value: 500 },
+    { id: feeId(), label: 'Recording Fees', basis: 'flat', value: 150 },
+    { id: feeId(), label: 'Transfer Tax', basis: 'price', value: 0 },
+  ];
+}
+
+/** Resolve one fee line to a dollar amount. */
+export function closingCostAmount(item: ClosingCostItem, loan: number, price: number): number {
+  if (item.basis === 'loan') return (loan * (item.value || 0)) / 100;
+  if (item.basis === 'price') return (price * (item.value || 0)) / 100;
+  return item.value || 0;
+}
+
+export function totalClosingCosts(items: ClosingCostItem[], loan: number, price: number): number {
+  return (items || []).reduce((sum, it) => sum + closingCostAmount(it, loan, price), 0);
+}
 
 /** Standard amortized monthly payment. r is monthly rate (fraction), n months. */
 export function monthlyPayment(principal: number, annualRatePct: number, termYears: number): number {
@@ -38,18 +70,19 @@ export function ltvPct(loan: number, homeValue: number): number {
 // Annual premium as a % of the loan amount. Values approximate national MI rate
 // cards (e.g. MGIC/Radian) and are intentionally centralized for easy override.
 // ---------------------------------------------------------------------------
+// Ordered ASCENDING by maxLtv so the tightest applicable band wins, e.g. LTV 90
+// maps to the 85.01–90 band, not 95.01–97. Each byCredit entry: [minScore, annualPct].
 const PMI_TABLE: { maxLtv: number; byCredit: [number, number][] }[] = [
-  // each byCredit entry: [minScore, annualPct]
-  { maxLtv: 97, byCredit: [[760, 0.41], [740, 0.55], [720, 0.7], [700, 0.87], [680, 1.1], [660, 1.36], [640, 1.6], [0, 1.84]] },
-  { maxLtv: 95, byCredit: [[760, 0.3], [740, 0.38], [720, 0.54], [700, 0.7], [680, 0.9], [660, 1.1], [640, 1.32], [0, 1.55]] },
-  { maxLtv: 90, byCredit: [[760, 0.19], [740, 0.23], [720, 0.3], [700, 0.38], [680, 0.52], [660, 0.66], [640, 0.78], [0, 0.94]] },
   { maxLtv: 85, byCredit: [[760, 0.14], [740, 0.16], [720, 0.19], [700, 0.21], [680, 0.27], [660, 0.34], [640, 0.38], [0, 0.46]] },
+  { maxLtv: 90, byCredit: [[760, 0.19], [740, 0.23], [720, 0.3], [700, 0.38], [680, 0.52], [660, 0.66], [640, 0.78], [0, 0.94]] },
+  { maxLtv: 95, byCredit: [[760, 0.3], [740, 0.38], [720, 0.54], [700, 0.7], [680, 0.9], [660, 1.1], [640, 1.32], [0, 1.55]] },
+  { maxLtv: 97, byCredit: [[760, 0.41], [740, 0.55], [720, 0.7], [700, 0.87], [680, 1.1], [660, 1.36], [640, 1.6], [0, 1.84]] },
 ];
 
 /** Conventional PMI annual rate (%) — 0 when LTV ≤ 80. */
 export function pmiAnnualPct(ltv: number, creditScore: number): number {
   if (ltv <= 80) return 0;
-  const band = PMI_TABLE.find((b) => ltv <= b.maxLtv) ?? PMI_TABLE[0];
+  const band = PMI_TABLE.find((b) => ltv <= b.maxLtv) ?? PMI_TABLE[PMI_TABLE.length - 1];
   for (const [minScore, pctVal] of band.byCredit) {
     if (creditScore >= minScore) return pctVal;
   }
@@ -213,6 +246,7 @@ export interface ScenarioResult {
   totalInterest: number;
   payoffMonths: number;
   closingCosts: number;
+  closingItemized: boolean;
   creditsApplied: number;
   cashToClose: number;
   subline: string;
@@ -256,7 +290,10 @@ export function computeScenario(s: Scenario): ScenarioResult {
   const lenderFees = baseLoan * 0.005 + 1200; // ~0.5% origination + fixed fees
   const apr = computeApr(financedLoan, pi, termYears, mi.upfrontFinanced + lenderFees);
 
-  const closingCosts = baseLoan * DEFAULT_CLOSING_RATE;
+  const closingItemized = !!(s.closingCosts && s.closingCosts.length);
+  const closingCosts = closingItemized
+    ? totalClosingCosts(s.closingCosts as ClosingCostItem[], baseLoan, homeValue)
+    : baseLoan * DEFAULT_CLOSING_RATE;
   const creditsApplied = (s.lenderCredit || 0) + (s.sellerCredit || 0) + (s.otherCredits || 0);
   const cashToClose = Math.max(0, (s.downPayment || 0) + closingCosts - creditsApplied);
 
@@ -276,6 +313,7 @@ export function computeScenario(s: Scenario): ScenarioResult {
     closingCosts,
     creditsApplied,
     cashToClose,
+    closingItemized,
     subline: `${Math.round(baseLoan).toLocaleString('en-US')} loan · ${s.rate || 0}% · ${s.term} yr · ${Math.round(ltv)}% LTV`,
   };
 }
@@ -324,19 +362,259 @@ export function principalLimitFactor(age: number, expectedRatePct: number): numb
   });
 }
 
+export type HecmMode = 'refinance' | 'purchase';
+
+export interface HecmComputeInput {
+  mode: HecmMode;
+  age: number;
+  /** Appraised value (refinance) or purchase price (HECM for Purchase). */
+  homeValue: number;
+  existingMortgage: number;
+  otherDebts: number;
+  rate: number;
+  payout: string;
+}
+
 export interface HecmResult {
+  mode: HecmMode;
   plf: number;
   maxClaim: number;
   grossPrincipalLimit: number;
+  /** Existing mortgage + other liens/debts paid from proceeds (refinance). */
+  payoffTotal: number;
+  /** Net cash available to the borrower (refinance). */
   available: number;
+  /** Cash the borrower must bring (HECM for Purchase) = price − principal limit. */
+  requiredDownPayment: number;
   payoutLabel: string;
 }
 
-export function computeHecm(age: number, value: number, mortgage: number, rate: number, payout: string): HecmResult {
-  const plf = principalLimitFactor(age, rate);
-  const maxClaim = Math.min(value || 0, HECM_MAX_CLAIM);
+/**
+ * HECM principal limit + proceeds.
+ *  - refinance: available = principal limit − (existing mortgage + other debts to pay off)
+ *  - purchase (H4P): required down payment = purchase price − principal limit (borrower's investment;
+ *    the HECM covers the rest and there is no monthly mortgage payment).
+ * Max claim is capped at the FHA national lending limit.
+ */
+export function computeHecm(input: HecmComputeInput): HecmResult {
+  const plf = principalLimitFactor(input.age, input.rate);
+  const maxClaim = Math.min(input.homeValue || 0, HECM_MAX_CLAIM);
   const grossPrincipalLimit = maxClaim * plf;
-  const available = Math.max(0, grossPrincipalLimit - (mortgage || 0));
   const labels: Record<string, string> = { lump: 'Lump Sum', tenure: 'Tenure', line: 'Line of Credit' };
-  return { plf, maxClaim, grossPrincipalLimit, available, payoutLabel: labels[payout] || 'Lump Sum' };
+
+  if (input.mode === 'purchase') {
+    return {
+      mode: 'purchase',
+      plf,
+      maxClaim,
+      grossPrincipalLimit,
+      payoffTotal: 0,
+      available: 0,
+      requiredDownPayment: Math.max(0, (input.homeValue || 0) - grossPrincipalLimit),
+      payoutLabel: 'HECM for Purchase',
+    };
+  }
+
+  const payoffTotal = (input.existingMortgage || 0) + (input.otherDebts || 0);
+  return {
+    mode: 'refinance',
+    plf,
+    maxClaim,
+    grossPrincipalLimit,
+    payoffTotal,
+    available: Math.max(0, grossPrincipalLimit - payoffTotal),
+    requiredDownPayment: 0,
+    payoutLabel: labels[input.payout] || 'Lump Sum',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// VA entitlement (bonus / second-tier)
+// ---------------------------------------------------------------------------
+
+/** 2025 baseline conforming loan limit (one-unit), used as the default county loan limit. */
+export const VA_BASELINE_LIMIT = 806500;
+export const VA_BASIC_ENTITLEMENT = 36000;
+
+export interface VaEntitlementInput {
+  purchasePrice: number;
+  /** County one-unit loan limit (defaults to the national baseline). */
+  countyLoanLimit: number;
+  /** Veteran has full/restored entitlement (Blue Water Act: no county limit, no money down). */
+  fullEntitlement: boolean;
+  /** Prior VA loan balance still in use (used only when entitlement is partial). */
+  priorLoanAmount: number;
+  downPayment: number;
+  /** Subsequent VA use raises the funding fee on low-down loans. */
+  subsequentUse: boolean;
+  /** Funding-fee exempt (e.g. service-connected disability). */
+  fundingFeeExempt: boolean;
+}
+
+export interface VaEntitlementResult {
+  fullEntitlement: boolean;
+  maxGuaranty: number;
+  entitlementUsed: number;
+  availableEntitlement: number;
+  /** Max loan with no money down (partial entitlement) — Infinity when full entitlement. */
+  maxZeroDownLoan: number;
+  requiredDownPayment: number;
+  zeroDownEligible: boolean;
+  guarantyOnLoan: number;
+  fundingFeePct: number;
+  fundingFee: number;
+}
+
+/**
+ * VA second-tier (bonus) entitlement.
+ * The lender needs VA guaranty + borrower equity ≥ 25% of the price. With full/restored
+ * entitlement there is no county limit and no down payment (Blue Water Act, 2020). With
+ * partial entitlement, available guaranty = 25%×county limit − entitlement already used,
+ * the max no-down loan = available×4, and any shortfall to reach 25% must be covered by a
+ * down payment.
+ */
+export function vaEntitlement(input: VaEntitlementInput): VaEntitlementResult {
+  const price = input.purchasePrice || 0;
+  const down = input.downPayment || 0;
+  const downPct = price > 0 ? (down / price) * 100 : 0;
+  const fundingFeePct = input.fundingFeeExempt ? 0 : vaFundingFeePct(downPct, input.subsequentUse);
+  const loanAmount = Math.max(0, price - down);
+  const fundingFee = loanAmount * (fundingFeePct / 100);
+  const maxGuaranty = 0.25 * (input.countyLoanLimit || VA_BASELINE_LIMIT);
+
+  if (input.fullEntitlement) {
+    return {
+      fullEntitlement: true,
+      maxGuaranty,
+      entitlementUsed: 0,
+      availableEntitlement: maxGuaranty,
+      maxZeroDownLoan: Infinity,
+      requiredDownPayment: 0,
+      zeroDownEligible: true,
+      guarantyOnLoan: 0.25 * price,
+      fundingFeePct,
+      fundingFee,
+    };
+  }
+
+  const entitlementUsed = 0.25 * (input.priorLoanAmount || 0);
+  const availableEntitlement = Math.max(0, maxGuaranty - entitlementUsed);
+  const maxZeroDownLoan = availableEntitlement * 4;
+  const requiredDownPayment = Math.max(0, 0.25 * price - availableEntitlement);
+  return {
+    fullEntitlement: false,
+    maxGuaranty,
+    entitlementUsed,
+    availableEntitlement,
+    maxZeroDownLoan,
+    requiredDownPayment,
+    zeroDownEligible: requiredDownPayment <= 0,
+    guarantyOnLoan: Math.min(availableEntitlement, 0.25 * price),
+    fundingFeePct,
+    fundingFee,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Rate buydowns
+// ---------------------------------------------------------------------------
+
+/** Per-year reduction schedules for the common temporary buydown structures. */
+export const TEMP_BUYDOWN_STRUCTURES: Record<string, { label: string; reductions: number[] }> = {
+  '1-0': { label: '1-0', reductions: [1] },
+  '1-1': { label: '1-1', reductions: [1, 1] },
+  '2-1': { label: '2-1', reductions: [2, 1] },
+  '3-2-1': { label: '3-2-1', reductions: [3, 2, 1] },
+};
+
+export interface TempBuydownYear {
+  year: number;
+  rate: number;
+  monthly: number;
+  monthlySaved: number;
+  annualSaved: number;
+}
+
+export interface TempBuydownResult {
+  noteMonthly: number;
+  schedule: TempBuydownYear[];
+  /** Total escrow needed to fund the temporary buydown (paid by seller/lender/buyer). */
+  subsidyCost: number;
+  firstYearMonthly: number;
+  firstYearSavings: number;
+}
+
+/**
+ * Temporary buydown: the rate is reduced for the first N years, then snaps back to
+ * the note rate. The funded subsidy = the sum of monthly payment differences over the
+ * buydown period (the reduced payment is the standard note-amount/full-term payment at
+ * each reduced rate).
+ */
+export function temporaryBuydown(
+  loan: number,
+  noteRate: number,
+  termYears: number,
+  reductions: number[],
+): TempBuydownResult {
+  const noteMonthly = monthlyPayment(loan, noteRate, termYears);
+  let subsidyCost = 0;
+  const schedule: TempBuydownYear[] = reductions.map((red, i) => {
+    const rate = Math.max(0, noteRate - red);
+    const monthly = monthlyPayment(loan, rate, termYears);
+    const monthlySaved = noteMonthly - monthly;
+    const annualSaved = monthlySaved * 12;
+    subsidyCost += annualSaved;
+    return { year: i + 1, rate, monthly, monthlySaved, annualSaved };
+  });
+  return {
+    noteMonthly,
+    schedule,
+    subsidyCost,
+    firstYearMonthly: schedule[0]?.monthly ?? noteMonthly,
+    firstYearSavings: schedule[0]?.monthlySaved ?? 0,
+  };
+}
+
+export interface PermBuydownResult {
+  noteMonthly: number;
+  buydownMonthly: number;
+  monthlySavings: number;
+  /** Upfront cost in dollars (points % of loan). */
+  cost: number;
+  /** Months to recoup the cost from the lower payment. */
+  breakEvenMonths: number;
+  /** Interest saved over the full loan term. */
+  lifetimeInterestSaved: number;
+  /** Net benefit if the borrower keeps the loan for `holdYears` (savings − cost). */
+  netOverHold: number;
+}
+
+/**
+ * Permanent buydown (discount points): the borrower pays points upfront to permanently
+ * lower the rate for the life of the loan.
+ */
+export function permanentBuydown(
+  loan: number,
+  noteRate: number,
+  boughtRate: number,
+  termYears: number,
+  pointsPct: number,
+  holdYears: number,
+): PermBuydownResult {
+  const noteMonthly = monthlyPayment(loan, noteRate, termYears);
+  const buydownMonthly = monthlyPayment(loan, boughtRate, termYears);
+  const monthlySavings = noteMonthly - buydownMonthly;
+  const cost = (loan * pointsPct) / 100;
+  const breakEvenMonths = monthlySavings > 0 ? cost / monthlySavings : Infinity;
+  const noteInterest = amortizationSchedule(loan, noteRate, termYears).reduce((a, r) => a + r.interest, 0);
+  const buyInterest = amortizationSchedule(loan, boughtRate, termYears).reduce((a, r) => a + r.interest, 0);
+  return {
+    noteMonthly,
+    buydownMonthly,
+    monthlySavings,
+    cost,
+    breakEvenMonths,
+    lifetimeInterestSaved: noteInterest - buyInterest,
+    netOverHold: monthlySavings * holdYears * 12 - cost,
+  };
 }

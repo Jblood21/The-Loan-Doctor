@@ -1,0 +1,30 @@
+# Render.com Blueprint — deploys LoanDr. as ONE free web service
+# (Express API + the built React frontend served from the same origin).
+#
+# To use: push this repo to GitHub, then on render.com choose
+# "New +" → "Blueprint" → pick this repo. Render reads this file and provisions
+# the service automatically. See DEPLOYMENT.md for the click-by-click guide.
+
+services:
+  - type: web
+    name: loandr
+    runtime: node
+    plan: free
+    # Build the frontend (dist/) and install the API's dependencies.
+    buildCommand: npm install && npm --prefix server install && npm run build
+    # Start the API, which also serves dist/ in production.
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Signing secret for login tokens — Render generates a strong random value.
+      - key: JWT_SECRET
+        generateValue: true
+      # Admin Dashboard login password. Change this in the Render dashboard.
+      - key: ADMIN_PASSWORD
+        value: loandr-admin
+      # Seed the demo loan-officer account so you can sign in immediately.
+      - key: SEED_DEMO_USER
+        value: "true"

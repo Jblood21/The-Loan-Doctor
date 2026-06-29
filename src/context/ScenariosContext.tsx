@@ -1,12 +1,15 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '@/lib/api';
-import type { Scenario } from '@/types';
+import { cloneFees } from '@/components/ClosingCostsEditor';
+import { defaultClosingCosts } from '@/lib/finance';
+import type { ClosingCostItem, Scenario } from '@/types';
 import { useAuth } from './AuthContext';
+import { useSettings } from './SettingsContext';
 
 export const MAX_SCENARIOS = 6;
 
-export function blankScenario(name: string): Scenario {
+export function blankScenario(name: string, fees?: ClosingCostItem[]): Scenario {
   return {
     name,
     transaction: 'purchase',
@@ -22,6 +25,7 @@ export function blankScenario(name: string): Scenario {
     lenderCredit: 0,
     sellerCredit: 0,
     otherCredits: 0,
+    closingCosts: fees && fees.length ? cloneFees(fees) : defaultClosingCosts(),
   };
 }
 
@@ -44,6 +48,14 @@ const ScenariosContext = createContext<ScenariosContextValue | null>(null);
 
 export function ScenariosProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { settings } = useSettings();
+  // Latest saved default fee schedule, read when seeding new scenarios.
+  const feeDefaultsRef = useRef(settings.feeDefaults);
+  useEffect(() => {
+    feeDefaultsRef.current = settings.feeDefaults;
+  }, [settings.feeDefaults]);
+  const seededBlank = (name: string) => blankScenario(name, feeDefaultsRef.current);
+
   const [scenarios, setScenarios] = useState<Scenario[]>([blankScenario('Scenario 1')]);
   const [active, setActive] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -69,7 +81,7 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
       try {
         const { scenarios: s } = await api.listScenarios();
         if (cancelled) return;
-        const list = s && s.length ? s : [blankScenario('Scenario 1')];
+        const list = s && s.length ? s : [seededBlank('Scenario 1')];
         setScenarios(list);
         setActive(0);
         setLoaded(true);
@@ -129,7 +141,7 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
   const addScenario = () =>
     setScenarios((list) => {
       if (list.length >= MAX_SCENARIOS) return list;
-      const next = [...list, blankScenario(`Scenario ${list.length + 1}`)];
+      const next = [...list, seededBlank(`Scenario ${list.length + 1}`)];
       setActive(next.length - 1);
       setDirty(true);
       return next;

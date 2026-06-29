@@ -32,6 +32,11 @@ export function longDate(d: Date): string {
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+/** Long date with weekday, e.g. Monday, June 22, 2026. */
+export function longDateWeekday(d: Date): string {
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 /** Parse a form value to a number, preserving empty string as 0 for math. */
 export function toNum(raw: string | number): number {
   if (raw === '' || raw === null || raw === undefined) return 0;

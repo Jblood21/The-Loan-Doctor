@@ -1,0 +1,154 @@
+# LoanDr. — Loan Officer Workspace
+
+A web app for mortgage loan officers (MLOs): model and compare up to six loan
+scenarios side by side, run a reverse‑mortgage (HECM) estimate, generate a branded
+borrower pre‑approval letter (PDF), reach a set of working calculators, get help, and
+— for the owner/admin — see usage data across all users.
+
+This is a ground‑up rebuild of the design handoff in [`design_reference/`](design_reference/),
+implemented as a real production stack.
+
+- **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS + React Router
+- **Backend:** Node + Express, JWT auth (bcrypt), PDF generation (PDFKit), JSON file store
+- **Real math:** P&I, taxes/insurance, mortgage insurance (PMI/MIP/VA/USDA), APR,
+  total interest, full amortization schedules, and an interpolated HECM PLF table
+
+---
+
+## Quick start (local testing)
+
+### Prerequisites
+- **Node.js 18+** (developed on Node 22). Check with `node -v`.
+- npm (comes with Node).
+
+### 1. Install dependencies
+```bash
+npm run setup        # installs both the web app and the server
+```
+(That's shorthand for `npm install && npm --prefix server install`.)
+
+### 2. Run everything
+```bash
+npm run dev
+```
+This starts **both** servers at once:
+- Web app → **http://localhost:5173**
+- API     → **http://localhost:4000** (the web app proxies `/api` to it automatically)
+
+Open **http://localhost:5173** in your browser.
+
+### 3. Sign in
+The backend seeds two accounts on first run:
+
+| Role  | Email               | Password   | What you can see                          |
+|-------|---------------------|------------|-------------------------------------------|
+| Admin | `admin@loandr.app`  | `admin123` | Everything, **plus** the Admin Dashboard  |
+| LO    | `demo@lender.com`   | `demo1234` | The full loan‑officer workspace           |
+
+You can also click **Create an account** on the login screen to register a new user.
+
+> Tip: run the two servers separately if you prefer — `npm run dev:web` and, in another
+> terminal, `npm run dev:api`.
+
+---
+
+## What to test
+
+- **Compare Loans** — switch **Purchase ⇄ Refinance** (the price field relabels to
+  "Home Value"), change loan type (Conventional/FHA/VA/USDA/ARM) and watch mortgage
+  insurance update, edit the linked **Down Payment $ / %** fields, add/remove scenarios
+  (up to 6), **Save** (persists to the backend) and **Export** (downloads JSON).
+- **Reverse (HECM)** — toggle Refinance/Equity vs. HECM for Purchase, add other liens/debts
+  to pay off, and change age / value / rate to see the principal limit update.
+- **Pre‑Approval** — pick a saved scenario *or* connect a (stubbed) LOS, search and
+  "Use" a borrower; the letter wording adapts to the loan (type, purchase/refi, borrower
+  count) with optional real-estate-agent dual branding, then **Download PDF** or **Email**.
+- **Tools** — open any of the eight calculators (Affordability, Rent vs. Buy, Amortization,
+  DTI, Refi Break‑Even, Extra Payment, Rate Buydown, VA Bonus Entitlement). They all compute live.
+- **Help Center** — search the FAQ and expand items.
+- **Admin Dashboard** — sign in as the admin account to see stats + the users table.
+- **Settings** — open the slide‑over, edit your loan‑officer / lender / dual‑branding
+  info, and Save. Your branding flows into the pre‑approval letter.
+
+Your scenarios and settings are saved per account on the backend (and cached in the
+browser), so they survive refreshes.
+
+---
+
+## Project structure
+
+```
+.
+├── index.html               # Vite entry
+├── src/
+│   ├── main.tsx, App.tsx     # app bootstrap + routing/auth gate
+│   ├── index.css             # Tailwind + design tokens
+│   ├── types.ts              # shared domain types
+│   ├── lib/
+│   │   ├── finance.ts        # ALL mortgage math (P&I, MI, APR, amortization, HECM)
+│   │   ├── format.ts         # currency / number / date formatting
+│   │   └── api.ts            # typed API client
+│   ├── context/              # Auth, Scenarios, Settings, UI (settings drawer)
+│   ├── components/           # Sidebar, AppShell, SettingsDrawer, Logo, PageHeader, ui/*
+│   └── pages/                # Login, Compare, Hecm, PreApproval, Tools, Help, Admin
+│       └── tools/            # the eight calculators
+├── server/
+│   ├── src/
+│   │   ├── index.js          # Express app + route mounting + seeding
+│   │   ├── store.js          # JSON file persistence (server/data/db.json)
+│   │   ├── auth.js           # JWT middleware
+│   │   └── routes/           # auth, settings, scenarios, admin, los, preapproval
+│   └── .env.example
+├── design_reference/         # the original design handoff (HTML prototype + README)
+└── .env.example
+```
+
+## API overview
+
+All under `/api`. Auth routes are rate‑limited; protected routes need
+`Authorization: Bearer <token>`.
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/auth/register`, `/auth/login` | create / sign in → `{ token, user }` |
+| GET / PUT | `/auth/me`, `/auth/profile`, `/auth/password` | session + profile |
+| GET / PUT | `/settings` | per‑user branding & preferences |
+| GET / PUT / POST / DELETE | `/scenarios[/:id]` | saved scenarios |
+| POST / GET | `/admin/login`, `/admin/users`, `/admin/stats` | admin (role‑gated) |
+| POST / GET | `/los/connect`, `/los/disconnect`, `/los/borrowers` | LOS sandbox |
+| POST | `/preapproval/pdf` | generate the pre‑approval PDF |
+| GET | `/health` | liveness check |
+
+## Configuration
+
+Copy the example env files if you want to change defaults:
+```bash
+cp .env.example .env                 # frontend (API base / proxy)
+cp server/.env.example server/.env   # backend (JWT secret, admin password, seed users)
+```
+The defaults work out of the box for local testing. **Change `JWT_SECRET` and
+`ADMIN_PASSWORD` before deploying.**
+
+## Production build (preview)
+```bash
+npm run build      # type-checks + builds the web app to dist/
+npm run preview    # serves the built app locally
+```
+
+---
+
+## A note on the financial math
+
+The figures are computed from standard national rate cards and formulas (see
+`src/lib/finance.ts`), which is a big step up from the prototype's placeholders. They are
+**estimates for illustration** — before quoting a borrower, confirm exact lender PMI
+factors, FHA/VA/USDA fees, closing costs, and the current HECM PLF tables. Each of those
+is centralized in `finance.ts` (frontend) so it's easy to override per lender or wire to
+your backend.
+
+## Going live on the web
+
+The app is set up to deploy as a **single service** (the Express server serves the built
+frontend and the API from one origin), so you get one public URL. A free, near‑one‑click
+path on Render — plus a portable `Dockerfile` for other hosts — is documented in
+**[DEPLOYMENT.md](DEPLOYMENT.md)**.

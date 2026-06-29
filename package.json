@@ -10,9 +10,11 @@
     "dev:api": "npm --prefix server run dev",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "start": "npm --prefix server start",
     "lint": "tsc --noEmit",
     "server:install": "npm --prefix server install",
-    "setup": "npm install && npm --prefix server install"
+    "setup": "npm install && npm --prefix server install",
+    "deploy:build": "npm install && npm --prefix server install && npm run build"
   },
   "dependencies": {
     "lucide-react": "^0.460.0",
