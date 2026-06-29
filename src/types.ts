@@ -78,6 +78,8 @@ export interface Settings {
   titleCompany: string;
   titleFeesPct: number;
   titleAgentName: string;
+  // Default closing-cost fee schedule used to seed new scenarios.
+  feeDefaults: ClosingCostItem[];
   // Preferences
   darkMode: boolean;
 }

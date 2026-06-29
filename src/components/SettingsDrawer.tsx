@@ -3,6 +3,8 @@ import { useSettings } from '@/context/SettingsContext';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from './ui/Button';
 import { TextField, Label } from './ui/TextField';
+import { ClosingCostsEditor, cloneFees } from './ClosingCostsEditor';
+import { defaultClosingCosts } from '@/lib/finance';
 import { initials } from '@/lib/format';
 import type { Settings } from '@/types';
 
@@ -131,6 +133,24 @@ export function SettingsDrawer() {
               </Button>
             </div>
           ))}
+
+          <div className="mb-6">
+            <div className="mb-1 text-[14px] font-bold text-text-primary">Default Closing Costs</div>
+            <div className="mb-1 text-[12.5px] text-text-muted">
+              Your standard fee schedule. New scenarios start from these, and “Reset to my defaults” on Compare restores them.
+            </div>
+            <ClosingCostsEditor
+              items={settings.feeDefaults ?? []}
+              onChange={(items) => update({ feeDefaults: items })}
+              showAmounts={false}
+              onReset={() => update({ feeDefaults: cloneFees(defaultClosingCosts()) })}
+              resetLabel="Reset to standard"
+              emptyHint="No default fees yet."
+            />
+            <Button variant="primary" size="md" className="mt-[14px]" disabled={saving} onClick={() => save()}>
+              {saving ? 'Saving…' : 'Save Default Fees'}
+            </Button>
+          </div>
 
           <div className="mb-2 flex items-center justify-between rounded-xl border border-border bg-elevated px-4 py-[14px]">
             <div>

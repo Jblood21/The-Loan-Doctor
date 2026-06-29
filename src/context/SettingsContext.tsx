@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '@/lib/api';
+import { defaultClosingCosts } from '@/lib/finance';
 import type { Settings } from '@/types';
 import { useAuth } from './AuthContext';
 
@@ -22,6 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   titleCompany: '',
   titleFeesPct: 0.5,
   titleAgentName: '',
+  feeDefaults: defaultClosingCosts(),
   darkMode: true,
 };
 
