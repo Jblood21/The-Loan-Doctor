@@ -1,18 +1,18 @@
 // Builds the pre-approval letter content in a narrative letterhead format
-// (RE line → To Whom It May Concern → pre-approval paragraphs → Best regards).
-// Supports selectable templates per loan program and an editable body, while the
-// letterhead, signature, and contact footer come from settings. Pure (pass `now`).
+// (optional title → RE line → salutation → body paragraphs → optional terms table →
+// optional validity → closing → signature). Supports selectable program templates,
+// an editable body, and several optional/editable parts. Pure (pass `now`).
 
 import type { LoanType, Scenario, Settings } from '@/types';
 import { computeScenario, loanTypeLabel } from './finance';
-import { fmt, longDateWeekday } from './format';
+import { fmt, longDate, longDateWeekday } from './format';
 
 export interface LetterTemplateMeta {
   id: string;
   label: string;
 }
 
-/** Templates offered in the picker — each sets the financing wording. */
+/** Program templates offered in the picker — each sets the financing wording. */
 export const LETTER_TEMPLATES: LetterTemplateMeta[] = [
   { id: 'auto', label: 'Auto — match loan type' },
   { id: 'conventional', label: 'Conventional' },
@@ -24,10 +24,18 @@ export const LETTER_TEMPLATES: LetterTemplateMeta[] = [
   { id: 'firsttime', label: 'First-Time Buyer' },
 ];
 
+/** Visual letterhead styles offered in the picker. */
+export const LETTERHEAD_STYLES: LetterTemplateMeta[] = [
+  { id: 'mortgage-expert', label: 'The Mortgage Expert (green band)' },
+  { id: 'classic', label: 'Classic (centered)' },
+];
+
+/** Quick-pick presets for the salutation + closing fields. */
+export const SALUTATION_PRESETS = ['To Whom It May Concern:', 'Dear Listing Agent:', 'Dear Seller:', 'Dear Buyer’s Agent:'];
+export const CLOSING_PRESETS = ['Best regards,', 'Sincerely,', 'Warm regards,', 'Respectfully,'];
+
 interface TemplateSpec {
-  /** Financing label, or null to use the scenario's loan type. */
   label: string | null;
-  /** Tail clause appended to the first sentence. */
   tail: string;
 }
 
@@ -46,7 +54,6 @@ export interface ResolvedTemplate {
   paragraphs: string[];
 }
 
-/** Resolve a template's default body paragraphs for the scenario. */
 export function resolveTemplate(id: string, scenario: Scenario, opts: { borrowerName?: string; propertyAddress?: string } = {}): ResolvedTemplate {
   const spec = TEMPLATE_SPECS[id] || TEMPLATE_SPECS.auto;
   const label = spec.label ?? loanTypeLabel(scenario.loanType);
@@ -71,14 +78,25 @@ function bodyParagraphs(
   const p1 = isRefi
     ? `${name} ${isAre} pre-approved to refinance the property located at ${property} with a loan amount of ${loan} using ${financingLabel} financing${tail}.`
     : `${name} ${isAre} pre-approved for the purchase of the home located at ${property} at a purchase price of ${price} using ${financingLabel} financing${tail}.`;
-
   const p2 = `This pre-approval is supported by ${two ? 'their' : 'a'} strong credit history and credit score${two ? 's' : ''}. The borrower${two ? 's have' : ' has'} provided income and asset documentation verifying sufficient income and assets needed for this transaction.`;
-
   const p3 = `Based on this, ${name} can close in a timely manner pending underwriter review of the file, including a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`;
-
   const p4 = `Please contact me with any questions regarding this financing and credit pre-approval.`;
-
   return [p1, p2, p3, p4];
+}
+
+function buildTerms(scenario: Scenario): { label: string; value: string }[] {
+  const calc = computeScenario(scenario);
+  const isRefi = scenario.transaction === 'refinance';
+  const two = scenario.borrowers === '2';
+  return [
+    { label: 'Loan Type', value: loanTypeLabel(scenario.loanType) },
+    { label: 'Borrowers', value: two ? 'Two (co-borrowers)' : 'One' },
+    { label: isRefi ? 'Estimated Home Value' : 'Purchase Price', value: fmt(scenario.homePrice || 0) },
+    { label: 'Loan Amount', value: fmt(calc.baseLoan) },
+    { label: isRefi ? 'Estimated Equity' : 'Down Payment', value: fmt(scenario.downPayment || 0) },
+    { label: 'Interest Rate', value: `${scenario.rate || 0}%` },
+    { label: 'Loan Term', value: `${scenario.term}-year ${scenario.loanType === 'arm' ? 'ARM' : 'fixed'}` },
+  ];
 }
 
 export interface LetterAgent {
@@ -89,10 +107,13 @@ export interface LetterAgent {
 
 export interface PreApprovalLetter {
   date: string;
+  title: string;
   reLine: string;
   subjectAddress: string;
   salutation: string;
   paragraphs: string[];
+  terms: { label: string; value: string }[] | null;
+  validity: string;
   closing: string;
   officerName: string;
   officerTitle: string;
@@ -105,10 +126,21 @@ export interface LetterOptions {
   propertyAddress?: string;
   includeAgent: boolean;
   now?: Date;
-  /** Template id used for the default body (defaults to 'auto'). */
   templateId?: string;
-  /** Edited body override (paragraphs); falls back to the resolved template. */
+  /** Edited body override (paragraphs). */
   paragraphs?: string[];
+  // Editable parts (empty/undefined → sensible default).
+  reLine?: string;
+  salutation?: string;
+  closing?: string;
+  title?: string;
+  /** Display date override; empty → today's weekday date. */
+  dateText?: string;
+  // Optional sections.
+  showTerms?: boolean;
+  showValidity?: boolean;
+  expDays?: number;
+  showSubjectAddress?: boolean;
 }
 
 export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, opts: LetterOptions): PreApprovalLetter {
@@ -120,6 +152,11 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
 
   const now = opts.now || new Date();
   const name = (opts.borrowerName || '').trim() || '—';
+  const showSubjectAddress = opts.showSubjectAddress !== false;
+
+  const expDays = opts.expDays || 90;
+  const exp = new Date(now.getTime() + expDays * 86_400_000);
+  const validity = `This pre-approval is valid through ${longDate(exp)} and is subject to property appraisal, title review, and final underwriting verification.`;
 
   const hasAgent = !!(settings.agentName && settings.agentName.trim());
   const includeAgent = opts.includeAgent && hasAgent;
@@ -131,12 +168,15 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
     : '';
 
   return {
-    date: longDateWeekday(now),
-    reLine: `Pre-Approval for ${name}`,
-    subjectAddress: (opts.propertyAddress || '').trim(),
-    salutation: 'To Whom It May Concern:',
+    date: (opts.dateText || '').trim() || longDateWeekday(now),
+    title: (opts.title || '').trim(),
+    reLine: (opts.reLine || '').trim() || `Pre-Approval for ${name}`,
+    subjectAddress: showSubjectAddress ? (opts.propertyAddress || '').trim() : '',
+    salutation: (opts.salutation || '').trim() || 'To Whom It May Concern:',
     paragraphs,
-    closing: 'Best regards,',
+    terms: opts.showTerms ? buildTerms(scenario) : null,
+    validity: opts.showValidity ? validity : '',
+    closing: (opts.closing || '').trim() || 'Best regards,',
     officerName: settings.name || 'Alan Blood',
     officerTitle: settings.officerTitle || 'Mortgage Specialist',
     partnerLine,
