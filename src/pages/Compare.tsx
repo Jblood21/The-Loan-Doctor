@@ -6,12 +6,21 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { PillGroup } from '@/components/ui/Pill';
 import { NumberField } from '@/components/ui/NumberField';
 import { Select } from '@/components/ui/Select';
-import { Label } from '@/components/ui/TextField';
+import { Label, TextField } from '@/components/ui/TextField';
 import { useScenarios, MAX_SCENARIOS } from '@/context/ScenariosContext';
 import { useUI } from '@/context/UIContext';
-import { computeScenario } from '@/lib/finance';
-import { fmt, fmt2, pct } from '@/lib/format';
-import type { LoanProgram, LoanType, TransactionType } from '@/types';
+import { closingCostAmount, computeScenario, defaultClosingCosts } from '@/lib/finance';
+import { fmt, fmt2, pct, toNum } from '@/lib/format';
+import type { ClosingCostItem, FeeBasis, LoanProgram, LoanType, TransactionType } from '@/types';
+
+const FEE_BASES: { value: FeeBasis; label: string }[] = [
+  { value: 'flat', label: 'Flat $' },
+  { value: 'loan', label: '% of Loan' },
+  { value: 'price', label: '% of Price' },
+];
+
+const newFeeId = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `c${Date.now()}${Math.round(Math.random() * 1e6)}`;
 
 const LOAN_TYPES: { value: LoanType; label: string }[] = [
   { value: 'conventional', label: 'Conventional' },
@@ -61,6 +70,16 @@ export default function Compare() {
   };
 
   const miApplies = r.mi.applies;
+
+  // --- closing cost line-item management ---
+  const feeItems: ClosingCostItem[] = current.closingCosts ?? [];
+  const feeBaseLoan = r.baseLoan;
+  const feePrice = current.homePrice || 0;
+  const setFees = (next: ClosingCostItem[]) => patch({ closingCosts: next });
+  const updateFee = (id: string, p: Partial<ClosingCostItem>) => setFees(feeItems.map((it) => (it.id === id ? { ...it, ...p } : it)));
+  const addFee = () => setFees([...feeItems, { id: newFeeId(), label: 'Custom Fee', basis: 'flat', value: 0 }]);
+  const removeFee = (id: string) => setFees(feeItems.filter((it) => it.id !== id));
+  const resetFees = () => setFees(defaultClosingCosts());
 
   return (
     <div className="animate-lp-fade">
@@ -221,6 +240,80 @@ export default function Compare() {
               </div>
             ))}
           </div>
+
+          {/* CLOSING COSTS & FEES */}
+          <Divider className="my-6" />
+          <div className="flex items-center justify-between">
+            <SectionLabel>CLOSING COSTS &amp; FEES</SectionLabel>
+            <span className="num text-[13px] font-semibold text-text-softer">{fmt(r.closingCosts)}</span>
+          </div>
+
+          {feeItems.length === 0 ? (
+            <div className="mt-3 rounded-[10px] border border-dashed border-border-input bg-input px-4 py-4 text-center">
+              <div className="mb-2.5 text-[13px] text-text-muted">Using a 3% estimate. Itemize fees for an exact cash-to-close.</div>
+              <Button variant="secondary" size="sm" onClick={resetFees}>
+                Add standard fees
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="mt-3 hidden grid-cols-[1fr_104px_96px_84px_24px] gap-2 px-1 text-[11px] font-bold tracking-[0.4px] text-text-dim sm:grid">
+                <span>FEE</span>
+                <span>BASIS</span>
+                <span>AMOUNT</span>
+                <span className="text-right">TOTAL</span>
+                <span />
+              </div>
+              <div className="mt-1.5 flex flex-col gap-2">
+                {feeItems.map((it) => (
+                  <div key={it.id} className="grid grid-cols-[1fr_104px_96px_84px_24px] items-center gap-2">
+                    <TextField
+                      value={it.label}
+                      onChange={(e) => updateFee(it.id, { label: e.target.value })}
+                      className="!h-[38px] !rounded-[8px] !text-[13px]"
+                      aria-label="Fee name"
+                    />
+                    <Select
+                      value={it.basis}
+                      onChange={(e) => updateFee(it.id, { basis: e.target.value as FeeBasis })}
+                      options={FEE_BASES}
+                      className="!h-[38px] !rounded-[8px] !px-2.5 !text-[12.5px]"
+                    />
+                    <NumberField
+                      size="sm"
+                      prefix={it.basis === 'flat' ? '$' : undefined}
+                      suffix={it.basis === 'flat' ? undefined : '%'}
+                      value={it.value}
+                      onChange={(v) => updateFee(it.id, { value: toNum(v) })}
+                      className="!h-[38px] !rounded-[8px]"
+                      ariaLabel={`${it.label} amount`}
+                    />
+                    <span className="num text-right text-[13px] text-text-softer">{fmt(closingCostAmount(it, feeBaseLoan, feePrice))}</span>
+                    <button
+                      onClick={() => removeFee(it.id)}
+                      title="Remove fee"
+                      className="flex h-6 w-6 items-center justify-center rounded text-[16px] leading-none text-text-dim transition-colors hover:text-danger"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" onClick={addFee}>
+                    + Add fee
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={resetFees}>
+                    Reset to standard
+                  </Button>
+                </div>
+                <div className="text-[12.5px] text-text-muted">
+                  Total <span className="num font-semibold text-text-softer">{fmt(r.closingCosts)}</span>
+                </div>
+              </div>
+            </>
+          )}
         </Card>
 
         {/* RIGHT — results */}
@@ -266,7 +359,7 @@ export default function Compare() {
             </div>
             {[
               { label: 'Down Payment', value: fmt(current.downPayment || 0) },
-              { label: 'Est. Closing Costs (3%)', value: fmt(r.closingCosts) },
+              { label: r.closingItemized ? 'Closing Costs' : 'Est. Closing Costs (3%)', value: fmt(r.closingCosts) },
               { label: 'Credits Applied', value: `–${fmt(r.creditsApplied)}` },
             ].map((row) => (
               <div key={row.label} className="flex items-center justify-between py-[7px] text-[13px]">

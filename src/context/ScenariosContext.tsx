@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '@/lib/api';
+import { defaultClosingCosts } from '@/lib/finance';
 import type { Scenario } from '@/types';
 import { useAuth } from './AuthContext';
 
@@ -22,6 +23,7 @@ export function blankScenario(name: string): Scenario {
     lenderCredit: 0,
     sellerCredit: 0,
     otherCredits: 0,
+    closingCosts: defaultClosingCosts(),
   };
 }
 

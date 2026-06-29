@@ -6,6 +6,17 @@ export type LoanProgram = 'standard' | 'homeready' | 'homepossible' | 'firsttime
 export type LoanTerm = '30' | '20' | '15' | '10';
 export type PayoutOption = 'lump' | 'tenure' | 'line';
 
+/** How a closing-cost line item is computed. */
+export type FeeBasis = 'flat' | 'loan' | 'price';
+
+export interface ClosingCostItem {
+  id: string;
+  label: string;
+  basis: FeeBasis;
+  /** Dollar amount when basis is 'flat', otherwise a percentage. */
+  value: number;
+}
+
 export interface Scenario {
   /** Server id, present once persisted. */
   id?: string;
@@ -24,6 +35,8 @@ export interface Scenario {
   lenderCredit: number;
   sellerCredit: number;
   otherCredits: number;
+  /** Itemized closing costs (base + custom fees). When empty, a 3% estimate is used. */
+  closingCosts?: ClosingCostItem[];
   /** Optional per-scenario override for property tax rate (%/yr of home value). */
   taxRatePct?: number;
   /** Optional per-scenario override for homeowners insurance rate (%/yr of home value). */

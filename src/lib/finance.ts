@@ -12,13 +12,45 @@
 // All rates are documented inline. Lender-specific factors are centralized here so a
 // backend can later override them per lender.
 
-import type { LoanType, Scenario } from '@/types';
+import type { ClosingCostItem, LoanType, Scenario } from '@/types';
 
 export const DEFAULT_TAX_RATE = 1.25; // %/yr of home value
 export const DEFAULT_INSURANCE_RATE = 0.35; // %/yr of home value
-export const DEFAULT_CLOSING_RATE = 0.03; // 3% of loan, rough estimate
+export const DEFAULT_CLOSING_RATE = 0.03; // 3% of loan, rough fallback estimate
 /** FHA national HECM max claim amount (2025 lending limit). */
 export const HECM_MAX_CLAIM = 1209750;
+
+// ---------------------------------------------------------------------------
+// Closing costs — itemized base + custom fees
+// ---------------------------------------------------------------------------
+
+let _feeSeq = 0;
+const feeId = () => `f${++_feeSeq}`;
+
+/** A starter set of common closing-cost line items the LO can edit/extend. */
+export function defaultClosingCosts(): ClosingCostItem[] {
+  return [
+    { id: feeId(), label: 'Origination Fee', basis: 'loan', value: 1.0 },
+    { id: feeId(), label: 'Underwriting / Processing', basis: 'flat', value: 1195 },
+    { id: feeId(), label: 'Appraisal', basis: 'flat', value: 650 },
+    { id: feeId(), label: 'Credit Report', basis: 'flat', value: 75 },
+    { id: feeId(), label: "Title – Lender's Policy", basis: 'flat', value: 650 },
+    { id: feeId(), label: 'Settlement / Closing Fee', basis: 'flat', value: 500 },
+    { id: feeId(), label: 'Recording Fees', basis: 'flat', value: 150 },
+    { id: feeId(), label: 'Transfer Tax', basis: 'price', value: 0 },
+  ];
+}
+
+/** Resolve one fee line to a dollar amount. */
+export function closingCostAmount(item: ClosingCostItem, loan: number, price: number): number {
+  if (item.basis === 'loan') return (loan * (item.value || 0)) / 100;
+  if (item.basis === 'price') return (price * (item.value || 0)) / 100;
+  return item.value || 0;
+}
+
+export function totalClosingCosts(items: ClosingCostItem[], loan: number, price: number): number {
+  return (items || []).reduce((sum, it) => sum + closingCostAmount(it, loan, price), 0);
+}
 
 /** Standard amortized monthly payment. r is monthly rate (fraction), n months. */
 export function monthlyPayment(principal: number, annualRatePct: number, termYears: number): number {
@@ -214,6 +246,7 @@ export interface ScenarioResult {
   totalInterest: number;
   payoffMonths: number;
   closingCosts: number;
+  closingItemized: boolean;
   creditsApplied: number;
   cashToClose: number;
   subline: string;
@@ -257,7 +290,10 @@ export function computeScenario(s: Scenario): ScenarioResult {
   const lenderFees = baseLoan * 0.005 + 1200; // ~0.5% origination + fixed fees
   const apr = computeApr(financedLoan, pi, termYears, mi.upfrontFinanced + lenderFees);
 
-  const closingCosts = baseLoan * DEFAULT_CLOSING_RATE;
+  const closingItemized = !!(s.closingCosts && s.closingCosts.length);
+  const closingCosts = closingItemized
+    ? totalClosingCosts(s.closingCosts as ClosingCostItem[], baseLoan, homeValue)
+    : baseLoan * DEFAULT_CLOSING_RATE;
   const creditsApplied = (s.lenderCredit || 0) + (s.sellerCredit || 0) + (s.otherCredits || 0);
   const cashToClose = Math.max(0, (s.downPayment || 0) + closingCosts - creditsApplied);
 
@@ -277,6 +313,7 @@ export function computeScenario(s: Scenario): ScenarioResult {
     closingCosts,
     creditsApplied,
     cashToClose,
+    closingItemized,
     subline: `${Math.round(baseLoan).toLocaleString('en-US')} loan · ${s.rate || 0}% · ${s.term} yr · ${Math.round(ltv)}% LTV`,
   };
 }
