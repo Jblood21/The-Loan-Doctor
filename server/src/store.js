@@ -14,7 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, counters: { preApprovals: 0 } };
+const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -109,6 +109,47 @@ export function setLos(userId, provider, connected) {
 }
 export function getLos(userId) {
   return db.los[userId] || {};
+}
+
+// ---- inbound LOS borrowers (pushed via Zapier webhook) -----------------
+export function getLosBorrowers(userId) {
+  return db.losBorrowers[userId] || [];
+}
+/** Upsert borrowers (dedupe by loan number, else name+address); newest first, capped. */
+export function upsertLosBorrowers(userId, items) {
+  const existing = db.losBorrowers[userId] || [];
+  const key = (b) => (b.loanNumber ? `ln:${b.loanNumber}` : `na:${b.name}|${b.address}`);
+  const map = new Map(existing.map((b) => [key(b), b]));
+  for (const it of items) map.set(key(it), { ...map.get(key(it)), ...it });
+  const merged = Array.from(map.values()).sort((a, b) => (b.receivedAt || 0) - (a.receivedAt || 0)).slice(0, 300);
+  db.losBorrowers[userId] = merged;
+  persist();
+  return merged;
+}
+export function clearLosBorrowers(userId) {
+  db.losBorrowers[userId] = [];
+  persist();
+}
+
+// ---- per-user webhook token (identifies the Zap source) ----------------
+export function findUserByWebhookToken(token) {
+  return token ? db.users.find((u) => u.webhookToken === token) : undefined;
+}
+export function ensureWebhookToken(userId) {
+  const u = findUserById(userId);
+  if (!u) return null;
+  if (!u.webhookToken) {
+    u.webhookToken = `whk_${randomUUID().replace(/-/g, '')}`;
+    persist();
+  }
+  return u.webhookToken;
+}
+export function regenerateWebhookToken(userId) {
+  const u = findUserById(userId);
+  if (!u) return null;
+  u.webhookToken = `whk_${randomUUID().replace(/-/g, '')}`;
+  persist();
+  return u.webhookToken;
 }
 
 // ---- counters ----------------------------------------------------------
