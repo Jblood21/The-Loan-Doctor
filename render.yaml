@@ -22,9 +22,38 @@ services:
       # Signing secret for login tokens — Render generates a strong random value.
       - key: JWT_SECRET
         generateValue: true
-      # Admin Dashboard login password. Change this in the Render dashboard.
+
+      # ---- Admin account -------------------------------------------------
+      # Render prompts you for these on first deploy (sync:false = not stored in
+      # this file). Pick a strong ADMIN_PASSWORD; ADMIN_EMAIL is optional.
       - key: ADMIN_PASSWORD
-        value: loandr-admin
-      # Seed the demo loan-officer account so you can sign in immediately.
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+
+      # ---- Your personal loan-officer login ------------------------------
+      # Seeded on first run so you can always sign in, even with signups closed.
+      - key: OWNER_EMAIL
+        sync: false
+      - key: OWNER_PASSWORD
+        sync: false
+      - key: OWNER_NAME
+        sync: false
+      - key: OWNER_COMPANY
+        sync: false
+
+      # ---- Access control ------------------------------------------------
+      # Public self-signup is OFF. To let specific people register, set a
+      # SIGNUP_CODE and share it; they enter it on the Create-account screen.
+      - key: ALLOW_SIGNUP
+        value: "false"
+      - key: SIGNUP_CODE
+        sync: false
+      # No demo/sample accounts in production.
       - key: SEED_DEMO_USER
-        value: "true"
+        value: "false"
+
+      # ---- Public URL (for the Zapier/LOS webhook link shown in the app) -
+      # Set to your Render URL after first deploy, e.g. https://loandr.onrender.com
+      - key: PUBLIC_BASE_URL
+        sync: false

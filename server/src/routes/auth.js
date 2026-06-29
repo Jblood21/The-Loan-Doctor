@@ -6,8 +6,24 @@ import { requireAuth, signToken } from '../auth.js';
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Registration gate. Three states:
+//   • SIGNUP_CODE set        → anyone with the matching access code may register (invite-only).
+//   • ALLOW_SIGNUP !== 'false' → open registration (default; fine for dev).
+//   • otherwise               → registration closed entirely.
+const SIGNUP_CODE = process.env.SIGNUP_CODE || '';
+const SIGNUPS_OPEN = process.env.ALLOW_SIGNUP !== 'false';
+
 router.post('/register', (req, res) => {
-  const { email, password, name = '', company = '' } = req.body || {};
+  const { email, password, name = '', company = '', code = '' } = req.body || {};
+
+  if (SIGNUP_CODE) {
+    if (String(code).trim() !== SIGNUP_CODE) {
+      return res.status(403).json({ error: 'A valid access code is required to create an account.' });
+    }
+  } else if (!SIGNUPS_OPEN) {
+    return res.status(403).json({ error: 'Account creation is closed. Contact your administrator for access.' });
+  }
+
   if (!EMAIL_RE.test(email || '')) return res.status(400).json({ error: 'A valid email is required' });
   if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
   if (findUserByEmail(email)) return res.status(409).json({ error: 'An account with that email already exists' });

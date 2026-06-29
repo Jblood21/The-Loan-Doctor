@@ -61,7 +61,7 @@ export const api = {
   health: () => request<{ ok: boolean }>('GET', '/health'),
 
   // auth
-  register: (data: { email: string; password: string; name?: string; company?: string }) =>
+  register: (data: { email: string; password: string; name?: string; company?: string; code?: string }) =>
     request<AuthResponse>('POST', '/auth/register', data),
   login: (data: { email: string; password: string }) => request<AuthResponse>('POST', '/auth/login', data),
   me: () => request<{ user: User }>('GET', '/auth/me'),

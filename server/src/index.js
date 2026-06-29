@@ -64,11 +64,19 @@ app.use((err, _req, res, _next) => {
 
 seed();
 app.listen(PORT, () => {
+  const isProd = process.env.NODE_ENV === 'production';
   console.log(`\n  LoanDr. API → http://localhost:${PORT}`);
   console.log(`  Health      → http://localhost:${PORT}/api/health`);
-  console.log('  Seeded accounts:');
-  console.log(`    admin  → admin@loandr.app / ${process.env.ADMIN_PASSWORD || 'admin123'}`);
-  if (process.env.SEED_DEMO_USER !== 'false') {
-    console.log(`    demo   → ${process.env.DEMO_EMAIL || 'demo@lender.com'} / ${process.env.DEMO_PASSWORD || 'demo1234'}\n`);
+  if (isProd) {
+    // Never print real credentials to production logs.
+    console.log('  Seeded admin account (sign in with your configured ADMIN_EMAIL / ADMIN_PASSWORD).');
+    if (process.env.OWNER_EMAIL) console.log(`  Owner login → ${process.env.OWNER_EMAIL} (your OWNER_PASSWORD)`);
+  } else {
+    console.log('  Seeded accounts (dev):');
+    console.log(`    admin  → ${process.env.ADMIN_EMAIL || 'admin@loandr.app'} / ${process.env.ADMIN_PASSWORD || 'admin123'}`);
+    if (process.env.SEED_DEMO_USER !== 'false') {
+      console.log(`    demo   → ${process.env.DEMO_EMAIL || 'demo@lender.com'} / ${process.env.DEMO_PASSWORD || 'demo1234'}`);
+    }
+    console.log('');
   }
 });
