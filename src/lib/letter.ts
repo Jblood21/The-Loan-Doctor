@@ -34,6 +34,29 @@ export const LETTERHEAD_STYLES: LetterTemplateMeta[] = [
 export const SALUTATION_PRESETS = ['To Whom It May Concern:', 'Dear Listing Agent:', 'Dear Seller:', 'Dear Buyer’s Agent:'];
 export const CLOSING_PRESETS = ['Best regards,', 'Sincerely,', 'Warm regards,', 'Respectfully,'];
 
+export type PronounChoice = 'he' | 'she' | 'they';
+
+/** Borrower reference (pronoun) options for the picker. */
+export const PRONOUN_OPTIONS: { value: PronounChoice; label: string }[] = [
+  { value: 'he', label: 'He / Him' },
+  { value: 'she', label: 'She / Her' },
+  { value: 'they', label: 'They / Them' },
+];
+
+interface PronounSet {
+  subjCap: string;
+  poss: string;
+  have: string;
+}
+
+/** Two borrowers always read as plural "they". */
+function pronounSet(choice: PronounChoice, twoBorrowers: boolean): PronounSet {
+  if (twoBorrowers) return { subjCap: 'They', poss: 'their', have: 'have' };
+  if (choice === 'he') return { subjCap: 'He', poss: 'his', have: 'has' };
+  if (choice === 'she') return { subjCap: 'She', poss: 'her', have: 'has' };
+  return { subjCap: 'They', poss: 'their', have: 'have' };
+}
+
 interface TemplateSpec {
   label: string | null;
   tail: string;
@@ -54,18 +77,19 @@ export interface ResolvedTemplate {
   paragraphs: string[];
 }
 
-export function resolveTemplate(id: string, scenario: Scenario, opts: { borrowerName?: string; propertyAddress?: string } = {}): ResolvedTemplate {
+interface BodyOpts {
+  borrowerName?: string;
+  propertyAddress?: string;
+  pronoun?: PronounChoice;
+}
+
+export function resolveTemplate(id: string, scenario: Scenario, opts: BodyOpts = {}): ResolvedTemplate {
   const spec = TEMPLATE_SPECS[id] || TEMPLATE_SPECS.auto;
   const label = spec.label ?? loanTypeLabel(scenario.loanType);
   return { paragraphs: bodyParagraphs(scenario, opts, label, spec.tail) };
 }
 
-function bodyParagraphs(
-  scenario: Scenario,
-  opts: { borrowerName?: string; propertyAddress?: string },
-  financingLabel: string,
-  tail: string,
-): string[] {
+function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: string, tail: string): string[] {
   const calc = computeScenario(scenario);
   const isRefi = scenario.transaction === 'refinance';
   const two = scenario.borrowers === '2';
@@ -74,11 +98,13 @@ function bodyParagraphs(
   const property = (opts.propertyAddress || '').trim() || 'the subject property';
   const price = fmt(scenario.homePrice || 0);
   const loan = fmt(calc.baseLoan);
+  const pr = pronounSet(opts.pronoun || 'they', two);
+  const scores = two ? 'credit scores' : 'credit score';
 
   const p1 = isRefi
     ? `${name} ${isAre} pre-approved to refinance the property located at ${property} with a loan amount of ${loan} using ${financingLabel} financing${tail}.`
     : `${name} ${isAre} pre-approved for the purchase of the home located at ${property} at a purchase price of ${price} using ${financingLabel} financing${tail}.`;
-  const p2 = `This pre-approval is supported by ${two ? 'their' : 'a'} strong credit history and credit score${two ? 's' : ''}. The borrower${two ? 's have' : ' has'} provided income and asset documentation verifying sufficient income and assets needed for this transaction.`;
+  const p2 = `This pre-approval is supported by ${pr.poss} strong credit history and ${scores}. ${pr.subjCap} ${pr.have} provided income and asset documentation verifying sufficient income and assets needed for this transaction.`;
   const p3 = `Based on this, ${name} can close in a timely manner pending underwriter review of the file, including a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`;
   const p4 = `Please contact me with any questions regarding this financing and credit pre-approval.`;
   return [p1, p2, p3, p4];
@@ -127,6 +153,8 @@ export interface LetterOptions {
   includeAgent: boolean;
   now?: Date;
   templateId?: string;
+  /** How to reference the borrower (single-borrower pronoun). */
+  pronoun?: PronounChoice;
   /** Edited body override (paragraphs). */
   paragraphs?: string[];
   // Editable parts (empty/undefined → sensible default).
@@ -147,6 +175,7 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
   const def = resolveTemplate(opts.templateId || 'auto', scenario, {
     borrowerName: opts.borrowerName,
     propertyAddress: opts.propertyAddress,
+    pronoun: opts.pronoun,
   });
   const paragraphs = opts.paragraphs && opts.paragraphs.length ? opts.paragraphs : def.paragraphs;
 

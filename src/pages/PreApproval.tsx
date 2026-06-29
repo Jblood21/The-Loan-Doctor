@@ -16,10 +16,12 @@ import {
   buildPreApprovalLetter,
   LETTER_TEMPLATES,
   LETTERHEAD_STYLES,
+  PRONOUN_OPTIONS,
   resolveTemplate,
   SALUTATION_PRESETS,
   CLOSING_PRESETS,
 } from '@/lib/letter';
+import type { PronounChoice } from '@/lib/letter';
 import { fmt, longDateWeekday } from '@/lib/format';
 import type { PreApprovalState } from '@/types';
 
@@ -108,6 +110,7 @@ export default function PreApproval() {
   const [templateId, setTemplateId] = useState('auto');
   const [bodyText, setBodyText] = useState('');
   const [customized, setCustomized] = useState(false);
+  const [pronoun, setPronoun] = useState<PronounChoice>('they');
 
   // Letter customization.
   const [styleId, setStyleId] = useState('mortgage-expert');
@@ -124,8 +127,8 @@ export default function PreApproval() {
   const [expDays, setExpDays] = useState('90');
 
   const tpl = useMemo(
-    () => resolveTemplate(templateId, srcScenario, { borrowerName: pa.borrowerName, propertyAddress: pa.propertyAddress }),
-    [templateId, srcScenario, pa.borrowerName, pa.propertyAddress],
+    () => resolveTemplate(templateId, srcScenario, { borrowerName: pa.borrowerName, propertyAddress: pa.propertyAddress, pronoun }),
+    [templateId, srcScenario, pa.borrowerName, pa.propertyAddress, pronoun],
   );
   useEffect(() => {
     if (customized) return;
@@ -145,6 +148,7 @@ export default function PreApproval() {
     includeAgent,
     now: today,
     templateId,
+    pronoun,
     paragraphs: parsedParagraphs.length ? parsedParagraphs : undefined,
     reLine,
     salutation,
@@ -444,6 +448,17 @@ export default function PreApproval() {
               <Label>Closing</Label>
               <TextField value={closing} onChange={(e) => setClosing(e.target.value)} />
               <PresetChips presets={CLOSING_PRESETS} onPick={setClosing} />
+            </div>
+            <div className="col-span-2">
+              <Label>Reference borrower as</Label>
+              <SegmentedControl
+                options={PRONOUN_OPTIONS}
+                value={pronoun}
+                onChange={(v) => setPronoun(v as PronounChoice)}
+              />
+              <div className="mt-1.5 text-[12px] text-text-muted">
+                {srcScenario.borrowers === '2' ? 'Two borrowers always read as “they/them”.' : 'Sets he/him, she/her, or they/them in the letter wording.'}
+              </div>
             </div>
             <div>
               <Label>Date</Label>
