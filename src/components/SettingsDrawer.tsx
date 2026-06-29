@@ -25,10 +25,12 @@ const SECTIONS: Section[] = [
     note: 'Your info for documents and contact details.',
     cta: 'Save Loan Officer Info',
     fields: [
-      { key: 'name', label: 'Your Name', ph: 'John Smith' },
-      { key: 'company', label: 'Company', ph: 'ABC Mortgage' },
-      { key: 'phone', label: 'Phone', ph: '(555) 123-4567' },
-      { key: 'nmls', label: 'NMLS #', ph: '123456' },
+      { key: 'name', label: 'Your Name', ph: 'Alan Blood' },
+      { key: 'officerTitle', label: 'Title', ph: 'Mortgage Specialist' },
+      { key: 'company', label: 'Company', ph: 'CFG Home Loans' },
+      { key: 'email', label: 'Email', ph: 'you@lender.com' },
+      { key: 'phone', label: 'Phone', ph: '801.706.2802' },
+      { key: 'nmls', label: 'NMLS #', ph: '3146' },
     ],
   },
   {

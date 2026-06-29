@@ -49,6 +49,8 @@ export interface Settings {
   company: string;
   phone: string;
   nmls: string;
+  email: string;
+  officerTitle: string;
   // Lender Information
   lenderName: string;
   lenderNmls: string;

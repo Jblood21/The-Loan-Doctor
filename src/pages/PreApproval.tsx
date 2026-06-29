@@ -6,15 +6,18 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Select } from '@/components/ui/Select';
 import { TextField, Label } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
-import { LogoMark } from '@/components/Logo';
 import { useScenarios } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useUI } from '@/context/UIContext';
 import { api } from '@/lib/api';
 import { computeScenario } from '@/lib/finance';
 import { buildPreApprovalLetter, LETTER_TEMPLATES, resolveTemplate } from '@/lib/letter';
-import { fmt, longDate } from '@/lib/format';
+import { fmt } from '@/lib/format';
 import type { PreApprovalState } from '@/types';
+
+// The Mortgage Expert brand palette.
+const GREEN = '#1f3d25';
+const GOLD = '#b18f3f';
 
 const PROVIDERS = [
   { value: 'arive', label: 'Arive' },
@@ -45,8 +48,8 @@ export default function PreApproval() {
     losProvider: 'arive',
     losConnected: false,
     losQuery: '',
-    borrowerName: 'Michael & Laura Thompson',
-    propertyAddress: '',
+    borrowerName: 'Robert Boot',
+    propertyAddress: '205 Grand Avenue, Arco, ID 83213',
     expDays: '90',
   });
   const [losResults, setLosResults] = useState<Borrower[]>(STUB_BORROWERS);
@@ -57,38 +60,33 @@ export default function PreApproval() {
   const today = new Date();
   const hasAgent = !!(settings.agentName && settings.agentName.trim());
 
-  // Letter template + editable text.
+  // Letter template + editable body.
   const [templateId, setTemplateId] = useState('auto');
-  const [introText, setIntroText] = useState('');
-  const [highlightsText, setHighlightsText] = useState('');
+  const [bodyText, setBodyText] = useState('');
   const [customized, setCustomized] = useState(false);
 
-  // Default text for the chosen template + scenario.
   const tpl = useMemo(
-    () => resolveTemplate(templateId, srcScenario, pa.propertyAddress),
-    [templateId, srcScenario, pa.propertyAddress],
+    () => resolveTemplate(templateId, srcScenario, { borrowerName: pa.borrowerName, propertyAddress: pa.propertyAddress }),
+    [templateId, srcScenario, pa.borrowerName, pa.propertyAddress],
   );
-  // Seed the editable fields from the template until the user customizes them.
+  // Seed the editable body from the template until the user customizes it.
   useEffect(() => {
     if (customized) return;
-    setIntroText(tpl.intro);
-    setHighlightsText(tpl.highlights.join('\n'));
+    setBodyText(tpl.paragraphs.join('\n\n'));
   }, [tpl, customized]);
 
-  const parsedHighlights = highlightsText
-    .split('\n')
+  const parsedParagraphs = bodyText
+    .split(/\n\s*\n/)
     .map((s) => s.trim())
     .filter(Boolean);
 
   const letter = buildPreApprovalLetter(srcScenario, settings, {
     borrowerName: pa.borrowerName,
     propertyAddress: pa.propertyAddress,
-    expDays: parseInt(pa.expDays, 10),
     includeAgent,
     now: today,
     templateId,
-    intro: introText || undefined,
-    highlights: parsedHighlights.length ? parsedHighlights : undefined,
+    paragraphs: parsedParagraphs.length ? parsedParagraphs : undefined,
   });
 
   const onTemplateChange = (id: string) => {
@@ -136,23 +134,23 @@ export default function PreApproval() {
 
   const downloadPdf = async () => {
     const payload = {
-      heading: letter.heading,
+      date: letter.date,
+      reLine: letter.reLine,
+      subjectAddress: letter.subjectAddress,
       salutation: letter.salutation,
-      intro: letter.intro,
-      highlights: letter.highlights,
-      validity: letter.validity,
+      paragraphs: letter.paragraphs,
+      closing: letter.closing,
       borrowerName: pa.borrowerName || '—',
-      propertyAddress: pa.propertyAddress,
+      officer: { name: letter.officerName, title: letter.officerTitle, nmls: settings.nmls, email: settings.email, phone: settings.phone },
       lender: {
         name: settings.lenderName || settings.company,
         address: settings.lenderAddress,
         phone: settings.lenderPhone || settings.phone,
+        email: settings.email,
         nmls: settings.lenderNmls || settings.nmls,
+        website: settings.website,
       },
-      officer: { name: settings.name, nmls: settings.nmls, company: settings.company, phone: settings.phone },
       agent: letter.agent,
-      terms: letter.terms,
-      today: longDate(today),
     };
     try {
       const blob = await api.preApprovalPdf(payload);
@@ -173,7 +171,7 @@ export default function PreApproval() {
     const body = encodeURIComponent(
       `Hi ${pa.borrowerName},\n\nAttached is your pre-approval letter for a ${computeScenario(srcScenario).typeLabel} loan of ${fmt(
         computeScenario(srcScenario).baseLoan,
-      )}.\n\nBest,\n${settings.name}`,
+      )}.\n\nBest regards,\n${settings.name}`,
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
@@ -183,7 +181,7 @@ export default function PreApproval() {
       <PageHeader
         badge={<Badge tone="blue">Generator</Badge>}
         title="Pre-Approval Letter"
-        subtitle="Pull a borrower from your LOS or an existing scenario, then generate a branded letter that adapts to the loan."
+        subtitle="Pull a borrower from your LOS or a scenario, pick a program template, then generate a branded letter."
       />
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_1.05fr]">
@@ -211,9 +209,6 @@ export default function PreApproval() {
                   label: `${s.name || `Scenario ${i + 1}`} · ${computeScenario(s).typeLabel} · ${fmt(computeScenario(s).baseLoan)}`,
                 }))}
               />
-              <div className="mt-2.5 text-[12.5px] text-[#7d96ae]">
-                The letter’s wording adapts to this scenario — loan type, purchase vs. refinance, and borrower count.
-              </div>
             </div>
           )}
 
@@ -252,10 +247,7 @@ export default function PreApproval() {
                   />
                   <div className="flex flex-col gap-2">
                     {losResults.map((b) => (
-                      <div
-                        key={b.name}
-                        className="flex items-center justify-between rounded-[10px] border border-border-input bg-elevated px-3.5 py-[11px]"
-                      >
+                      <div key={b.name} className="flex items-center justify-between rounded-[10px] border border-border-input bg-elevated px-3.5 py-[11px]">
                         <div>
                           <div className="text-[13.5px] font-semibold text-text-primary">{b.name}</div>
                           <div className="text-[12px] text-text-muted">{b.meta}</div>
@@ -278,8 +270,21 @@ export default function PreApproval() {
           )}
 
           <Divider className="mb-5" />
+          <div className="mb-5 flex flex-col gap-4">
+            <div>
+              <Label>Borrower Name(s)</Label>
+              <TextField placeholder="Robert Boot" value={pa.borrowerName} onChange={(e) => set({ borrowerName: e.target.value })} />
+              {srcScenario.borrowers === '2' && (
+                <div className="mt-1.5 text-[12px] text-text-muted">Two borrowers — enter both names; the letter uses co-borrower wording.</div>
+              )}
+            </div>
+            <div>
+              <Label>Subject Property Address</Label>
+              <TextField placeholder="205 Grand Avenue, Arco, ID 83213" value={pa.propertyAddress} onChange={(e) => set({ propertyAddress: e.target.value })} />
+            </div>
+          </div>
 
-          {/* Letter template + editable text */}
+          {/* Letter template + editable body */}
           <div className="mb-5">
             <div className="mb-2 flex items-center justify-between">
               <SectionLabel>LETTER TEMPLATE</SectionLabel>
@@ -295,96 +300,49 @@ export default function PreApproval() {
               options={LETTER_TEMPLATES.map((t) => ({ value: t.id, label: t.label }))}
             />
             <div className="mt-1.5 text-[12px] text-text-muted">
-              {customized ? 'Editing custom text — Reset re-syncs with the template & scenario.' : 'Pick a program template, then edit the wording below to taste.'}
+              {customized ? 'Editing custom text — Reset re-syncs with the template & scenario.' : 'Pick a program, then edit the letter body below to taste.'}
             </div>
-
-            <Label className="mt-3.5">Intro paragraph</Label>
+            <Label className="mt-3.5">Letter body (paragraphs separated by a blank line)</Label>
             <textarea
-              value={introText}
+              value={bodyText}
               onChange={(e) => {
-                setIntroText(e.target.value);
+                setBodyText(e.target.value);
                 setCustomized(true);
               }}
-              rows={4}
-              className="w-full resize-y rounded-[10px] border border-border-input bg-input p-3 text-[13px] leading-[1.6] text-text-primary outline-none transition-shadow focus:border-brand-blue focus:shadow-focus"
-            />
-
-            <Label className="mt-3">Highlights (one per line)</Label>
-            <textarea
-              value={highlightsText}
-              onChange={(e) => {
-                setHighlightsText(e.target.value);
-                setCustomized(true);
-              }}
-              rows={3}
+              rows={10}
               className="w-full resize-y rounded-[10px] border border-border-input bg-input p-3 text-[13px] leading-[1.6] text-text-primary outline-none transition-shadow focus:border-brand-blue focus:shadow-focus"
             />
           </div>
 
-          <Divider className="mb-5" />
-          <div className="flex flex-col gap-4">
-            <div>
-              <Label>Borrower Name(s)</Label>
-              <TextField placeholder="Michael & Laura Thompson" value={pa.borrowerName} onChange={(e) => set({ borrowerName: e.target.value })} />
-              {srcScenario.borrowers === '2' && (
-                <div className="mt-1.5 text-[12px] text-text-muted">
-                  This scenario has two borrowers — enter both names (e.g. “Michael &amp; Laura Thompson”). The letter uses co-borrower wording.
-                </div>
-              )}
-            </div>
-            <div>
-              <Label>Property Address (optional)</Label>
-              <TextField placeholder="123 Main St, City, ST 12345" value={pa.propertyAddress} onChange={(e) => set({ propertyAddress: e.target.value })} />
-            </div>
-            <div>
-              <Label>Letter Valid For</Label>
-              <Select
-                value={pa.expDays}
-                onChange={(e) => set({ expDays: e.target.value as PreApprovalState['expDays'] })}
-                options={[
-                  { value: '30', label: '30 days' },
-                  { value: '60', label: '60 days' },
-                  { value: '90', label: '90 days' },
-                ]}
-              />
-            </div>
-
-            {/* Dual branding */}
-            <div className="flex items-center justify-between rounded-[10px] border border-border-input bg-input px-3.5 py-3">
-              <div className="pr-3">
-                <div className="text-[13px] font-semibold text-text-label">Dual branding (real-estate agent)</div>
-                <div className="text-[12px] text-text-muted">
-                  {hasAgent ? (
-                    <>Co-brand with {settings.agentName}{settings.brokerage ? `, ${settings.brokerage}` : ''}</>
-                  ) : (
-                    <>
-                      No agent saved.{' '}
-                      <button onClick={openSettings} className="cursor-pointer border-none bg-transparent p-0 text-brand-blue-light underline">
-                        Add one in Settings
-                      </button>
-                    </>
-                  )}
-                </div>
+          {/* Dual branding */}
+          <div className="mb-5 flex items-center justify-between rounded-[10px] border border-border-input bg-input px-3.5 py-3">
+            <div className="pr-3">
+              <div className="text-[13px] font-semibold text-text-label">Dual branding (real-estate agent)</div>
+              <div className="text-[12px] text-text-muted">
+                {hasAgent ? (
+                  <>Co-brand with {settings.agentName}{settings.brokerage ? `, ${settings.brokerage}` : ''}</>
+                ) : (
+                  <>
+                    No agent saved.{' '}
+                    <button onClick={openSettings} className="cursor-pointer border-none bg-transparent p-0 text-brand-blue-light underline">
+                      Add one in Settings
+                    </button>
+                  </>
+                )}
               </div>
-              <button
-                role="switch"
-                aria-checked={includeAgent && hasAgent}
-                disabled={!hasAgent}
-                onClick={() => setIncludeAgent((v) => !v)}
-                className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors disabled:opacity-40 ${
-                  includeAgent && hasAgent ? 'bg-brand-blue' : 'bg-border-input'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
-                    includeAgent && hasAgent ? 'left-[22px]' : 'left-0.5'
-                  }`}
-                />
-              </button>
             </div>
+            <button
+              role="switch"
+              aria-checked={includeAgent && hasAgent}
+              disabled={!hasAgent}
+              onClick={() => setIncludeAgent((v) => !v)}
+              className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors disabled:opacity-40 ${includeAgent && hasAgent ? 'bg-brand-blue' : 'bg-border-input'}`}
+            >
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${includeAgent && hasAgent ? 'left-[22px]' : 'left-0.5'}`} />
+            </button>
           </div>
 
-          <div className="mt-[22px] flex gap-2.5">
+          <div className="flex gap-2.5">
             <Button variant="primary" className="flex-1 !h-[46px]" onClick={downloadPdf}>
               Download PDF
             </Button>
@@ -394,80 +352,64 @@ export default function PreApproval() {
           </div>
           <div className="mt-3.5">
             <StubNote>
-              LOS borrower pull is a stubbed provider sandbox; the PDF is generated by the backend. Wire your real LOS
-              API and an e-sign/email service for production.
+              The letterhead, signature, and contact footer come from Settings. LOS borrower pull is a stubbed sandbox;
+              the PDF is generated by the backend — wire your real LOS API and e-sign/email service for production.
             </StubNote>
           </div>
         </Card>
 
-        {/* RIGHT — live letter preview (light) */}
+        {/* RIGHT — live letter preview */}
         <div className="sticky top-5">
           <div className="rounded-2xl bg-[#eef1f5] p-1.5 shadow-letter">
-            <div className="min-h-[540px] rounded-[11px] bg-white px-9 py-[38px] text-[#1b2733]">
-              <div className="mb-[22px] flex items-center justify-between border-b-2 border-[#0c2238] pb-[18px]">
-                <div>
-                  <div className="font-display text-[20px] font-bold text-[#0c2238]">{settings.lenderName || 'ABC Mortgage'}</div>
-                  <div className="mt-[3px] text-[11.5px] text-[#5b6b7b]">{settings.lenderAddress || '123 Main Street, Suite 100 · New York, NY 10001'}</div>
-                  <div className="text-[11.5px] text-[#5b6b7b]">
-                    {settings.lenderPhone || '(800) 555-1234'} · NMLS #{settings.lenderNmls || '123456'}
-                  </div>
-                </div>
-                <LogoMark size={46} stroke="#fff" />
+            <div className="flex min-h-[660px] flex-col overflow-hidden rounded-[11px] bg-white" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+              {/* Letterhead */}
+              <div className="px-10 pt-9">
+                <img src="/brand/letterhead-logo.jpg" alt="The Mortgage Expert — Alan Blood" className="h-[58px] w-auto" />
+                <div className="mt-4 h-[3px] w-full rounded" style={{ background: GOLD }} />
               </div>
 
-              <div className="mb-[18px] text-[12.5px] text-[#5b6b7b]">{longDate(today)}</div>
-              <div className="mb-3.5 text-[18px] font-bold text-[#0c2238]">{letter.heading}</div>
-              <p className="mb-[13px] text-[13.5px] leading-[1.7]">{letter.salutation}</p>
-              <p className="mb-4 text-[13.5px] leading-[1.7]">{letter.intro}</p>
-
-              <div className="mb-[18px] rounded-[10px] bg-[#f4f6f9] px-5 py-4">
-                {letter.terms.map((row) => (
-                  <div key={row.label} className="flex justify-between border-b border-[#e3e8ee] py-[7px] text-[13px] last:border-0">
-                    <span className="text-[#5b6b7b]">{row.label}</span>
-                    <span className="num font-semibold text-[#0c2238]">{row.value}</span>
+              {/* Body */}
+              <div className="flex-1 px-10 py-7 text-[#1b2733]">
+                <div className="text-[12.5px] text-[#555]">{letter.date}</div>
+                <div className="mt-5 text-[13.5px]">
+                  <span className="font-bold">RE:</span> {letter.reLine}
+                </div>
+                {letter.subjectAddress && (
+                  <div className="ml-[30px] text-[13.5px] font-bold" style={{ color: GREEN }}>
+                    {letter.subjectAddress}
                   </div>
+                )}
+                <div className="mt-5 text-[13.5px]">{letter.salutation}</div>
+                {letter.paragraphs.map((p, i) => (
+                  <p key={i} className="mt-3.5 text-[13.5px] leading-[1.65]">
+                    {p}
+                  </p>
                 ))}
+                <div className="mt-7 text-[13.5px]">{letter.closing}</div>
+                <div className="mt-1 text-[15px] font-bold" style={{ color: GREEN }}>
+                  {letter.officerName}
+                </div>
+                <div className="text-[12.5px] text-[#5b6b7b]">{letter.officerTitle}</div>
+                {letter.partnerLine && <div className="mt-2 text-[12px] italic text-[#5b6b7b]">{letter.partnerLine}</div>}
               </div>
 
-              {letter.highlights.length > 0 && (
-                <ul className="mb-4 ml-[18px] list-disc text-[13px] leading-[1.7] text-[#1b2733] marker:text-[#2f80ed]">
-                  {letter.highlights.map((h, i) => (
-                    <li key={i}>{h}</li>
-                  ))}
-                </ul>
-              )}
-              <p className="mb-4 text-[13.5px] leading-[1.7]">
-                This pre-approval is valid through <strong>{letter.expDate}</strong> and is subject to property
-                appraisal, title review, and final underwriting verification.
-              </p>
-
-              <p className="mb-1 text-[13.5px]">Sincerely,</p>
-              <div className="mt-1 font-display text-[17px] italic text-[#0c2238]">{letter.signatureName}</div>
-              <div className="text-[12px] text-[#5b6b7b]">{letter.signatureLine}</div>
-
-              {/* Dual-branding block */}
-              {letter.agent && (
-                <div className="mt-5 grid grid-cols-2 gap-4 rounded-[10px] border border-[#e3e8ee] bg-[#f9fafb] px-5 py-4">
-                  <div>
-                    <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.6px] text-[#9aa7b4]">Your Loan Officer</div>
-                    <div className="text-[13px] font-semibold text-[#0c2238]">{settings.name || 'John Smith'}</div>
-                    <div className="text-[11.5px] text-[#5b6b7b]">NMLS #{settings.nmls || '123456'} · {settings.company || 'ABC Mortgage'}</div>
-                    {(settings.lenderPhone || settings.phone) && (
-                      <div className="text-[11.5px] text-[#5b6b7b]">{settings.lenderPhone || settings.phone}</div>
-                    )}
-                  </div>
-                  <div className="border-l border-[#e3e8ee] pl-4">
-                    <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.6px] text-[#9aa7b4]">Your Real Estate Agent</div>
-                    <div className="text-[13px] font-semibold text-[#0c2238]">{letter.agent.name}</div>
-                    {letter.agent.brokerage && <div className="text-[11.5px] text-[#5b6b7b]">{letter.agent.brokerage}</div>}
-                    {letter.agent.phone && <div className="text-[11.5px] text-[#5b6b7b]">{letter.agent.phone}</div>}
+              {/* Contact footer band */}
+              <div className="mt-auto" style={{ background: GREEN, borderTop: `4px solid ${GOLD}` }}>
+                <div className="flex items-center gap-4 px-9 py-5">
+                  <img src="/brand/officer-headshot.png" alt={settings.name} className="h-[62px] w-[62px] flex-shrink-0 rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
+                  <div className="text-[11.5px] leading-[1.5] text-white">
+                    <div className="font-semibold">
+                      {settings.phone}
+                      {settings.email ? <span className="text-[#cfe0d2]">{'  ·  '}{settings.email}</span> : null}
+                    </div>
+                    <div className="text-[#dfeae0]">{settings.lenderAddress}</div>
+                    <div className="text-[#dfeae0]">{settings.lenderName}</div>
+                    <div style={{ color: GOLD }}>
+                      NMLS# {settings.lenderNmls || settings.nmls}
+                      {settings.website ? `   ·   ${settings.website}` : ''}
+                    </div>
                   </div>
                 </div>
-              )}
-
-              <div className="mt-[18px] border-t border-[#e3e8ee] pt-3.5 text-[10px] leading-[1.5] text-[#9aa7b4]">
-                Equal Housing Lender. This is not a commitment to lend. All loans are subject to credit approval,
-                verification of information, and satisfactory appraisal.
               </div>
             </div>
           </div>

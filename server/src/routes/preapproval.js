@@ -1,122 +1,128 @@
 import { Router } from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
 import { incPreApprovals } from '../store.js';
 import { requireAuth } from '../auth.js';
 
 const router = Router();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ASSETS = path.join(__dirname, '..', 'assets');
+const LOGO = path.join(ASSETS, 'letterhead-logo.jpg');
+const HEADSHOT = path.join(ASSETS, 'officer-headshot.png');
+
+const GREEN = '#1f3d25';
+const GOLD = '#b18f3f';
 
 router.post('/pdf', requireAuth, (req, res) => {
   const {
-    heading = 'Pre-Approval Letter',
-    salutation,
-    intro,
-    highlights = [],
-    validity,
+    date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
+    reLine = 'Pre-Approval',
+    subjectAddress = '',
+    salutation = 'To Whom It May Concern:',
+    paragraphs = [],
+    closing = 'Best regards,',
     borrowerName = '—',
-    propertyAddress = '',
-    lender = {},
     officer = {},
+    lender = {},
     agent = null,
-    type = 'Conventional',
-    terms = [],
-    expDate = '',
-    today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
   } = req.body || {};
 
-  // Fall back to generic wording if the client didn't send the adaptive text.
-  const introText =
-    intro ||
-    `Congratulations! Based on a review of your credit, income, and assets, you have been pre-approved for a ${type} mortgage loan${
-      propertyAddress ? ` for the property at ${propertyAddress}` : ''
-    } under the following terms:`;
-  const salutationText = salutation || `Dear ${borrowerName},`;
-  const validityText =
-    validity || `This pre-approval is valid through ${expDate} and is subject to property appraisal, title review, and final underwriting verification.`;
-
-  const doc = new PDFDocument({ size: 'LETTER', margins: { top: 64, bottom: 64, left: 64, right: 64 } });
+  const doc = new PDFDocument({ size: 'LETTER', margins: { top: 56, bottom: 130, left: 64, right: 64 } });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="preapproval-${String(borrowerName).split(' ').pop() || 'letter'}.pdf"`);
   doc.pipe(res);
 
-  const navy = '#0c2238';
-  const muted = '#5b6b7b';
   const LEFT = 64;
   const RIGHT = 548;
+  const PAGE_W = 612;
+  const PAGE_H = 792;
 
-  // Letterhead
-  doc.fillColor(navy).fontSize(20).font('Helvetica-Bold').text(lender.name || 'ABC Mortgage');
-  doc.moveDown(0.2);
-  doc.fillColor(muted).fontSize(9).font('Helvetica');
-  if (lender.address) doc.text(lender.address);
-  doc.text(`${lender.phone || '(800) 555-1234'}  ·  NMLS #${lender.nmls || '123456'}`);
-  doc.moveTo(LEFT, doc.y + 6).lineTo(RIGHT, doc.y + 6).strokeColor(navy).lineWidth(2).stroke();
-  doc.moveDown(1.4);
-
-  // Date + heading
-  doc.fillColor(muted).fontSize(10).text(today);
-  doc.moveDown(0.6);
-  doc.fillColor(navy).fontSize(16).font('Helvetica-Bold').text(heading);
-  doc.moveDown(0.8);
-
-  // Body
-  doc.fillColor('#1b2733').fontSize(11).font('Helvetica');
-  doc.text(salutationText);
-  doc.moveDown(0.6);
-  doc.text(introText, { lineGap: 3 });
-  doc.moveDown(0.8);
-
-  // Terms table
-  terms.forEach((row) => {
-    const y = doc.y;
-    doc.fillColor(muted).font('Helvetica').fontSize(11).text(row.label, LEFT + 8, y);
-    doc.fillColor(navy).font('Helvetica-Bold').text(row.value, LEFT + 8, y, { width: RIGHT - LEFT - 16, align: 'right' });
-    doc.moveDown(0.2);
-    doc.strokeColor('#e3e8ee').lineWidth(0.5).moveTo(LEFT + 8, doc.y + 2).lineTo(RIGHT - 8, doc.y + 2).stroke();
-    doc.moveDown(0.4);
-  });
-  doc.moveDown(0.8);
-
-  if (Array.isArray(highlights) && highlights.length) {
-    doc.fillColor('#1b2733').font('Helvetica').fontSize(11);
-    highlights.forEach((h) => doc.text(`•  ${h}`, LEFT + 8, doc.y, { lineGap: 2, width: RIGHT - LEFT - 16 }));
-    doc.moveDown(0.6);
+  // Letterhead logo + gold rule
+  try {
+    if (fs.existsSync(LOGO)) doc.image(LOGO, LEFT, 48, { height: 46 });
+  } catch {
+    /* logo optional */
   }
-  doc.fillColor('#1b2733').font('Helvetica').fontSize(11).text(validityText, { lineGap: 3 });
-  doc.moveDown(1.2);
+  doc.moveTo(LEFT, 108).lineTo(RIGHT, 108).lineWidth(3).strokeColor(GOLD).stroke();
+  doc.y = 126;
+
+  // Date
+  doc.fillColor('#555555').font('Helvetica').fontSize(10).text(date, LEFT, doc.y);
+  doc.moveDown(1);
+
+  // RE line
+  const reY = doc.y;
+  doc.fillColor('#1b2733').font('Helvetica-Bold').fontSize(11).text('RE: ', LEFT, reY, { continued: true });
+  doc.font('Helvetica').text(reLine);
+  if (subjectAddress) {
+    doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(11).text(subjectAddress, LEFT + 26, doc.y);
+  }
+  doc.moveDown(1);
+
+  // Salutation + body
+  doc.fillColor('#1b2733').font('Helvetica').fontSize(11).text(salutation, LEFT, doc.y);
+  doc.moveDown(0.6);
+  (Array.isArray(paragraphs) ? paragraphs : []).forEach((p) => {
+    doc.fillColor('#1b2733').font('Helvetica').fontSize(11).text(p, LEFT, doc.y, { width: RIGHT - LEFT, lineGap: 2 });
+    doc.moveDown(0.7);
+  });
 
   // Signature
-  doc.text('Sincerely,');
-  doc.moveDown(0.3);
-  doc.fillColor(navy).font('Helvetica-Oblique').fontSize(14).text(officer.name || 'John Smith');
-  doc.fillColor(muted).font('Helvetica').fontSize(10).text(`Loan Officer · NMLS #${officer.nmls || '123456'} · ${officer.company || lender.name || 'ABC Mortgage'}`);
-
-  // Dual-branding block (loan officer + real-estate agent)
+  doc.moveDown(0.6);
+  doc.fillColor('#1b2733').font('Helvetica').fontSize(11).text(closing, LEFT, doc.y);
+  doc.moveDown(0.4);
+  doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(13).text(officer.name || 'Alan Blood', LEFT, doc.y);
+  doc.fillColor('#5b6b7b').font('Helvetica').fontSize(10).text(officer.title || 'Mortgage Specialist', LEFT, doc.y);
   if (agent && agent.name) {
-    doc.moveDown(1.2);
-    const top = doc.y;
-    doc.strokeColor('#e3e8ee').lineWidth(0.5).moveTo(LEFT, top).lineTo(RIGHT, top).stroke();
-    const colTop = top + 12;
-    const col2 = 310;
-
-    doc.font('Helvetica-Bold').fontSize(8).fillColor('#9aa7b4').text('YOUR LOAN OFFICER', LEFT, colTop, { width: 230 });
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(navy).text(officer.name || 'John Smith', LEFT, colTop + 12, { width: 230 });
-    doc.font('Helvetica').fontSize(9).fillColor(muted).text(`NMLS #${officer.nmls || '123456'} · ${officer.company || lender.name || ''}`, LEFT, colTop + 28, { width: 230 });
-    if (officer.phone) doc.text(officer.phone, LEFT, colTop + 40, { width: 230 });
-
-    doc.font('Helvetica-Bold').fontSize(8).fillColor('#9aa7b4').text('YOUR REAL ESTATE AGENT', col2, colTop, { width: 230 });
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(navy).text(agent.name, col2, colTop + 12, { width: 230 });
-    if (agent.brokerage) doc.font('Helvetica').fontSize(9).fillColor(muted).text(agent.brokerage, col2, colTop + 28, { width: 230 });
-    if (agent.phone) doc.font('Helvetica').fontSize(9).fillColor(muted).text(agent.phone, col2, colTop + 40, { width: 230 });
-    doc.y = colTop + 58;
+    doc.moveDown(0.4);
+    doc.fillColor('#5b6b7b').font('Helvetica-Oblique').fontSize(9).text(
+      `Prepared in partnership with ${agent.name}${agent.brokerage ? `, ${agent.brokerage}` : ''}${agent.phone ? ` · ${agent.phone}` : ''}.`,
+      LEFT,
+      doc.y,
+      { width: RIGHT - LEFT },
+    );
   }
 
-  doc.moveDown(1.5);
-  doc.font('Helvetica').fontSize(8).fillColor('#9aa7b4').text(
-    'Equal Housing Lender. This is not a commitment to lend. All loans are subject to credit approval, verification of information, and satisfactory appraisal.',
-    LEFT,
-    doc.y,
-    { lineGap: 2, width: RIGHT - LEFT },
-  );
+  // ---- Contact footer band (absolute, bottom of page) ----
+  // Drop the bottom margin so absolutely-positioned band text doesn't trigger new pages.
+  doc.page.margins.bottom = 0;
+  const bandH = 104;
+  const bandY = PAGE_H - bandH;
+  doc.save();
+  doc.rect(0, bandY, PAGE_W, bandH).fill(GREEN);
+  doc.rect(0, bandY, PAGE_W, 4).fill(GOLD);
+  doc.restore();
+
+  // headshot (circular)
+  const r = 31;
+  const cx = LEFT + r;
+  const cy = bandY + bandH / 2;
+  try {
+    if (fs.existsSync(HEADSHOT)) {
+      doc.save();
+      doc.circle(cx, cy, r).clip();
+      doc.image(HEADSHOT, cx - r, cy - r, { cover: [r * 2, r * 2], align: 'center', valign: 'top' });
+      doc.restore();
+      doc.circle(cx, cy, r).lineWidth(2).strokeColor(GOLD).stroke();
+    }
+  } catch {
+    /* headshot optional */
+  }
+
+  // contact text
+  const tx = LEFT + r * 2 + 18;
+  let ty = bandY + 24;
+  const line = (text, color, font = 'Helvetica', size = 10) => {
+    doc.fillColor(color).font(font).fontSize(size).text(text, tx, ty, { width: PAGE_W - tx - 24, lineBreak: false });
+    ty += size + 5;
+  };
+  const phoneEmail = [lender.phone, lender.email].filter(Boolean).join('   ·   ');
+  line(phoneEmail, '#ffffff', 'Helvetica-Bold', 10);
+  if (lender.address) line(lender.address, '#dfeae0');
+  if (lender.name) line(lender.name, '#dfeae0');
+  line(`NMLS# ${lender.nmls || ''}${lender.website ? `     ·     ${lender.website}` : ''}`, GOLD, 'Helvetica-Bold', 10);
 
   doc.end();
   incPreApprovals();
