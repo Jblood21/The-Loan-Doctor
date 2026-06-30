@@ -146,6 +146,7 @@ export function SettingsDrawer() {
               onReset={() => update({ feeDefaults: cloneFees(defaultClosingCosts()) })}
               resetLabel="Reset to standard"
               emptyHint="No default fees yet."
+              enableTitleSchedule
             />
             <Button variant="primary" size="md" className="mt-[14px]" disabled={saving} onClick={() => save()}>
               {saving ? 'Saving…' : 'Save Default Fees'}

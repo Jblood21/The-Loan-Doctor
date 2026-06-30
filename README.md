@@ -38,7 +38,7 @@ This starts **both** servers at once:
 Open **http://localhost:5173** in your browser.
 
 ### 3. Sign in
-The backend seeds two accounts on first run:
+For **local development**, the backend seeds two convenience accounts on first run:
 
 | Role  | Email               | Password   | What you can see                          |
 |-------|---------------------|------------|-------------------------------------------|
@@ -46,6 +46,12 @@ The backend seeds two accounts on first run:
 | LO    | `demo@lender.com`   | `demo1234` | The full loan‑officer workspace           |
 
 You can also click **Create an account** on the login screen to register a new user.
+
+> **Production is hardened.** With `NODE_ENV=production`, these demo accounts are **not**
+> seeded and there is no default admin password — you set `ADMIN_PASSWORD` and a personal
+> `OWNER_EMAIL`/`OWNER_PASSWORD`, and public self-signup is off unless you enable it with
+> `ALLOW_SIGNUP=true` or invite people via a `SIGNUP_CODE`. See
+> [DEPLOYMENT.md](DEPLOYMENT.md) and [`server/.env.example`](server/.env.example).
 
 > Tip: run the two servers separately if you prefer — `npm run dev:web` and, in another
 > terminal, `npm run dev:api`.

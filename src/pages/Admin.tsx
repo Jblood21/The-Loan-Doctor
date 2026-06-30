@@ -80,7 +80,7 @@ export default function Admin() {
         <Card className="p-10 text-center">
           <div className="text-[16px] font-semibold text-text-heading">Admins only</div>
           <p className="mt-2 text-[14px] text-text-muted">
-            Sign in with an administrator account (e.g. <strong>admin@loandr.app</strong>) to view usage data.
+            This area is restricted to administrator accounts. Sign in with your admin credentials to view usage data.
           </p>
         </Card>
       </div>

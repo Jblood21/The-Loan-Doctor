@@ -179,23 +179,59 @@ export function publicUser(u) {
   };
 }
 
-/** Seed an admin, a demo LO, and the sample users shown on the admin dashboard. */
+/** Seed the admin account, an optional owner login, and (in non-prod) demo data. */
 export function seed() {
   load();
   if (db.users.length > 0) return; // already seeded
 
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const isProd = process.env.NODE_ENV === 'production';
+
+  // --- Admin account --------------------------------------------------------
+  // In production NEVER fall back to a known default password. If ADMIN_PASSWORD
+  // is unset, generate a random one and warn loudly so no guessable admin ships.
+  let adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    if (isProd) {
+      adminPassword = randomUUID();
+      console.warn(
+        '[seed] ADMIN_PASSWORD is not set — generated a random admin password you cannot see. ' +
+          'Set ADMIN_PASSWORD in your environment and redeploy to choose your own.',
+      );
+    } else {
+      adminPassword = 'admin123';
+    }
+  }
   addUser({
-    email: 'admin@loandr.app',
+    email: (process.env.ADMIN_EMAIL || 'admin@loandr.app').toLowerCase(),
     password: adminPassword,
     name: 'Owner Admin',
-    company: 'LoanDr.',
+    company: process.env.OWNER_COMPANY || 'LoanDr.',
     nmls: '000001',
     role: 'admin',
     status: 'Active',
   });
 
-  if (process.env.SEED_DEMO_USER !== 'false') {
+  // --- Owner / personal loan-officer login ----------------------------------
+  // Seeded from env so you always have a normal account even when signups are
+  // closed. Recommended for production: set OWNER_EMAIL + OWNER_PASSWORD.
+  if (process.env.OWNER_EMAIL && process.env.OWNER_PASSWORD) {
+    addUser({
+      email: process.env.OWNER_EMAIL,
+      password: process.env.OWNER_PASSWORD,
+      name: process.env.OWNER_NAME || 'Loan Officer',
+      company: process.env.OWNER_COMPANY || '',
+      phone: process.env.OWNER_PHONE || '',
+      nmls: process.env.OWNER_NMLS || '',
+      role: 'user',
+      status: 'Active',
+    });
+  }
+
+  // --- Demo data (development / explicit opt-in only) ------------------------
+  // Never seed the throwaway demo account or sample users in production unless
+  // explicitly asked for (SEED_DEMO_USER=true), so a shared link stays clean.
+  const seedDemo = process.env.SEED_DEMO_USER === 'true' || (!isProd && process.env.SEED_DEMO_USER !== 'false');
+  if (seedDemo) {
     addUser({
       email: process.env.DEMO_EMAIL || 'demo@lender.com',
       password: process.env.DEMO_PASSWORD || 'demo1234',
@@ -206,18 +242,19 @@ export function seed() {
       role: 'user',
       status: 'Active',
     });
+
+    // Sample users that populate the admin Users table (demo flavor only).
+    const samples = [
+      ['Sarah Chen', 'sarah.chen@summitlend.com', 'Summit Lending', 42, 'Active'],
+      ['Marcus Webb', 'm.webb@bayfinance.com', 'Bay Finance', 18, 'Active'],
+      ['Elena Ruiz', 'elena@homefirstmtg.com', 'HomeFirst Mortgage', 7, 'Trial'],
+      ['David Okafor', 'd.okafor@apexloans.com', 'Apex Loans', 63, 'Active'],
+      ['Priya Patel', 'priya.patel@northstarfg.com', 'Northstar Funding', 29, 'Inactive'],
+    ];
+    for (const [name, email, company, count, status] of samples) {
+      addUser({ email, password: randomUUID(), name, company, role: 'user', status, scenarioCount: count });
+    }
   }
 
-  // Sample users that populate the admin Users table.
-  const samples = [
-    ['Sarah Chen', 'sarah.chen@summitlend.com', 'Summit Lending', 42, 'Active'],
-    ['Marcus Webb', 'm.webb@bayfinance.com', 'Bay Finance', 18, 'Active'],
-    ['Elena Ruiz', 'elena@homefirstmtg.com', 'HomeFirst Mortgage', 7, 'Trial'],
-    ['David Okafor', 'd.okafor@apexloans.com', 'Apex Loans', 63, 'Active'],
-    ['Priya Patel', 'priya.patel@northstarfg.com', 'Northstar Funding', 29, 'Inactive'],
-  ];
-  for (const [name, email, company, count, status] of samples) {
-    addUser({ email, password: randomUUID(), name, company, role: 'user', status, scenarioCount: count });
-  }
   persist();
 }

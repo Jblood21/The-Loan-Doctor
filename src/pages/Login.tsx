@@ -21,6 +21,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -32,7 +33,7 @@ export default function Login() {
       if (mode === 'login') {
         await login(email, password);
       } else {
-        await register({ email, password, name, company });
+        await register({ email, password, name, company, code });
       }
       navigate('/compare', { replace: true });
     } catch (err) {
@@ -121,6 +122,18 @@ export default function Login() {
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
               />
+              <Label>Access code</Label>
+              <TextField
+                size="lg"
+                className="mb-[6px]"
+                placeholder="Provided by your administrator"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                autoComplete="off"
+              />
+              <p className="mb-[18px] text-[12px] leading-[1.5] text-text-dim2">
+                Required only if this workspace is invite-only. Leave blank if you weren’t given one.
+              </p>
             </>
           )}
 
@@ -209,8 +222,8 @@ export default function Login() {
           </div>
 
           <div className="mt-7 rounded-[11px] border border-[rgba(47,128,237,0.2)] bg-[rgba(47,128,237,0.08)] px-[15px] py-[13px] text-[12.5px] leading-[1.5] text-[#8fb4dd]">
-            Demo build — log in as <strong>demo@lender.com / demo1234</strong>, or{' '}
-            <strong>admin@loandr.app / admin123</strong> for the Admin Dashboard. You can also create a new account.
+            <strong>Preview build</strong> — for evaluation and demonstration. Please don’t enter real borrower
+            personal or financial information.
           </div>
         </form>
       </div>
