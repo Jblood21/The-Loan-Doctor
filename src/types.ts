@@ -6,8 +6,18 @@ export type LoanProgram = 'standard' | 'homeready' | 'homepossible' | 'firsttime
 export type LoanTerm = '30' | '20' | '15' | '10';
 export type PayoutOption = 'lump' | 'tenure' | 'line';
 
-/** How a closing-cost line item is computed. */
-export type FeeBasis = 'flat' | 'loan' | 'price';
+/** How a closing-cost line item is computed.
+ *  flat / loan / price are manual; the `title-*` bases auto-read the title-insurance
+ *  rate schedule (src/lib/titleFees.ts) by purchase price or loan amount. */
+export type FeeBasis =
+  | 'flat'
+  | 'loan'
+  | 'price'
+  | 'title-owners'
+  | 'title-homeowners'
+  | 'title-builder'
+  | 'title-loan'
+  | 'title-refi';
 
 export interface ClosingCostItem {
   id: string;

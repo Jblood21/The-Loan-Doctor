@@ -12,7 +12,8 @@
 // All rates are documented inline. Lender-specific factors are centralized here so a
 // backend can later override them per lender.
 
-import type { ClosingCostItem, LoanType, Scenario } from '@/types';
+import type { ClosingCostItem, LoanType, Scenario, TransactionType } from '@/types';
+import { buildTitleScheduleFees, titleBasisAmount } from './titleFees';
 
 export const DEFAULT_TAX_RATE = 1.25; // %/yr of home value
 export const DEFAULT_INSURANCE_RATE = 0.35; // %/yr of home value
@@ -27,24 +28,27 @@ export const HECM_MAX_CLAIM = 1209750;
 let _feeSeq = 0;
 const feeId = () => `f${++_feeSeq}`;
 
-/** A starter set of common closing-cost line items the LO can edit/extend. */
-export function defaultClosingCosts(): ClosingCostItem[] {
-  return [
+/** A starter set of common closing-cost line items the LO can edit/extend.
+ *  Lender fees are manual; the title block is driven by the title rate schedule
+ *  (titleFees.ts) so its amounts auto-update from the scenario's price/loan. */
+export function defaultClosingCosts(transaction: TransactionType = 'purchase'): ClosingCostItem[] {
+  const lender: ClosingCostItem[] = [
     { id: feeId(), label: 'Origination Fee', basis: 'loan', value: 1.0 },
     { id: feeId(), label: 'Underwriting / Processing', basis: 'flat', value: 1195 },
     { id: feeId(), label: 'Appraisal', basis: 'flat', value: 650 },
     { id: feeId(), label: 'Credit Report', basis: 'flat', value: 75 },
-    { id: feeId(), label: "Title – Lender's Policy", basis: 'flat', value: 650 },
-    { id: feeId(), label: 'Settlement / Closing Fee', basis: 'flat', value: 500 },
-    { id: feeId(), label: 'Recording Fees', basis: 'flat', value: 150 },
-    { id: feeId(), label: 'Transfer Tax', basis: 'price', value: 0 },
   ];
+  const title = buildTitleScheduleFees({ transaction, mode: 'full', newId: feeId });
+  const tail: ClosingCostItem[] = transaction === 'purchase' ? [{ id: feeId(), label: 'Transfer Tax', basis: 'price', value: 0 }] : [];
+  return [...lender, ...title, ...tail];
 }
 
 /** Resolve one fee line to a dollar amount. */
 export function closingCostAmount(item: ClosingCostItem, loan: number, price: number): number {
   if (item.basis === 'loan') return (loan * (item.value || 0)) / 100;
   if (item.basis === 'price') return (price * (item.value || 0)) / 100;
+  const title = titleBasisAmount(item.basis, loan, price);
+  if (title !== null) return title;
   return item.value || 0;
 }
 

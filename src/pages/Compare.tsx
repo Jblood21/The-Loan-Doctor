@@ -265,6 +265,8 @@ export default function Compare() {
             onReset={resetFees}
             resetLabel="Reset to my defaults"
             emptyHint="Using a 3% estimate. Itemize fees for an exact cash-to-close."
+            enableTitleSchedule
+            transaction={current.transaction}
           />
         </Card>
 
