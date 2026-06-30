@@ -43,12 +43,14 @@ services:
         sync: false
 
       # ---- Access control ------------------------------------------------
-      # Public self-signup is OFF. To let specific people register, set a
-      # SIGNUP_CODE and share it; they enter it on the Create-account screen.
+      # Public self-signup is OFF; people register only with the SIGNUP_CODE
+      # below, which they enter on the Create-account screen. Change this to
+      # something private in Render → Environment, or clear it to fully close
+      # signups. (Your own owner login never needs the code.)
       - key: ALLOW_SIGNUP
         value: "false"
       - key: SIGNUP_CODE
-        sync: false
+        value: "123456"
       # No demo/sample accounts in production.
       - key: SEED_DEMO_USER
         value: "false"

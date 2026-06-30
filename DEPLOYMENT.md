@@ -44,7 +44,7 @@ haven't merged yet.
    | Variable          | What to enter                                                             |
    |-------------------|---------------------------------------------------------------------------|
    | `ADMIN_EMAIL`     | Your preferred admin login email (defaults to `admin@loandr.app`).        |
-   | `SIGNUP_CODE`     | A secret code if you want to *invite* others to register (see below).     |
+   | `SIGNUP_CODE`     | Invite code others type to register. Defaults to `123456` — change it to something private, or clear it to fully close signups. |
    | `PUBLIC_BASE_URL` | Leave blank for now — you'll set it after Step 4 to your live URL.        |
 
 4. Click **Apply** (or **Create Resources**) and wait ~3–5 minutes while it builds. You'll
@@ -73,8 +73,9 @@ That's it — you have a shareable link. 🎉
 ### Inviting others (optional)
 The app ships locked down to your accounts. Two ways to give access to other people:
 
-- **Invite code:** set a `SIGNUP_CODE` (any secret string) in Render → Environment. Share it
-  privately; invitees pick **Create an account** on the login screen and enter the code.
+- **Invite code:** the deploy ships with `SIGNUP_CODE=123456` so you can hand the link to a
+  few people right away — they pick **Create an account** and enter `123456`. Change it to
+  something private in Render → Environment whenever you like (it's easy to guess as-is).
 - **Fully open signups:** set `ALLOW_SIGNUP=true` and leave `SIGNUP_CODE` blank — then anyone
   with the link can register their own account.
 
