@@ -178,8 +178,8 @@ router.post('/pdf', requireAuth, (req, res) => {
   doc.moveDown(0.5);
   doc.fillColor('#1b2733').font('Helvetica').fontSize(11).text(closing, LEFT, doc.y);
   doc.moveDown(0.35);
-  doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(13).text(officer.name || 'Alan Blood', LEFT, doc.y);
-  doc.fillColor('#5b6b7b').font('Helvetica').fontSize(10).text(officer.title || 'Mortgage Specialist', LEFT, doc.y);
+  doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(13).text(officer.name || lender.name || 'Your Loan Officer', LEFT, doc.y);
+  doc.fillColor('#5b6b7b').font('Helvetica').fontSize(10).text(officer.title || 'Mortgage Loan Officer', LEFT, doc.y);
   if (agent && agent.name) {
     doc.moveDown(0.35);
     doc.fillColor('#5b6b7b').font('Helvetica-Oblique').fontSize(9).text(
