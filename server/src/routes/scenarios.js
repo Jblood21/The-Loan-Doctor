@@ -5,7 +5,15 @@ import { requireAuth } from '../auth.js';
 
 const router = Router();
 
+// Defensive server-side cap (the UI allows 6; this just stops API abuse from
+// storing an unbounded blob). Non-object entries are dropped.
+const MAX_SCENARIOS = 50;
 const withId = (s) => ({ ...s, id: s.id || randomUUID() });
+const sanitizeList = (arr) =>
+  (Array.isArray(arr) ? arr : [])
+    .filter((s) => s && typeof s === 'object' && !Array.isArray(s))
+    .slice(0, MAX_SCENARIOS)
+    .map(withId);
 
 router.get('/', requireAuth, (req, res) => {
   res.json({ scenarios: getScenarios(req.user.id) });
@@ -13,13 +21,15 @@ router.get('/', requireAuth, (req, res) => {
 
 // Replace the whole set (the Compare screen's "Save").
 router.put('/', requireAuth, (req, res) => {
-  const list = Array.isArray(req.body?.scenarios) ? req.body.scenarios.map(withId) : [];
-  res.json({ scenarios: setScenarios(req.user.id, list) });
+  res.json({ scenarios: setScenarios(req.user.id, sanitizeList(req.body?.scenarios)) });
 });
 
 router.post('/', requireAuth, (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return res.status(400).json({ error: 'Invalid scenario' });
   const list = getScenarios(req.user.id);
-  const scenario = withId(req.body || {});
+  if (list.length >= MAX_SCENARIOS) return res.status(409).json({ error: 'Scenario limit reached' });
+  const scenario = withId(body);
   setScenarios(req.user.id, [...list, scenario]);
   res.status(201).json({ scenario });
 });

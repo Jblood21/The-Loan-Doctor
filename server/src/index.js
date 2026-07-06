@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
 import { seed } from './store.js';
@@ -19,6 +20,11 @@ import preApprovalRoutes from './routes/preapproval.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+app.set('trust proxy', 1); // behind Render/other TLS proxy — needed for correct client IPs (rate limiting)
+
+// Security headers. CSP is left off because the SPA uses inline styles; the other
+// hardening headers (HSTS, X-Content-Type-Options, frameguard, referrer policy) apply.
+app.use(helmet({ contentSecurityPolicy: false }));
 
 // CORS — reflect any origin in dev; lock to CORS_ORIGIN list in production.
 const allowed = (process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -30,14 +36,16 @@ app.use(
 );
 app.use(express.json({ limit: '1mb' }));
 
-// Throttle auth endpoints against brute-force.
+// Throttle auth endpoints against brute-force, and the public webhook against abuse.
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true, legacyHeaders: false });
+const webhookLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/scenarios', scenarioRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/los/webhook', webhookLimiter);
 app.use('/api/los', losRoutes);
 app.use('/api/preapproval', preApprovalRoutes);
 

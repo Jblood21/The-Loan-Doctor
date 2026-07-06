@@ -24,6 +24,7 @@ export default function Login() {
   const [code, setCode] = useState('');
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async (e: FormEvent) => {
@@ -175,7 +176,19 @@ export default function Login() {
                 />{' '}
                 Remember me
               </label>
-              <a className="cursor-pointer text-brand-blue-light no-underline">Forgot password?</a>
+              <button
+                type="button"
+                onClick={() => setInfo('Password resets aren’t self-serve yet — contact your administrator to reset it.')}
+                className="cursor-pointer border-none bg-transparent text-brand-blue-light no-underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
+
+          {info && (
+            <div className="mb-4 rounded-[11px] border border-[rgba(47,128,237,0.3)] bg-[rgba(47,128,237,0.1)] px-[15px] py-3 text-[13px] text-[#8fb4dd]">
+              {info}
             </div>
           )}
 
