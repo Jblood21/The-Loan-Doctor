@@ -37,7 +37,21 @@ router.post('/pdf', requireAuth, (req, res) => {
     officer = {},
     lender = {},
     agent = null,
+    logo = null,
   } = req.body || {};
+
+  // Custom uploaded letterhead logo (data URL) overrides the built-in file.
+  let logoSource = fs.existsSync(LOGO) ? LOGO : null;
+  if (typeof logo === 'string' && logo.startsWith('data:')) {
+    const b64 = logo.split(',')[1];
+    if (b64) {
+      try {
+        logoSource = Buffer.from(b64, 'base64');
+      } catch {
+        /* fall back to default */
+      }
+    }
+  }
 
   const classic = style === 'classic';
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: 56, bottom: FOOTER_H + 8, left: LEFT, right: 64 } });
@@ -119,11 +133,11 @@ router.post('/pdf', requireAuth, (req, res) => {
 
   // --- Letterhead (page 1 only) ---
   try {
-    if (fs.existsSync(LOGO)) {
-      const img = doc.openImage(LOGO);
+    if (logoSource) {
+      const img = doc.openImage(logoSource);
       const logoW = (46 * img.width) / img.height;
       const x = classic ? (PAGE_W - logoW) / 2 : LEFT;
-      doc.image(LOGO, x, 48, { height: 46 });
+      doc.image(logoSource, x, 48, { height: 46 });
     }
   } catch {
     /* logo optional */

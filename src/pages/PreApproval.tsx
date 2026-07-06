@@ -280,6 +280,7 @@ export default function PreApproval() {
         website: settings.website,
       },
       agent: letter.agent,
+      logo: settings.logoDataUrl || undefined,
     };
     try {
       const blob = await api.preApprovalPdf(payload);
@@ -640,7 +641,7 @@ export default function PreApproval() {
             <div className="flex min-h-[660px] flex-col overflow-hidden rounded-[11px] bg-white" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
               {/* Letterhead */}
               <div className={`px-10 pt-9 ${isClassic ? 'flex flex-col items-center' : ''}`}>
-                <img src="/brand/letterhead-logo.jpg" alt="The Mortgage Expert — Alan Blood" className="h-[58px] w-auto" />
+                <img src={settings.logoDataUrl || '/brand/letterhead-logo.jpg'} alt={settings.lenderName || settings.company || 'Company logo'} className="h-[58px] w-auto" />
                 <div className="mt-4 h-[3px] w-full rounded" style={{ background: GOLD }} />
               </div>
 
