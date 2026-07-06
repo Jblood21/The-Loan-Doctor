@@ -650,3 +650,89 @@ export function permanentBuydown(
     netOverHold: monthlySavings * holdYears * 12 - cost,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Seller net sheet — estimated proceeds from a home sale.
+// ---------------------------------------------------------------------------
+
+export interface SellerNetInput {
+  salePrice: number;
+  mortgagePayoff: number;
+  /** Total agent commission as a % of sale price (both sides). */
+  commissionPct: number;
+  /** Seller-paid closing costs (title, transfer tax, attorney, escrow) in dollars. */
+  sellerClosingCosts: number;
+  /** Credits/concessions to the buyer in dollars. */
+  concessions: number;
+  /** Other liens/HOA/repairs paid at closing in dollars. */
+  otherLiens: number;
+}
+
+export interface SellerNetResult {
+  salePrice: number;
+  commission: number;
+  totalCosts: number;
+  netProceeds: number;
+  /** Net as a % of sale price. */
+  netPct: number;
+}
+
+export function sellerNetSheet(i: SellerNetInput): SellerNetResult {
+  const salePrice = i.salePrice || 0;
+  const commission = salePrice * ((i.commissionPct || 0) / 100);
+  const totalCosts = commission + (i.mortgagePayoff || 0) + (i.sellerClosingCosts || 0) + (i.concessions || 0) + (i.otherLiens || 0);
+  const netProceeds = salePrice - totalCosts;
+  return {
+    salePrice,
+    commission,
+    totalCosts,
+    netProceeds,
+    netPct: salePrice > 0 ? (netProceeds / salePrice) * 100 : 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Cash-out refinance / debt consolidation.
+// ---------------------------------------------------------------------------
+
+export interface CashOutInput {
+  homeValue: number;
+  currentBalance: number;
+  /** Current mortgage P&I payment. */
+  currentPayment: number;
+  /** Aggregate balance of consumer debts being rolled into the new loan. */
+  debtBalance: number;
+  /** Aggregate monthly payment of those consumer debts. */
+  debtPayment: number;
+  /** Additional cash the borrower takes out beyond paying off debts. */
+  extraCash: number;
+  newRate: number;
+  newTermYears: number;
+}
+
+export interface CashOutResult {
+  newLoanAmount: number;
+  ltv: number;
+  newPayment: number;
+  /** Current mortgage payment + the debts' monthly payments. */
+  currentTotalMonthly: number;
+  /** currentTotalMonthly − newPayment (positive = lower monthly outflow). */
+  monthlySavings: number;
+  cashOut: number;
+  debtsPaidOff: number;
+}
+
+export function cashOutConsolidation(i: CashOutInput): CashOutResult {
+  const newLoanAmount = (i.currentBalance || 0) + (i.debtBalance || 0) + (i.extraCash || 0);
+  const newPayment = monthlyPayment(newLoanAmount, i.newRate || 0, i.newTermYears || 30);
+  const currentTotalMonthly = (i.currentPayment || 0) + (i.debtPayment || 0);
+  return {
+    newLoanAmount,
+    ltv: i.homeValue > 0 ? (newLoanAmount / i.homeValue) * 100 : 0,
+    newPayment,
+    currentTotalMonthly,
+    monthlySavings: currentTotalMonthly - newPayment,
+    cashOut: i.extraCash || 0,
+    debtsPaidOff: i.debtBalance || 0,
+  };
+}

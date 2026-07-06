@@ -16,6 +16,8 @@ import {
   isFinanceCharge,
   financeCharges,
   defaultClosingCosts,
+  sellerNetSheet,
+  cashOutConsolidation,
 } from './finance';
 import type { Scenario } from '@/types';
 
@@ -219,5 +221,32 @@ describe('buydowns', () => {
     expect(r.monthlySavings).toBeGreaterThan(0);
     expect(Number.isFinite(r.breakEvenMonths)).toBe(true);
     expect(r.cost).toBeCloseTo(4000, 5); // 1 point on 400k
+  });
+});
+
+describe('sellerNetSheet', () => {
+  it('nets sale price minus payoff, commission, and costs', () => {
+    const r = sellerNetSheet({ salePrice: 450000, mortgagePayoff: 260000, commissionPct: 5, sellerClosingCosts: 4500, concessions: 0, otherLiens: 0 });
+    expect(r.commission).toBeCloseTo(22500, 5); // 5% of 450k
+    expect(r.netProceeds).toBeCloseTo(450000 - 260000 - 22500 - 4500, 5);
+    expect(r.netPct).toBeCloseTo((r.netProceeds / 450000) * 100, 5);
+  });
+  it('can go negative (underwater sale)', () => {
+    const r = sellerNetSheet({ salePrice: 200000, mortgagePayoff: 220000, commissionPct: 6, sellerClosingCosts: 3000, concessions: 0, otherLiens: 0 });
+    expect(r.netProceeds).toBeLessThan(0);
+  });
+});
+
+describe('cashOutConsolidation', () => {
+  it('sums current balance + debts + extra cash into the new loan', () => {
+    const r = cashOutConsolidation({ homeValue: 500000, currentBalance: 280000, currentPayment: 1750, debtBalance: 35000, debtPayment: 850, extraCash: 10000, newRate: 6.5, newTermYears: 30 });
+    expect(r.newLoanAmount).toBe(325000);
+    expect(r.ltv).toBeCloseTo(65, 1);
+    expect(r.currentTotalMonthly).toBe(2600);
+    expect(r.monthlySavings).toBeCloseTo(2600 - r.newPayment, 5);
+  });
+  it('guards divide-by-zero on home value', () => {
+    const r = cashOutConsolidation({ homeValue: 0, currentBalance: 100000, currentPayment: 800, debtBalance: 0, debtPayment: 0, extraCash: 0, newRate: 6, newTermYears: 30 });
+    expect(r.ltv).toBe(0);
   });
 });

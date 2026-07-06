@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeftRight, BarChart3, Home, Percent, PlusCircle, RefreshCw, ShieldCheck, TrendingDown } from 'lucide-react';
+import { ArrowLeftRight, BarChart3, Home, Percent, PlusCircle, RefreshCw, ShieldCheck, TrendingDown, Receipt, Coins } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import type { CalcProps } from './tools/_shared';
@@ -11,6 +11,8 @@ import RefiBreakEven from './tools/RefiBreakEven';
 import ExtraPayment from './tools/ExtraPayment';
 import Buydown from './tools/Buydown';
 import VaEntitlement from './tools/VaEntitlement';
+import SellerNet from './tools/SellerNet';
+import CashOut from './tools/CashOut';
 
 interface Tool {
   key: string;
@@ -31,6 +33,8 @@ const TOOLS: Tool[] = [
   { key: 'extra', title: 'Extra Payment', desc: 'Interest saved and payoff time with extra principal.', bg: 'rgba(248,113,113,.14)', fg: '#f87171', icon: PlusCircle, Component: ExtraPayment },
   { key: 'buydown', title: 'Rate Buydown', desc: 'Permanent points vs. a temporary buydown — and which is worth it.', bg: 'rgba(56,189,248,.14)', fg: '#38bdf8', icon: TrendingDown, Component: Buydown },
   { key: 'va', title: 'VA Bonus Entitlement', desc: 'Second-tier entitlement, max $0-down loan, and required down payment.', bg: 'rgba(129,140,248,.14)', fg: '#818cf8', icon: ShieldCheck, Component: VaEntitlement },
+  { key: 'sellernet', title: 'Seller Net Sheet', desc: 'Estimated proceeds a seller nets after payoff, commission, and costs.', bg: 'rgba(96,165,250,.14)', fg: '#60a5fa', icon: Receipt, Component: SellerNet },
+  { key: 'cashout', title: 'Cash-Out / Consolidation', desc: 'Roll high-rate debt into the mortgage and compare monthly outflow.', bg: 'rgba(251,146,60,.14)', fg: '#fb923c', icon: Coins, Component: CashOut },
 ];
 
 export default function Tools() {
