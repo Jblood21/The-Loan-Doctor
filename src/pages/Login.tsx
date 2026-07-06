@@ -22,6 +22,7 @@ export default function Login() {
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [code, setCode] = useState('');
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -31,7 +32,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       if (mode === 'login') {
-        await login(email, password);
+        await login(email, password, remember);
       } else {
         await register({ email, password, name, company, code });
       }
@@ -141,6 +142,8 @@ export default function Login() {
           <TextField
             size="lg"
             type="email"
+            name="email"
+            autoComplete="username"
             className="mb-[18px]"
             placeholder="you@lender.com"
             value={email}
@@ -152,6 +155,8 @@ export default function Login() {
           <TextField
             size="lg"
             type="password"
+            name="password"
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             className="mb-3.5"
             placeholder="••••••••"
             value={password}
@@ -162,7 +167,13 @@ export default function Login() {
           {mode === 'login' && (
             <div className="mb-[26px] flex items-center justify-between text-[13px]">
               <label className="flex cursor-pointer items-center gap-2 text-[#9db4cb]">
-                <input type="checkbox" className="h-[15px] w-[15px] accent-brand-teal" /> Remember me
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="h-[15px] w-[15px] accent-brand-teal"
+                />{' '}
+                Remember me
               </label>
               <a className="cursor-pointer text-brand-blue-light no-underline">Forgot password?</a>
             </div>

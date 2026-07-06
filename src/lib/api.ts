@@ -9,11 +9,14 @@ const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(
 const TOKEN_KEY = 'loandr.token';
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
 }
-export function setToken(token: string | null) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+/** Persist the auth token. remember=true (default) keeps you signed in across browser
+ *  restarts (localStorage); remember=false clears it when the tab/browser closes. */
+export function setToken(token: string | null, remember = true) {
+  localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  if (token) (remember ? localStorage : sessionStorage).setItem(TOKEN_KEY, token);
 }
 
 export class ApiError extends Error {
