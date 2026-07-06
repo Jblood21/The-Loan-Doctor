@@ -13,6 +13,8 @@ import { useScenarios, MAX_SCENARIOS } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useUI } from '@/context/UIContext';
 import { computeScenario, defaultClosingCosts } from '@/lib/finance';
+import { DonutChart, PAYMENT_COLORS } from '@/components/charts/DonutChart';
+import { api } from '@/lib/api';
 import { fmt, fmt2, pct } from '@/lib/format';
 import type { ClosingCostItem, LoanProgram, LoanType, TransactionType } from '@/types';
 
@@ -55,14 +57,73 @@ export default function Compare() {
   const r = computeScenario(current);
   const priceLabel = current.transaction === 'refinance' ? 'Home Value' : 'Purchase Price';
 
-  const exportScenarios = () => {
-    const blob = new Blob([JSON.stringify(scenarios, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'loandr-scenarios.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const [busy, setBusy] = useState<'pdf' | 'share' | null>(null);
+  const [shareMsg, setShareMsg] = useState('');
+
+  // Build the side-by-side comparison matrix from every scenario.
+  const buildComparison = () => {
+    const results = scenarios.map((s) => ({ s, c: computeScenario(s) }));
+    const names = results.map(({ s }) => s.name);
+    const bestIndex = results.reduce((best, { c }, i, arr) => (c.totalMonthly < arr[best].c.totalMonthly ? i : best), 0);
+    const rows: { label: string; get: (x: { s: (typeof results)[0]['s']; c: (typeof results)[0]['c'] }) => string }[] = [
+      { label: 'Loan Type', get: ({ c }) => c.typeLabel },
+      { label: 'Price / Value', get: ({ s }) => fmt(s.homePrice || 0) },
+      { label: 'Loan Amount', get: ({ c }) => fmt(c.baseLoan) },
+      { label: 'Down Payment', get: ({ s }) => fmt(s.downPayment || 0) },
+      { label: 'Rate', get: ({ s }) => `${s.rate || 0}%` },
+      { label: 'Term', get: ({ s }) => `${s.term} yr` },
+      { label: 'Principal & Interest', get: ({ c }) => fmt2(c.pi) },
+      { label: 'Property Taxes', get: ({ c }) => fmt2(c.taxes) },
+      { label: 'Homeowners Insurance', get: ({ c }) => fmt2(c.insurance) },
+      { label: 'Mortgage Insurance', get: ({ c }) => (c.mi.applies ? fmt2(c.mi.monthly) : 'None') },
+      { label: 'Total Monthly', get: ({ c }) => fmt2(c.totalMonthly) },
+      { label: 'APR (est.)', get: ({ c }) => pct(c.apr, 3) },
+      { label: 'Closing Costs', get: ({ c }) => fmt(c.closingCosts) },
+      { label: 'Cash to Close', get: ({ c }) => fmt(c.cashToClose) },
+    ];
+    const metrics = rows.map((row) => ({ label: row.label, values: results.map(row.get) }));
+    const lender = {
+      name: settings.lenderName || settings.company,
+      phone: settings.lenderPhone || settings.phone,
+      email: settings.email,
+      nmls: settings.lenderNmls || settings.nmls,
+      website: settings.website,
+      address: settings.lenderAddress,
+    };
+    return { names, metrics, bestIndex, lender };
+  };
+
+  const exportComparisonPdf = async () => {
+    setBusy('pdf');
+    setShareMsg('');
+    try {
+      const blob = await api.comparePdf({ title: 'Loan Comparison', ...buildComparison(), logo: settings.logoDataUrl || undefined });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'loan-comparison.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setShareMsg('Could not generate the PDF. Please try again.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const shareQuote = async () => {
+    setBusy('share');
+    setShareMsg('');
+    try {
+      const { names, metrics, bestIndex, lender } = buildComparison();
+      const { url } = await api.createShare({ title: 'Loan Comparison', names, metrics, bestIndex, lender });
+      const copied = await navigator.clipboard.writeText(url).then(() => true).catch(() => false);
+      setShareMsg(copied ? 'Share link copied to clipboard!' : url);
+    } catch {
+      setShareMsg('Could not create a share link. Save your scenarios and try again.');
+    } finally {
+      setBusy(null);
+    }
   };
 
   const miApplies = r.mi.applies;
@@ -90,8 +151,11 @@ export default function Compare() {
             <Button variant="secondary" onClick={openSettings}>
               My Scenarios
             </Button>
-            <Button variant="secondary" onClick={exportScenarios}>
-              Export
+            <Button variant="secondary" onClick={shareQuote} disabled={busy !== null}>
+              {busy === 'share' ? 'Sharing…' : 'Share'}
+            </Button>
+            <Button variant="secondary" onClick={exportComparisonPdf} disabled={busy !== null}>
+              {busy === 'pdf' ? 'Building…' : 'Export PDF'}
             </Button>
             <Button variant="primary" onClick={() => saveAll()} disabled={saving}>
               {saving ? 'Saving…' : dirty ? 'Save *' : 'Save'}
@@ -99,6 +163,12 @@ export default function Compare() {
           </>
         }
       />
+
+      {shareMsg && (
+        <div className="mb-4 flex items-center gap-2 rounded-[11px] border border-[rgba(45,212,191,0.28)] bg-[rgba(45,212,191,0.08)] px-4 py-2.5 text-[13px] text-brand-teal">
+          <span className="break-all">{shareMsg}</span>
+        </div>
+      )}
 
       {/* Scenario tabs */}
       <div className="mb-[22px] flex items-center gap-2 border-b border-border">
@@ -304,6 +374,21 @@ export default function Compare() {
                 </div>
               ))}
             </div>
+          </Card>
+
+          <Card className="p-5">
+            <div className="mb-3.5 text-[13px] font-bold text-text-softer">Monthly Payment Breakdown</div>
+            <DonutChart
+              segments={[
+                { label: 'Principal & Interest', value: r.pi, color: PAYMENT_COLORS[0] },
+                { label: 'Property Taxes', value: r.taxes, color: PAYMENT_COLORS[1] },
+                { label: 'Homeowners Insurance', value: r.insurance, color: PAYMENT_COLORS[2] },
+                ...(miApplies ? [{ label: r.mi.label, value: r.mi.monthly, color: PAYMENT_COLORS[3] }] : []),
+              ]}
+              centerValue={fmt(r.totalMonthly)}
+              centerLabel="/mo"
+              formatValue={fmt}
+            />
           </Card>
 
           <Card className="p-5">

@@ -74,6 +74,8 @@ export interface Settings {
   nmls: string;
   email: string;
   officerTitle: string;
+  /** Custom letterhead logo as a data URL (overrides the built-in logo). */
+  logoDataUrl?: string;
   // Lender Information
   lenderName: string;
   lenderNmls: string;

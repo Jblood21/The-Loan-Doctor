@@ -3,6 +3,7 @@ import { Modal } from '@/components/ui/Modal';
 import { amortizationSchedule, monthlyPayment } from '@/lib/finance';
 import { fmt, fmt2 } from '@/lib/format';
 import { CalcField, CalcSelect, Headline, ResultPanel, Row, TERM_OPTIONS, type CalcProps } from './_shared';
+import { AreaChart } from '@/components/charts/AreaChart';
 
 export default function Amortization({ open, onClose }: CalcProps) {
   const [loan, setLoan] = useState(320000);
@@ -66,6 +67,17 @@ export default function Amortization({ open, onClose }: CalcProps) {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="mt-6">
+        <div className="mb-2 text-[12.5px] font-semibold text-text-soft">Loan balance over time</div>
+        <AreaChart
+          points={[{ x: 0, y: loan }, ...byYear.map((y) => ({ x: y.year, y: y.balance }))]}
+          height={190}
+          formatY={(v) => fmt(v)}
+          formatX={(x) => (x === 0 ? 'Start' : `Year ${x}`)}
+          yLabel="Loan balance over time"
+        />
       </div>
     </Modal>
   );

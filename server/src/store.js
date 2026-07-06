@@ -30,7 +30,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, counters: { preApprovals: 0 } };
+const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, shares: {}, counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -170,6 +170,23 @@ export function regenerateWebhookToken(userId) {
   // Deterministic tokens can't be rotated without a persistent salt, so this simply
   // re-confirms the stable URL rather than issuing one that would die on the next restart.
   return ensureWebhookToken(userId);
+}
+
+// ---- shareable quote snapshots -----------------------------------------
+export function createShare(userId, snapshot) {
+  const id = randomUUID().replace(/-/g, '').slice(0, 12);
+  db.shares[id] = { id, userId, ...snapshot, createdAt: new Date().toISOString() };
+  // Bound growth: keep the newest 500 shares.
+  const ids = Object.keys(db.shares);
+  if (ids.length > 500) {
+    ids.sort((a, b) => (db.shares[a].createdAt < db.shares[b].createdAt ? -1 : 1));
+    for (const old of ids.slice(0, ids.length - 500)) delete db.shares[old];
+  }
+  persist();
+  return id;
+}
+export function getShare(id) {
+  return db.shares[id] || null;
 }
 
 // ---- counters ----------------------------------------------------------

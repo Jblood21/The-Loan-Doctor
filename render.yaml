@@ -9,7 +9,7 @@ services:
   - type: web
     name: loandr
     runtime: node
-    plan: free
+    plan: starter
     # Build the frontend (dist/) and install the API's dependencies.
     buildCommand: npm install && npm --prefix server install && npm run build
     # Start the API, which also serves dist/ in production.
@@ -60,17 +60,14 @@ services:
       - key: PUBLIC_BASE_URL
         sync: false
 
-      # ---- Persistent storage (STRONGLY recommended once live) -----------
-      # The free plan's disk is EPHEMERAL: every restart/redeploy wipes accounts,
-      # webhook tokens, and received loans — which breaks a configured Zap. To keep
-      # data, upgrade the service to a paid plan, attach a Disk (see the `disk:`
-      # block below), and point DATA_DIR at its mount path.
+      # ---- Persistent storage --------------------------------------------
+      # Data lives on the mounted disk below, so accounts, webhook tokens, saved
+      # scenarios, and received loans survive restarts and redeploys.
       - key: DATA_DIR
-        sync: false
+        value: /var/data
 
-    # Uncomment on a PAID plan to make data survive restarts/redeploys, then set
-    # DATA_DIR=/var/data in the environment above. (Disks aren't available on free.)
-    # disk:
-    #   name: loandr-data
-    #   mountPath: /var/data
-    #   sizeGB: 1
+    # Persistent disk (paid plans). Its mount path matches DATA_DIR above.
+    disk:
+      name: loandr-data
+      mountPath: /var/data
+      sizeGB: 1

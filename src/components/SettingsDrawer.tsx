@@ -6,6 +6,7 @@ import { TextField, Label } from './ui/TextField';
 import { ClosingCostsEditor, cloneFees } from './ClosingCostsEditor';
 import { defaultClosingCosts } from '@/lib/finance';
 import { initials } from '@/lib/format';
+import type { ChangeEvent } from 'react';
 import type { Settings } from '@/types';
 
 interface Field {
@@ -78,6 +79,35 @@ export function SettingsDrawer() {
 
   const name = settings.name || user?.name || 'Loan Officer';
 
+  // Read an uploaded image, downscale it to a letterhead-friendly size, and save it
+  // as a data URL. PNG keeps transparency; falls back to JPEG if the file is large.
+  const onLogoFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 400;
+        const scale = Math.min(1, maxW / img.width);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, w, h);
+        let dataUrl = canvas.toDataURL('image/png');
+        if (dataUrl.length > 800000) dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        save({ logoDataUrl: dataUrl });
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <>
       <div onClick={closeSettings} className="fixed inset-0 z-40 bg-[rgba(4,9,15,0.6)] backdrop-blur-[2px]" />
@@ -133,6 +163,39 @@ export function SettingsDrawer() {
               </Button>
             </div>
           ))}
+
+          <div className="mb-6">
+            <div className="mb-1 text-[14px] font-bold text-text-primary">Letterhead Logo</div>
+            <div className="mb-[14px] text-[12.5px] text-text-muted">
+              Upload your own logo for pre-approval letters. Leave empty to use the built-in letterhead.
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex h-[64px] w-[150px] items-center justify-center overflow-hidden rounded-[10px] border border-border bg-[#eef1f5] px-2">
+                <img
+                  src={settings.logoDataUrl || '/brand/letterhead-logo.jpg'}
+                  alt="Letterhead logo preview"
+                  className="max-h-[52px] max-w-full object-contain"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="cursor-pointer">
+                  <input type="file" accept="image/png,image/jpeg,image/svg+xml" onChange={onLogoFile} className="hidden" />
+                  <span className="inline-flex h-[36px] items-center rounded-[9px] border border-border bg-elevated px-3.5 text-[13px] font-semibold text-text-primary transition-colors hover:border-brand-teal">
+                    Upload logo
+                  </span>
+                </label>
+                {settings.logoDataUrl && (
+                  <button
+                    type="button"
+                    onClick={() => save({ logoDataUrl: '' })}
+                    className="cursor-pointer border-none bg-transparent text-left text-[12.5px] text-text-muted underline hover:text-danger"
+                  >
+                    Remove custom logo
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
 
           <div className="mb-6">
             <div className="mb-1 text-[14px] font-bold text-text-primary">Default Closing Costs</div>
