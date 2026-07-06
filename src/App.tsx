@@ -9,6 +9,7 @@ import PreApproval from '@/pages/PreApproval';
 import Tools from '@/pages/Tools';
 import Help from '@/pages/Help';
 import Admin from '@/pages/Admin';
+import SharedQuote from '@/pages/SharedQuote';
 
 function Splash() {
   return (
@@ -38,6 +39,8 @@ function LoginGate() {
 function AppRoutes() {
   return (
     <Routes>
+      {/* Public borrower-facing shared quote — no login required. */}
+      <Route path="/q/:id" element={<SharedQuote />} />
       <Route path="/login" element={<LoginGate />} />
       <Route element={<RequireAuth />}>
         <Route path="/compare" element={<Compare />} />

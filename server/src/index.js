@@ -17,6 +17,8 @@ import scenarioRoutes from './routes/scenarios.js';
 import adminRoutes from './routes/admin.js';
 import losRoutes from './routes/los.js';
 import preApprovalRoutes from './routes/preapproval.js';
+import compareRoutes from './routes/compare.js';
+import shareRoutes from './routes/share.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -48,6 +50,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/los/webhook', webhookLimiter);
 app.use('/api/los', losRoutes);
 app.use('/api/preapproval', preApprovalRoutes);
+app.use('/api/compare', compareRoutes);
+app.use('/api/share', shareRoutes);
 
 // Unknown API routes → JSON 404 (before the static SPA fallback).
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));

@@ -103,4 +103,23 @@ export const api = {
 
   // pre-approval PDF — returns a Blob
   preApprovalPdf: (payload: unknown) => request<Blob>('POST', '/preapproval/pdf', payload),
+
+  // comparison PDF + shareable quote links
+  comparePdf: (payload: unknown) => request<Blob>('POST', '/compare/pdf', payload),
+  createShare: (payload: unknown) => request<{ id: string; url: string }>('POST', '/share', payload),
+  getShare: (id: string) => request<{ share: SharedQuote }>('GET', `/share/${id}`),
 };
+
+export interface ShareMetric {
+  label: string;
+  values: string[];
+}
+export interface SharedQuote {
+  title: string;
+  borrowerName: string;
+  names: string[];
+  metrics: ShareMetric[];
+  bestIndex?: number;
+  lender: { name?: string; phone?: string; email?: string; nmls?: string; website?: string; address?: string };
+  createdAt?: string;
+}
