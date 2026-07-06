@@ -7,8 +7,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash, createHmac } from 'node:crypto';
 import bcrypt from 'bcryptjs';
+
+/** Stable, deterministic id for a seeded account so it survives a data wipe with the
+ *  same id — keeps a logged-in session valid across restarts (e.g. Render free tier). */
+function stableSeedId(email) {
+  return `seed-${createHash('sha256').update(String(email || '').toLowerCase()).digest('hex').slice(0, 24)}`;
+}
+
+/** Deterministic per-user webhook token derived from the server secret + user id.
+ *  Unguessable (HMAC) yet stable across restarts, so the webhook URL never changes. */
+function webhookTokenFor(userId) {
+  const secret = process.env.JWT_SECRET || 'dev-secret-change-me-in-production';
+  return `whk_${createHmac('sha256', secret).update(`webhook:${userId}`).digest('hex').slice(0, 32)}`;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // DATA_DIR is configurable so production can point it at a persistent volume
@@ -52,9 +65,9 @@ export function findUserByEmail(email) {
 export function findUserById(id) {
   return db.users.find((u) => u.id === id);
 }
-export function addUser({ email, password, passwordHash, name = '', company = '', phone = '', nmls = '', role = 'user', status = 'Active', scenarioCount = 0 }) {
+export function addUser({ id, email, password, passwordHash, name = '', company = '', phone = '', nmls = '', role = 'user', status = 'Active', scenarioCount = 0 }) {
   const user = {
-    id: randomUUID(),
+    id: id || randomUUID(),
     email: String(email).toLowerCase(),
     passwordHash: passwordHash || bcrypt.hashSync(password, 12),
     name,
@@ -135,24 +148,28 @@ export function clearLosBorrowers(userId) {
 }
 
 // ---- per-user webhook token (identifies the Zap source) ----------------
+// The token is deterministic (HMAC of the server secret + user id), so it stays the
+// same across restarts/redeploys even if the datastore is wiped — the webhook URL you
+// paste into Zapier never changes. Matching also accepts the derived token directly,
+// so a POST works even before the token has been persisted after a fresh boot.
 export function findUserByWebhookToken(token) {
-  return token ? db.users.find((u) => u.webhookToken === token) : undefined;
+  if (!token) return undefined;
+  return db.users.find((u) => u.webhookToken === token || webhookTokenFor(u.id) === token);
 }
 export function ensureWebhookToken(userId) {
   const u = findUserById(userId);
   if (!u) return null;
-  if (!u.webhookToken) {
-    u.webhookToken = `whk_${randomUUID().replace(/-/g, '')}`;
+  const token = webhookTokenFor(userId);
+  if (u.webhookToken !== token) {
+    u.webhookToken = token;
     persist();
   }
   return u.webhookToken;
 }
 export function regenerateWebhookToken(userId) {
-  const u = findUserById(userId);
-  if (!u) return null;
-  u.webhookToken = `whk_${randomUUID().replace(/-/g, '')}`;
-  persist();
-  return u.webhookToken;
+  // Deterministic tokens can't be rotated without a persistent salt, so this simply
+  // re-confirms the stable URL rather than issuing one that would die on the next restart.
+  return ensureWebhookToken(userId);
 }
 
 // ---- counters ----------------------------------------------------------
@@ -204,8 +221,10 @@ export function seed() {
       adminPassword = 'admin123';
     }
   }
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@loandr.app').toLowerCase();
   addUser({
-    email: (process.env.ADMIN_EMAIL || 'admin@loandr.app').toLowerCase(),
+    id: stableSeedId(adminEmail),
+    email: adminEmail,
     password: adminPassword,
     name: 'Owner Admin',
     company: process.env.OWNER_COMPANY || 'LoanDr.',
@@ -217,8 +236,11 @@ export function seed() {
   // --- Owner / personal loan-officer login ----------------------------------
   // Seeded from env so you always have a normal account even when signups are
   // closed. Recommended for production: set OWNER_EMAIL + OWNER_PASSWORD.
+  // Stable id so a re-seed after a data wipe keeps the same account — your login
+  // session (and webhook URL) survives restarts even without a persistent disk.
   if (process.env.OWNER_EMAIL && process.env.OWNER_PASSWORD) {
     addUser({
+      id: stableSeedId(process.env.OWNER_EMAIL),
       email: process.env.OWNER_EMAIL,
       password: process.env.OWNER_PASSWORD,
       name: process.env.OWNER_NAME || 'Loan Officer',
@@ -235,8 +257,10 @@ export function seed() {
   // explicitly asked for (SEED_DEMO_USER=true), so a shared link stays clean.
   const seedDemo = process.env.SEED_DEMO_USER === 'true' || (!isProd && process.env.SEED_DEMO_USER !== 'false');
   if (seedDemo) {
+    const demoEmail = process.env.DEMO_EMAIL || 'demo@lender.com';
     addUser({
-      email: process.env.DEMO_EMAIL || 'demo@lender.com',
+      id: stableSeedId(demoEmail),
+      email: demoEmail,
       password: process.env.DEMO_PASSWORD || 'demo1234',
       name: 'John Smith',
       company: 'ABC Mortgage',
