@@ -13,6 +13,7 @@ import { useScenarios, MAX_SCENARIOS } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useUI } from '@/context/UIContext';
 import { computeScenario, defaultClosingCosts } from '@/lib/finance';
+import { DonutChart, PAYMENT_COLORS } from '@/components/charts/DonutChart';
 import { fmt, fmt2, pct } from '@/lib/format';
 import type { ClosingCostItem, LoanProgram, LoanType, TransactionType } from '@/types';
 
@@ -304,6 +305,21 @@ export default function Compare() {
                 </div>
               ))}
             </div>
+          </Card>
+
+          <Card className="p-5">
+            <div className="mb-3.5 text-[13px] font-bold text-text-softer">Monthly Payment Breakdown</div>
+            <DonutChart
+              segments={[
+                { label: 'Principal & Interest', value: r.pi, color: PAYMENT_COLORS[0] },
+                { label: 'Property Taxes', value: r.taxes, color: PAYMENT_COLORS[1] },
+                { label: 'Homeowners Insurance', value: r.insurance, color: PAYMENT_COLORS[2] },
+                ...(miApplies ? [{ label: r.mi.label, value: r.mi.monthly, color: PAYMENT_COLORS[3] }] : []),
+              ]}
+              centerValue={fmt(r.totalMonthly)}
+              centerLabel="/mo"
+              formatValue={fmt}
+            />
           </Card>
 
           <Card className="p-5">
