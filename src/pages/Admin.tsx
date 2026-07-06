@@ -7,20 +7,15 @@ import { api } from '@/lib/api';
 import { initials, num } from '@/lib/format';
 import type { AdminStat, User } from '@/types';
 
+// Shown only if the stats/users API is unreachable — honest zeros, not fake data.
 const FALLBACK_STATS: AdminStat[] = [
-  { label: 'Total Users', value: '1,284', delta: '+38 this week' },
-  { label: 'Scenarios Saved', value: '7,932', delta: '+412 this week' },
-  { label: 'Active Today', value: '196', delta: '+12% vs. last week' },
-  { label: 'Pre-Approvals', value: '543', delta: '+27 this week' },
+  { label: 'Total Users', value: '—', delta: 'unavailable' },
+  { label: 'Scenarios Saved', value: '—', delta: 'unavailable' },
+  { label: 'Active Users', value: '—', delta: 'unavailable' },
+  { label: 'Pre-Approvals', value: '—', delta: 'unavailable' },
 ];
 
-const FALLBACK_USERS: User[] = [
-  { id: '1', name: 'Sarah Chen', email: 'sarah.chen@summitlend.com', company: 'Summit Lending', nmls: '', role: 'user', status: 'Active', scenarioCount: 42 },
-  { id: '2', name: 'Marcus Webb', email: 'm.webb@bayfinance.com', company: 'Bay Finance', nmls: '', role: 'user', status: 'Active', scenarioCount: 18 },
-  { id: '3', name: 'Elena Ruiz', email: 'elena@homefirstmtg.com', company: 'HomeFirst Mortgage', nmls: '', role: 'user', status: 'Trial', scenarioCount: 7 },
-  { id: '4', name: 'David Okafor', email: 'd.okafor@apexloans.com', company: 'Apex Loans', nmls: '', role: 'user', status: 'Active', scenarioCount: 63 },
-  { id: '5', name: 'Priya Patel', email: 'priya.patel@northstarfg.com', company: 'Northstar Funding', nmls: '', role: 'user', status: 'Inactive', scenarioCount: 29 },
-];
+const FALLBACK_USERS: User[] = [];
 
 const AVATAR_PALETTE = [
   'linear-gradient(135deg,#2f80ed,#2dd4bf)',

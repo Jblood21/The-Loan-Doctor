@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 
 interface ModalProps {
@@ -13,11 +13,42 @@ interface ModalProps {
 
 /** Centered modal with scrim — used by the Tools calculators. */
 export function Modal({ open, onClose, title, subtitle, children, width = 640 }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const dialog = dialogRef.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const focusables = () =>
+      Array.from(
+        dialog?.querySelectorAll<HTMLElement>(
+          'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+    // Move focus into the dialog on open.
+    (focusables()[0] ?? dialog)?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return onClose();
+      if (e.key !== 'Tab') return;
+      // Trap Tab within the dialog.
+      const items = focusables();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      previouslyFocused?.focus?.(); // restore focus on close
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -29,9 +60,11 @@ export function Modal({ open, onClose, title, subtitle, children, width = 640 }:
         aria-hidden
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        className="relative z-10 w-full animate-lp-fade rounded-2xl border border-border bg-card shadow-letter"
+        tabIndex={-1}
+        className="relative z-10 w-full animate-lp-fade rounded-2xl border border-border bg-card shadow-letter outline-none"
         style={{ maxWidth: width }}
       >
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">

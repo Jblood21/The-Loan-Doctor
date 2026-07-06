@@ -66,6 +66,12 @@ if (process.env.SERVE_CLIENT !== 'false' && fs.existsSync(path.join(distPath, 'i
 // Error handler (last).
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
+  // Client errors from body parsing (malformed JSON, oversized payload) carry a 4xx
+  // status — return that instead of masking it as a 500.
+  const status = err.status || err.statusCode;
+  if (status && status >= 400 && status < 500) {
+    return res.status(status).json({ error: err.type === 'entity.too.large' ? 'Payload too large' : 'Invalid request body' });
+  }
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
 });

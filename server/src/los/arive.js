@@ -1,8 +1,9 @@
-// Real ARIVE LOS adapter.
+// ARIVE LOS adapter (OPTIONAL / EXPERIMENTAL — the Zapier webhook is the primary path).
 //
-// ARIVE exposes a REST API: you generate an auth token in ARIVE under
-// Settings → API Integrations and pass it in a request header. Configure this
-// adapter entirely from server/.env — no code change needed to turn it on:
+// ARIVE does not publish a general pull API, so borrowers normally arrive via the
+// per-user Zapier webhook (see routes/los.js). This adapter stays dormant unless
+// ARIVE_API_BASE + ARIVE_API_TOKEN are set — for a private/partner API endpoint if
+// you're granted one. It is configured entirely from server/.env; no code change:
 //
 //   ARIVE_API_BASE        Base URL of your ARIVE API gateway (from your API Integrations page)
 //   ARIVE_API_TOKEN       The token you generated in ARIVE → Settings → API Integrations
