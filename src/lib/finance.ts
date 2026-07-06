@@ -56,6 +56,20 @@ export function totalClosingCosts(items: ClosingCostItem[], loan: number, price:
   return (items || []).reduce((sum, it) => sum + closingCostAmount(it, loan, price), 0);
 }
 
+// Which fees count as APR "finance charges" (Reg Z): lender-retained charges —
+// origination/points (% of loan), plus flat lender fees by label. Third-party
+// costs (appraisal, title, recording, transfer tax, credit) are excluded, as is
+// anything unrecognized (conservative — never overstates APR).
+const FINANCE_CHARGE_RE = /originat|underwrit|processing|application|discount|points|admin|commitment|rate.?lock|broker/i;
+export function isFinanceCharge(item: ClosingCostItem): boolean {
+  if (item.basis === 'loan') return true;
+  if (item.basis === 'price' || item.basis.startsWith('title-')) return false;
+  return FINANCE_CHARGE_RE.test(item.label || '');
+}
+export function financeCharges(items: ClosingCostItem[], loan: number, price: number): number {
+  return (items || []).filter(isFinanceCharge).reduce((sum, it) => sum + closingCostAmount(it, loan, price), 0);
+}
+
 /** Standard amortized monthly payment. r is monthly rate (fraction), n months. */
 export function monthlyPayment(principal: number, annualRatePct: number, termYears: number): number {
   const n = Math.max(1, Math.round(termYears * 12));
@@ -93,20 +107,30 @@ export function pmiAnnualPct(ltv: number, creditScore: number): number {
   return band.byCredit[band.byCredit.length - 1][1];
 }
 
-/** FHA annual MIP (%). Depends on LTV and term length. Base loan ≤ conforming. */
-export function fhaAnnualMipPct(ltv: number, termYears: number): number {
-  if (termYears > 15) return ltv > 90 ? 0.55 : 0.5;
+/** FHA base-loan threshold above which the higher "high-balance" MIP applies. */
+export const FHA_HIGH_BALANCE = 726200;
+
+/** FHA annual MIP (%) — by term, LTV, and whether the base loan is high-balance.
+ *  Reflects the schedule effective March 2023 (the 30-yr break is at 95% LTV). */
+export function fhaAnnualMipPct(ltv: number, termYears: number, baseLoan = 0): number {
+  const highBalance = baseLoan > FHA_HIGH_BALANCE;
+  if (termYears > 15) {
+    if (highBalance) return ltv > 95 ? 0.75 : 0.7;
+    return ltv > 95 ? 0.55 : 0.5;
+  }
   // 15-year (and shorter) terms
+  if (highBalance) return ltv > 90 ? 0.65 : ltv > 78 ? 0.4 : 0.15;
   return ltv > 90 ? 0.4 : 0.15;
 }
 export const FHA_UPFRONT_MIP = 1.75; // % of base loan, financed
 export const USDA_UPFRONT_FEE = 1.0; // % of loan, financed
 export const USDA_ANNUAL_FEE = 0.35; // % of balance, ~constant approximation
 
-/** VA funding fee (%) for a first-use purchase, tiered by down payment. Financed. */
+/** VA funding fee (%), tiered by down payment. Only the <5%-down tier differs for
+ *  subsequent use (3.3% vs 2.15%); the 5%+ and 10%+ tiers are the same either way. */
 export function vaFundingFeePct(downPct: number, subsequentUse = false): number {
-  if (downPct >= 10) return subsequentUse ? 1.25 : 1.25;
-  if (downPct >= 5) return subsequentUse ? 1.5 : 1.5;
+  if (downPct >= 10) return 1.25;
+  if (downPct >= 5) return 1.5;
   return subsequentUse ? 3.3 : 2.15;
 }
 
@@ -137,7 +161,7 @@ export function mortgageInsurance(
 ): MortgageInsurance {
   const ltv = ltvPct(baseLoan, homeValue);
   if (loanType === 'fha') {
-    const annualPct = fhaAnnualMipPct(ltv, termYears);
+    const annualPct = fhaAnnualMipPct(ltv, termYears, baseLoan);
     const upfront = baseLoan * (FHA_UPFRONT_MIP / 100);
     return {
       monthly: ((baseLoan + upfront) * (annualPct / 100)) / 12,
@@ -290,14 +314,18 @@ export function computeScenario(s: Scenario): ScenarioResult {
   const totalInterest = schedule.length ? schedule[schedule.length - 1].cumulativeInterest : 0;
   const payoffMonths = schedule.length;
 
-  // APR: treat estimated lender fees + financed upfront MI as prepaid finance charges.
-  const lenderFees = baseLoan * 0.005 + 1200; // ~0.5% origination + fixed fees
-  const apr = computeApr(financedLoan, pi, termYears, mi.upfrontFinanced + lenderFees);
-
   const closingItemized = !!(s.closingCosts && s.closingCosts.length);
   const closingCosts = closingItemized
     ? totalClosingCosts(s.closingCosts as ClosingCostItem[], baseLoan, homeValue)
     : baseLoan * DEFAULT_CLOSING_RATE;
+
+  // APR: prepaid finance charges = the lender/finance-charge portion of the itemized
+  // fees (origination, points, underwriting…) + financed upfront MI. Falls back to a
+  // rough estimate only when fees aren't itemized.
+  const prepaidFinanceCharges = closingItemized
+    ? financeCharges(s.closingCosts as ClosingCostItem[], baseLoan, homeValue) + mi.upfrontFinanced
+    : mi.upfrontFinanced + baseLoan * 0.005 + 1200;
+  const apr = computeApr(financedLoan, pi, termYears, prepaidFinanceCharges);
   const creditsApplied = (s.lenderCredit || 0) + (s.sellerCredit || 0) + (s.otherCredits || 0);
   const cashToClose = Math.max(0, (s.downPayment || 0) + closingCosts - creditsApplied);
 

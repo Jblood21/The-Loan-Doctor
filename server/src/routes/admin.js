@@ -23,14 +23,14 @@ router.get('/stats', requireAdmin, (req, res) => {
   const scenariosSaved = users.reduce((sum, u) => sum + scenarioCount(u.id), 0);
   const activeToday = users.filter((u) => u.status === 'Active').length;
 
-  // Real counts blended with a baseline so a fresh install still looks populated.
+  // Real counts only — no fabricated baselines.
   const fmt = (n) => n.toLocaleString('en-US');
   res.json({
     stats: [
-      { label: 'Total Users', value: fmt(1284 + users.length), delta: `+${users.length} tracked` },
-      { label: 'Scenarios Saved', value: fmt(7932 + scenariosSaved), delta: `+${scenariosSaved} this install` },
-      { label: 'Active Today', value: fmt(196 + activeToday), delta: '+12% vs. last week' },
-      { label: 'Pre-Approvals', value: fmt(543 + (counters.preApprovals || 0)), delta: `+${counters.preApprovals || 0} generated` },
+      { label: 'Total Users', value: fmt(users.length), delta: `${users.length} registered` },
+      { label: 'Scenarios Saved', value: fmt(scenariosSaved), delta: 'across all users' },
+      { label: 'Active Users', value: fmt(activeToday), delta: 'status: Active' },
+      { label: 'Pre-Approvals', value: fmt(counters.preApprovals || 0), delta: 'generated to date' },
     ],
   });
 });

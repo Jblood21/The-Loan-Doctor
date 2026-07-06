@@ -11,6 +11,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "start": "npm --prefix server start",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "server:install": "npm --prefix server install",
     "setup": "npm install && npm --prefix server install",
@@ -31,6 +33,7 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^4.1.10"
   }
 }
