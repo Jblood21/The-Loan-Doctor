@@ -40,6 +40,21 @@ function mapInbound(rec = {}) {
 // ---- inbound webhook (public; identified by per-user token) -------------
 // Zapier "Webhooks by Zapier → POST" sends Arive loan data here. Accepts a single
 // record, an array, or { borrowers: [...] } / { loans: [...] }.
+
+// GET is a liveness/verification probe: opening the webhook URL in a browser (or a
+// connectivity check from Zapier/monitoring) confirms the endpoint is active without
+// sending data. A valid token returns 200 {active:true}; an unknown token 404s.
+router.get('/webhook/:token', (req, res) => {
+  const user = findUserByWebhookToken(req.params.token);
+  if (!user) return res.status(404).json({ error: 'Unknown webhook token' });
+  res.json({
+    ok: true,
+    active: true,
+    message: 'Webhook is live. Send a POST with loan JSON to add borrowers.',
+    received: getLosBorrowers(user.id).length,
+  });
+});
+
 router.post('/webhook/:token', (req, res) => {
   const user = findUserByWebhookToken(req.params.token);
   if (!user) return res.status(404).json({ error: 'Unknown webhook token' });
@@ -50,7 +65,15 @@ router.post('/webhook/:token', (req, res) => {
     .map(mapInbound)
     .filter((b) => b.name && b.name !== 'Borrower')
     .map((b, i) => ({ id: `${now}-${i}`, receivedAt: now, ...b }));
-  if (!mapped.length) return res.status(400).json({ error: 'No borrower fields found in payload' });
+  // A test POST with no recognizable fields still succeeds (200) with a hint, so a
+  // Zapier setup test doesn't hard-fail — but nothing is stored until real fields arrive.
+  if (!mapped.length) {
+    return res.json({
+      ok: true,
+      received: 0,
+      warning: 'No borrower fields recognized. Map borrowerName, loanNumber, loanAmount, and propertyAddress in your Zap.',
+    });
+  }
   upsertLosBorrowers(user.id, mapped);
   res.json({ ok: true, received: mapped.length });
 });
