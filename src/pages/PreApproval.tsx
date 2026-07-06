@@ -102,6 +102,8 @@ export default function PreApproval() {
   const [losMode, setLosMode] = useState<'live' | 'zapier' | 'demo'>('demo');
   const [webhookUrl, setWebhookUrl] = useState('');
   const [webhookCount, setWebhookCount] = useState(0);
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookError, setWebhookError] = useState('');
   const [copied, setCopied] = useState(false);
   const [includeAgent, setIncludeAgent] = useState(true);
   const set = (patch: Partial<PreApprovalState>) => setPa((s) => ({ ...s, ...patch }));
@@ -193,21 +195,31 @@ export default function PreApproval() {
     };
   }, [pa.source, pa.losConnected, pa.losProvider, pa.losQuery]);
 
-  // Fetch this user's inbound webhook URL when the LOS source is selected.
-  useEffect(() => {
-    if (pa.source !== 'los') return;
-    let cancelled = false;
-    api
+  // Fetch (or generate) this user's inbound webhook URL. Surfaces loading/errors
+  // instead of failing silently, and can be retried with the Refresh button.
+  const loadWebhook = () => {
+    setWebhookLoading(true);
+    setWebhookError('');
+    return api
       .losWebhookInfo()
       .then((info) => {
-        if (cancelled) return;
         setWebhookUrl(info.url);
         setWebhookCount(info.count);
       })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+      .catch((err) => {
+        setWebhookError(
+          err instanceof ApiError && err.status === 401
+            ? 'Your session expired — sign out and back in, then Refresh.'
+            : 'Could not load your webhook URL. The server may be waking up (give it ~30s) — then Refresh.',
+        );
+      })
+      .finally(() => setWebhookLoading(false));
+  };
+
+  useEffect(() => {
+    if (pa.source !== 'los') return;
+    loadWebhook();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pa.source]);
 
   const copyWebhook = async () => {
@@ -404,16 +416,24 @@ export default function PreApproval() {
                     <input
                       readOnly
                       value={webhookUrl}
+                      placeholder={webhookLoading ? 'Generating your webhook URL…' : 'Click Refresh to generate your webhook URL'}
                       onFocus={(e) => e.currentTarget.select()}
-                      className="num h-9 flex-1 rounded-[8px] border border-border-input bg-app px-2.5 text-[11.5px] text-text-soft outline-none"
+                      className="num h-9 flex-1 rounded-[8px] border border-border-input bg-app px-2.5 text-[11.5px] text-text-soft outline-none placeholder:text-text-dim"
                     />
-                    <Button variant="secondary" size="sm" onClick={copyWebhook}>
+                    <Button variant="secondary" size="sm" onClick={copyWebhook} disabled={!webhookUrl}>
                       {copied ? 'Copied ✓' : 'Copy'}
                     </Button>
+                    <Button variant="ghost" size="sm" onClick={loadWebhook} disabled={webhookLoading}>
+                      {webhookLoading ? '…' : 'Refresh'}
+                    </Button>
                   </div>
-                  <div className="mt-1.5 text-[11px] text-text-dim">
-                    {webhookCount} borrower{webhookCount === 1 ? '' : 's'} received so far.
-                  </div>
+                  {webhookError ? (
+                    <div className="mt-1.5 text-[11px] leading-[1.5] text-danger">{webhookError}</div>
+                  ) : (
+                    <div className="mt-1.5 text-[11px] text-text-dim">
+                      {webhookCount} borrower{webhookCount === 1 ? '' : 's'} received so far.
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -59,3 +59,18 @@ services:
       # Set to your Render URL after first deploy, e.g. https://loandr.onrender.com
       - key: PUBLIC_BASE_URL
         sync: false
+
+      # ---- Persistent storage (STRONGLY recommended once live) -----------
+      # The free plan's disk is EPHEMERAL: every restart/redeploy wipes accounts,
+      # webhook tokens, and received loans — which breaks a configured Zap. To keep
+      # data, upgrade the service to a paid plan, attach a Disk (see the `disk:`
+      # block below), and point DATA_DIR at its mount path.
+      - key: DATA_DIR
+        sync: false
+
+    # Uncomment on a PAID plan to make data survive restarts/redeploys, then set
+    # DATA_DIR=/var/data in the environment above. (Disks aren't available on free.)
+    # disk:
+    #   name: loandr-data
+    #   mountPath: /var/data
+    #   sizeGB: 1

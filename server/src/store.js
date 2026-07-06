@@ -11,7 +11,10 @@ import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '..', 'data');
+// DATA_DIR is configurable so production can point it at a persistent volume
+// (e.g. a Render disk). Without a persistent disk the free tier wipes this on
+// every restart/redeploy — which resets accounts, webhook tokens, and loans.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, counters: { preApprovals: 0 } };
