@@ -460,12 +460,18 @@ export default function PreApproval() {
                 </div>
               ) : (
                 <div>
-                  <div className="mb-3 flex items-center justify-between rounded-[10px] border border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.1)] px-3.5 py-2.5">
-                    <span className="flex items-center gap-2 text-[13px] font-semibold text-good">
-                      <span className="h-2 w-2 rounded-full bg-good" />
-                      Connected
+                  <div
+                    className={`mb-3 flex items-center justify-between rounded-[10px] border px-3.5 py-2.5 ${
+                      losMode === 'demo'
+                        ? 'border-[rgba(251,191,36,0.28)] bg-[rgba(251,191,36,0.1)]'
+                        : 'border-[rgba(52,211,153,0.25)] bg-[rgba(52,211,153,0.1)]'
+                    }`}
+                  >
+                    <span className={`flex items-center gap-2 text-[13px] font-semibold ${losMode === 'demo' ? 'text-[#fbbf24]' : 'text-good'}`}>
+                      <span className={`h-2 w-2 rounded-full ${losMode === 'demo' ? 'bg-[#fbbf24]' : 'bg-good'}`} />
+                      {losMode === 'demo' ? 'Sandbox' : 'Live'}
                       <span className="font-medium text-text-muted">
-                        · {losMode === 'live' ? 'Live' : losMode === 'zapier' ? 'Zapier' : 'Sandbox'}
+                        · {losMode === 'live' ? 'Direct API' : losMode === 'zapier' ? 'Zapier (real loans)' : 'no loans received yet'}
                       </span>
                     </span>
                     <button onClick={disconnect} className="cursor-pointer border-none bg-transparent text-[12.5px] text-text-muted underline">
@@ -519,8 +525,9 @@ export default function PreApproval() {
                     )}
                   </div>
                   <div className="mt-2 text-[11.5px] text-text-dim">
-                    {losResults.length} borrower{losResults.length === 1 ? '' : 's'} available
-                    {losMode === 'demo' && ' · sample data until your Zap sends real loans'}
+                    {losMode === 'demo'
+                      ? 'Waiting for your first loan — send one from your Zap (or hit “Test” in Zapier) and it appears here instantly.'
+                      : `${losResults.length} borrower${losResults.length === 1 ? '' : 's'} available from your pipeline.`}
                   </div>
                 </div>
               )}
