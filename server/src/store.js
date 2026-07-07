@@ -216,64 +216,72 @@ export function publicUser(u) {
   };
 }
 
-/** Seed the admin account, an optional owner login, and (in non-prod) demo data. */
+/** Create the account if it doesn't exist; otherwise refresh only what the
+ *  environment should control (password/role), preserving in-app profile edits.
+ *  This is what guarantees the admin/owner login always matches the current env
+ *  vars — even when the account already exists on a persistent disk. */
+function ensureSeedAccount({ id, email, password, role, updatePassword = true, ...rest }) {
+  const existing = findUserByEmail(email);
+  if (existing) {
+    const patch = {};
+    if (updatePassword) patch.passwordHash = bcrypt.hashSync(password, 12);
+    if (role && existing.role !== role) patch.role = role;
+    if (Object.keys(patch).length) updateUser(existing.id, patch);
+    return existing;
+  }
+  return addUser({ id, email, password, role, ...rest });
+}
+
+/** Ensure the admin + owner logins match the environment on every boot, and seed
+ *  demo data only on a fresh (empty) database. */
 export function seed() {
   load();
-  if (db.users.length > 0) return; // already seeded
-
   const isProd = process.env.NODE_ENV === 'production';
+  const wasEmpty = db.users.length === 0;
 
-  // --- Admin account --------------------------------------------------------
+  // --- Admin account (ensured every boot) -----------------------------------
   // In production NEVER fall back to a known default password. If ADMIN_PASSWORD
-  // is unset, generate a random one and warn loudly so no guessable admin ships.
+  // is unset, generate a random one (create-only, never churn it on reboot).
+  const hasAdminPassword = !!process.env.ADMIN_PASSWORD;
   let adminPassword = process.env.ADMIN_PASSWORD;
   if (!adminPassword) {
-    if (isProd) {
-      adminPassword = randomUUID();
-      console.warn(
-        '[seed] ADMIN_PASSWORD is not set — generated a random admin password you cannot see. ' +
-          'Set ADMIN_PASSWORD in your environment and redeploy to choose your own.',
-      );
-    } else {
-      adminPassword = 'admin123';
-    }
+    adminPassword = isProd ? randomUUID() : 'admin123';
+    if (isProd) console.warn('[seed] ADMIN_PASSWORD is not set — using a random admin password. Set ADMIN_PASSWORD and redeploy to choose your own.');
   }
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@loandr.app').toLowerCase();
-  addUser({
+  ensureSeedAccount({
     id: stableSeedId(adminEmail),
     email: adminEmail,
     password: adminPassword,
+    role: 'admin',
+    updatePassword: hasAdminPassword, // only overwrite when explicitly configured
     name: 'Owner Admin',
     company: process.env.OWNER_COMPANY || 'LoanDr.',
     nmls: '000001',
-    role: 'admin',
     status: 'Active',
   });
 
-  // --- Owner / personal loan-officer login ----------------------------------
-  // Seeded from env so you always have a normal account even when signups are
-  // closed. Recommended for production: set OWNER_EMAIL + OWNER_PASSWORD.
-  // Stable id so a re-seed after a data wipe keeps the same account — your login
-  // session (and webhook URL) survives restarts even without a persistent disk.
+  // --- Owner login (ensured every boot when configured) ---------------------
+  // Env is the source of truth: whatever OWNER_EMAIL/OWNER_PASSWORD are set to,
+  // that login works — created if missing, password refreshed if it already
+  // exists. This fixes "I set my password in Render but it says incorrect."
   if (process.env.OWNER_EMAIL && process.env.OWNER_PASSWORD) {
-    addUser({
+    ensureSeedAccount({
       id: stableSeedId(process.env.OWNER_EMAIL),
       email: process.env.OWNER_EMAIL,
       password: process.env.OWNER_PASSWORD,
+      role: 'user',
       name: process.env.OWNER_NAME || 'Loan Officer',
       company: process.env.OWNER_COMPANY || '',
       phone: process.env.OWNER_PHONE || '',
       nmls: process.env.OWNER_NMLS || '',
-      role: 'user',
       status: 'Active',
     });
   }
 
-  // --- Demo data (development / explicit opt-in only) ------------------------
-  // Never seed the throwaway demo account or sample users in production unless
-  // explicitly asked for (SEED_DEMO_USER=true), so a shared link stays clean.
+  // --- Demo data (only on a fresh database) ---------------------------------
   const seedDemo = process.env.SEED_DEMO_USER === 'true' || (!isProd && process.env.SEED_DEMO_USER !== 'false');
-  if (seedDemo) {
+  if (wasEmpty && seedDemo) {
     const demoEmail = process.env.DEMO_EMAIL || 'demo@lender.com';
     addUser({
       id: stableSeedId(demoEmail),
