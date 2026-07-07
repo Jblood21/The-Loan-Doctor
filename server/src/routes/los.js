@@ -33,7 +33,9 @@ function mapInbound(rec = {}) {
     p.fullAddress ||
     [rec.propertyStreet || p.street, rec.propertyCity || p.city, rec.propertyState || p.state, rec.propertyZip || p.zip].filter(Boolean).join(', ') ||
     '';
-  const meta = [loanNo && `Loan #${loanNo}`, amount != null && amount !== '' && `$${Number(amount).toLocaleString('en-US')}`].filter(Boolean).join(' · ');
+  const amountNum = Number(amount);
+  const hasAmount = amount != null && amount !== '' && Number.isFinite(amountNum);
+  const meta = [loanNo && `Loan #${loanNo}`, hasAmount && `$${amountNum.toLocaleString('en-US')}`].filter(Boolean).join(' · ');
   return { name, meta, address: String(address || ''), loanNumber: String(loanNo || '') };
 }
 

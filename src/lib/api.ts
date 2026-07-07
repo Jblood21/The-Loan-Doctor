@@ -83,8 +83,7 @@ export const api = {
   updateScenario: (id: string, scenario: Scenario) => request<{ scenario: Scenario }>('PUT', `/scenarios/${id}`, scenario),
   deleteScenario: (id: string) => request<void>('DELETE', `/scenarios/${id}`),
 
-  // admin
-  adminLogin: (password: string) => request<{ token: string }>('POST', '/admin/login', { password }),
+  // admin (JWT role=admin gated)
   adminStats: () => request<{ stats: { label: string; value: string; delta: string }[] }>('GET', '/admin/stats'),
   adminUsers: () => request<{ users: User[] }>('GET', '/admin/users'),
 

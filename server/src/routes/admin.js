@@ -3,15 +3,9 @@ import { getCounters, getUsers, publicUser, scenarioCount } from '../store.js';
 import { requireAdmin } from '../auth.js';
 
 const router = Router();
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
-// Optional standalone admin password gate (kept from the original app).
-router.post('/login', (req, res) => {
-  if ((req.body?.password || '') !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Incorrect admin password' });
-  }
-  res.json({ ok: true });
-});
+// Admin access is granted by a JWT with role=admin (see requireAdmin). There is no
+// separate password endpoint — that would be a second, weaker credential path.
 
 router.get('/users', requireAdmin, (req, res) => {
   res.json({ users: getUsers().map(publicUser) });
