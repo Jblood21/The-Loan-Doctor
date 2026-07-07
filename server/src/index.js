@@ -86,9 +86,14 @@ app.listen(PORT, () => {
   console.log(`\n  LoanDr. API → http://localhost:${PORT}`);
   console.log(`  Health      → http://localhost:${PORT}/api/health`);
   if (isProd) {
-    // Never print real credentials to production logs.
-    console.log('  Seeded admin account (sign in with your configured ADMIN_EMAIL / ADMIN_PASSWORD).');
-    if (process.env.OWNER_EMAIL) console.log(`  Owner login → ${process.env.OWNER_EMAIL} (your OWNER_PASSWORD)`);
+    // Never print real credentials — just confirm which accounts can log in so you
+    // can verify your Render env vars from the logs.
+    console.log(`  Admin login ready → ${(process.env.ADMIN_EMAIL || 'admin@loandr.app').trim().toLowerCase()} (use your ADMIN_PASSWORD)`);
+    if (process.env.OWNER_EMAIL && process.env.OWNER_PASSWORD) {
+      console.log(`  Owner login ready → ${process.env.OWNER_EMAIL.trim().toLowerCase()} (use your OWNER_PASSWORD)`);
+    } else {
+      console.warn('  ⚠ No owner login configured — set OWNER_EMAIL and OWNER_PASSWORD in your environment to get a personal login.');
+    }
   } else {
     console.log('  Seeded accounts (dev):');
     console.log(`    admin  → ${process.env.ADMIN_EMAIL || 'admin@loandr.app'} / ${process.env.ADMIN_PASSWORD || 'admin123'}`);

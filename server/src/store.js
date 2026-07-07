@@ -13,7 +13,7 @@ import bcrypt from 'bcryptjs';
 /** Stable, deterministic id for a seeded account so it survives a data wipe with the
  *  same id — keeps a logged-in session valid across restarts (e.g. Render free tier). */
 function stableSeedId(email) {
-  return `seed-${createHash('sha256').update(String(email || '').toLowerCase()).digest('hex').slice(0, 24)}`;
+  return `seed-${createHash('sha256').update(normalizeEmail(email)).digest('hex').slice(0, 24)}`;
 }
 
 /** Deterministic per-user webhook token derived from the server secret + user id.
@@ -64,11 +64,16 @@ export function persist() {
 }
 
 // ---- users -------------------------------------------------------------
+/** Trim + lowercase an email so stray whitespace/case can't cause a login miss. */
+export function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
 export function getUsers() {
   return db.users;
 }
 export function findUserByEmail(email) {
-  return db.users.find((u) => u.email === String(email || '').toLowerCase());
+  const e = normalizeEmail(email);
+  return db.users.find((u) => u.email === e);
 }
 export function findUserById(id) {
   return db.users.find((u) => u.id === id);
@@ -76,7 +81,7 @@ export function findUserById(id) {
 export function addUser({ id, email, password, passwordHash, name = '', company = '', phone = '', nmls = '', role = 'user', status = 'Active', scenarioCount = 0 }) {
   const user = {
     id: id || randomUUID(),
-    email: String(email).toLowerCase(),
+    email: normalizeEmail(email),
     passwordHash: passwordHash || bcrypt.hashSync(password, 12),
     name,
     company,
@@ -245,18 +250,31 @@ function ensureSeedAccount({ id, email, password, role, updatePassword = true, .
 export function seed() {
   load();
   const isProd = process.env.NODE_ENV === 'production';
+
+  // One-shot factory reset: set RESET_DATA=true to wipe ALL data on boot, then
+  // the admin/owner accounts are re-created fresh below. Unset it afterward so it
+  // doesn't wipe on every restart.
+  if (process.env.RESET_DATA === 'true') {
+    db = structuredClone(EMPTY);
+    persist();
+    console.warn('[seed] RESET_DATA=true — wiped ALL data (users, scenarios, loans). Remove RESET_DATA in your environment so it stops wiping on every boot.');
+  }
+
   const wasEmpty = db.users.length === 0;
 
   // --- Admin account (ensured every boot) -----------------------------------
   // In production NEVER fall back to a known default password. If ADMIN_PASSWORD
   // is unset, generate a random one (create-only, never churn it on reboot).
-  const hasAdminPassword = !!process.env.ADMIN_PASSWORD;
-  let adminPassword = process.env.ADMIN_PASSWORD;
+  // Trim env passwords — a trailing space/newline pasted into a host's env UI is a
+  // classic "my password is wrong" cause.
+  const adminPwEnv = (process.env.ADMIN_PASSWORD || '').trim();
+  const hasAdminPassword = !!adminPwEnv;
+  let adminPassword = adminPwEnv;
   if (!adminPassword) {
     adminPassword = isProd ? randomUUID() : 'admin123';
     if (isProd) console.warn('[seed] ADMIN_PASSWORD is not set — using a random admin password. Set ADMIN_PASSWORD and redeploy to choose your own.');
   }
-  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@loandr.app').toLowerCase();
+  const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL || 'admin@loandr.app');
   ensureSeedAccount({
     id: stableSeedId(adminEmail),
     email: adminEmail,
@@ -273,11 +291,13 @@ export function seed() {
   // Env is the source of truth: whatever OWNER_EMAIL/OWNER_PASSWORD are set to,
   // that login works — created if missing, password refreshed if it already
   // exists. This fixes "I set my password in Render but it says incorrect."
-  if (process.env.OWNER_EMAIL && process.env.OWNER_PASSWORD) {
+  const ownerEmail = normalizeEmail(process.env.OWNER_EMAIL);
+  const ownerPassword = (process.env.OWNER_PASSWORD || '').trim();
+  if (ownerEmail && ownerPassword) {
     ensureSeedAccount({
-      id: stableSeedId(process.env.OWNER_EMAIL),
-      email: process.env.OWNER_EMAIL,
-      password: process.env.OWNER_PASSWORD,
+      id: stableSeedId(ownerEmail),
+      email: ownerEmail,
+      password: ownerPassword,
       role: 'user',
       name: process.env.OWNER_NAME || 'Loan Officer',
       company: process.env.OWNER_COMPANY || '',
