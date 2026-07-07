@@ -133,7 +133,10 @@ router.get('/borrowers', requireAuth, async (req, res) => {
   }
   const pushed = getLosBorrowers(req.user.id);
   if (pushed.length) return res.json({ results: filterByQuery(pushed, req.query.q), mode: 'zapier' });
-  res.json({ results: filterByQuery(STUB, req.query.q), mode: 'demo' });
+  // No real loans pushed yet. In production don't show fake sample borrowers — an
+  // honest empty state instead; the placeholder list is dev-only.
+  const isProd = process.env.NODE_ENV === 'production';
+  res.json({ results: isProd ? [] : filterByQuery(STUB, req.query.q), mode: 'demo' });
 });
 
 export default router;
