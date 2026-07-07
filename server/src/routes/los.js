@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getLos, setLos, getLosBorrowers, upsertLosBorrowers, clearLosBorrowers, ensureWebhookToken, regenerateWebhookToken, findUserByWebhookToken } from '../store.js';
+import { getLos, setLos, getLosBorrowers, upsertLosBorrowers, clearLosBorrowers, findUserByWebhookToken, sharedWebhookToken, SHARED_LOS_KEY } from '../store.js';
 import { requireAuth } from '../auth.js';
 import { ariveConfigured, ariveSearch } from '../los/arive.js';
 
@@ -37,27 +37,33 @@ function mapInbound(rec = {}) {
   return { name, meta, address: String(address || ''), loanNumber: String(loanNo || '') };
 }
 
-// ---- inbound webhook (public; identified by per-user token) -------------
+// ---- inbound webhook (public; one shared URL for the whole deployment) ---
 // Zapier "Webhooks by Zapier → POST" sends Arive loan data here. Accepts a single
-// record, an array, or { borrowers: [...] } / { loans: [...] }.
+// record, an array, or { borrowers: [...] } / { loans: [...] }. The shared token
+// routes to one pool everyone sees; a legacy per-user token still routes to that user.
+function resolveWebhookTarget(token) {
+  if (token === sharedWebhookToken()) return SHARED_LOS_KEY;
+  const user = findUserByWebhookToken(token);
+  return user ? user.id : null;
+}
 
 // GET is a liveness/verification probe: opening the webhook URL in a browser (or a
 // connectivity check from Zapier/monitoring) confirms the endpoint is active without
 // sending data. A valid token returns 200 {active:true}; an unknown token 404s.
 router.get('/webhook/:token', (req, res) => {
-  const user = findUserByWebhookToken(req.params.token);
-  if (!user) return res.status(404).json({ error: 'Unknown webhook token' });
+  const target = resolveWebhookTarget(req.params.token);
+  if (!target) return res.status(404).json({ error: 'Unknown webhook token' });
   res.json({
     ok: true,
     active: true,
     message: 'Webhook is live. Send a POST with loan JSON to add borrowers.',
-    received: getLosBorrowers(user.id).length,
+    received: getLosBorrowers(target).length,
   });
 });
 
 router.post('/webhook/:token', (req, res) => {
-  const user = findUserByWebhookToken(req.params.token);
-  if (!user) return res.status(404).json({ error: 'Unknown webhook token' });
+  const target = resolveWebhookTarget(req.params.token);
+  if (!target) return res.status(404).json({ error: 'Unknown webhook token' });
   const body = req.body || {};
   const records = Array.isArray(body) ? body : body.borrowers || body.loans || [body];
   const now = Date.now();
@@ -74,25 +80,28 @@ router.post('/webhook/:token', (req, res) => {
       warning: 'No borrower fields recognized. Map borrowerName, loanNumber, loanAmount, and propertyAddress in your Zap.',
     });
   }
-  upsertLosBorrowers(user.id, mapped);
+  upsertLosBorrowers(target, mapped);
   res.json({ ok: true, received: mapped.length });
 });
 
 // ---- webhook setup info (auth) -----------------------------------------
+// One shared webhook URL is returned for everyone.
 function webhookUrl(req, token) {
   const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
   return `${base.replace(/\/$/, '')}/api/los/webhook/${token}`;
 }
 router.get('/webhook-info', requireAuth, (req, res) => {
-  const token = ensureWebhookToken(req.user.id);
-  res.json({ token, url: webhookUrl(req, token), count: getLosBorrowers(req.user.id).length });
+  const token = sharedWebhookToken();
+  res.json({ token, url: webhookUrl(req, token), count: getLosBorrowers(SHARED_LOS_KEY).length });
 });
 router.post('/webhook-info/regenerate', requireAuth, (req, res) => {
-  const token = regenerateWebhookToken(req.user.id);
+  // The shared URL is derived from the server secret and can't be rotated per user;
+  // re-confirm it so the button still returns the current, permanent URL.
+  const token = sharedWebhookToken();
   res.json({ token, url: webhookUrl(req, token) });
 });
 router.post('/webhook-info/clear', requireAuth, (req, res) => {
-  clearLosBorrowers(req.user.id);
+  clearLosBorrowers(SHARED_LOS_KEY);
   res.json({ ok: true });
 });
 
@@ -110,7 +119,7 @@ router.post('/connect', requireAuth, async (req, res) => {
     }
   }
   setLos(req.user.id, provider, true);
-  const mode = getLosBorrowers(req.user.id).length ? 'zapier' : 'demo';
+  const mode = getLosBorrowers(SHARED_LOS_KEY).length ? 'zapier' : 'demo';
   res.json({ connected: true, provider, mode });
 });
 
@@ -131,7 +140,7 @@ router.get('/borrowers', requireAuth, async (req, res) => {
       return res.status(502).json({ error: `${provider} API error: ${err.message}` });
     }
   }
-  const pushed = getLosBorrowers(req.user.id);
+  const pushed = getLosBorrowers(SHARED_LOS_KEY);
   if (pushed.length) return res.json({ results: filterByQuery(pushed, req.query.q), mode: 'zapier' });
   // No real loans pushed yet. In production don't show fake sample borrowers — an
   // honest empty state instead; the placeholder list is dev-only.
