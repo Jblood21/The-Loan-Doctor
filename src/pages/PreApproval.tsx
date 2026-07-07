@@ -94,8 +94,8 @@ export default function PreApproval() {
     losProvider: 'arive',
     losConnected: false,
     losQuery: '',
-    borrowerName: 'Robert Boot',
-    propertyAddress: '205 Grand Avenue, Arco, ID 83213',
+    borrowerName: 'John Smith',
+    propertyAddress: '123 Main Street, Anytown, ST 00000',
     expDays: '90',
   });
   const [losResults, setLosResults] = useState<Borrower[]>(STUB_BORROWERS);
