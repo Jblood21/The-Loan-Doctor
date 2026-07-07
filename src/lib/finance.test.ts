@@ -123,6 +123,18 @@ describe('computeApr', () => {
     const pay = monthlyPayment(300000, 6.5, 30);
     near(computeApr(300000, pay, 30, 0), 6.5, 0.02);
   });
+  it('recurring MI in the stream raises APR above the P&I-only APR', () => {
+    const pay = monthlyPayment(300000, 6.5, 30);
+    const noMi = computeApr(300000, pay, 30, 0);
+    const withMi = computeApr(300000, pay, 30, 0, 150, 360); // $150/mo MI for the full term
+    expect(withMi).toBeGreaterThan(noMi + 0.5);
+  });
+  it('MI paid for fewer months raises APR less than MI for the full term', () => {
+    const pay = monthlyPayment(300000, 6.5, 30);
+    const shortMi = computeApr(300000, pay, 30, 0, 150, 60);
+    const longMi = computeApr(300000, pay, 30, 0, 150, 360);
+    expect(longMi).toBeGreaterThan(shortMi);
+  });
 });
 
 describe('amortizationSchedule', () => {
@@ -174,6 +186,25 @@ describe('computeScenario', () => {
     const withFees: Scenario = { ...base, closingCosts: defaultClosingCosts('purchase') };
     const noFees: Scenario = { ...base, closingCosts: [{ id: 'a', label: 'Appraisal', basis: 'flat', value: 650 }] };
     expect(computeScenario(withFees).apr).toBeGreaterThan(computeScenario(noFees).apr);
+  });
+  it('FHA APR reflects life-of-loan MIP (well above the note rate)', () => {
+    const fha: Scenario = { ...base, loanType: 'fha', downPayment: 10500, downPct: 3.5 }; // 96.5% LTV
+    const r = computeScenario(fha);
+    expect(r.mi.monthly).toBeGreaterThan(0);
+    expect(r.apr).toBeGreaterThan(base.rate + 0.5); // MIP pushes APR meaningfully above 6.5%
+  });
+  it('high-LTV conventional APR includes PMI until it cancels (not ≈ note rate)', () => {
+    const conv95: Scenario = { ...base, downPayment: 15000, downPct: 5, credit: '700' }; // 95% LTV
+    const r = computeScenario(conv95);
+    expect(r.mi.applies).toBe(true);
+    expect(r.apr).toBeGreaterThan(base.rate + 0.4);
+  });
+  it('VA funding-fee tier follows the dollar down payment, not a stale downPct', () => {
+    // 20% down in dollars but downPct left at 0 → must still use the 10%+ (1.25%) tier.
+    const va: Scenario = { ...base, loanType: 'va', downPayment: 60000, downPct: 0 };
+    const r = computeScenario(va);
+    // 1.25% of the 240k base loan = 3,000 financed upfront (not 2.15% = 5,160).
+    near(r.mi.upfrontFinanced, 240000 * 0.0125, 1);
   });
 });
 

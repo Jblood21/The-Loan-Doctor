@@ -164,7 +164,8 @@ export function mortgageInsurance(
     const annualPct = fhaAnnualMipPct(ltv, termYears, baseLoan);
     const upfront = baseLoan * (FHA_UPFRONT_MIP / 100);
     return {
-      monthly: ((baseLoan + upfront) * (annualPct / 100)) / 12,
+      // Annual MIP is quoted on the base loan amount (not base + financed UFMIP).
+      monthly: (baseLoan * (annualPct / 100)) / 12,
       upfrontFinanced: upfront,
       annualPct,
       label: 'FHA Mortgage Insurance (MIP)',
@@ -174,7 +175,8 @@ export function mortgageInsurance(
   if (loanType === 'usda') {
     const upfront = baseLoan * (USDA_UPFRONT_FEE / 100);
     return {
-      monthly: ((baseLoan + upfront) * (USDA_ANNUAL_FEE / 100)) / 12,
+      // Annual fee is quoted on the (base) loan balance, not base + financed upfront.
+      monthly: (baseLoan * (USDA_ANNUAL_FEE / 100)) / 12,
       upfrontFinanced: upfront,
       annualPct: USDA_ANNUAL_FEE,
       label: 'USDA Guarantee Fee',
@@ -204,18 +206,34 @@ export function mortgageInsurance(
   return { monthly: 0, upfrontFinanced: 0, annualPct: 0, label: 'Mortgage Insurance', applies: false };
 }
 
-/** Solve APR (%) from the financed loan, payment, term, and prepaid finance charges. */
+/**
+ * Solve APR (%) from the financed loan, the P&I payment, term, and prepaid finance
+ * charges. Recurring mortgage insurance is a Reg Z finance charge, so when it applies
+ * it is added to the payment stream for the months it is actually paid (miMonthly for
+ * the first miMonths payments) — otherwise a high-LTV/FHA loan's APR collapses to the
+ * note rate and understates the true cost. miMonthly/miMonths default to 0 (P&I only).
+ */
 export function computeApr(
   financedLoan: number,
   monthly: number,
   termYears: number,
   prepaidFinanceCharges: number,
+  miMonthly = 0,
+  miMonths = 0,
 ): number {
   const n = Math.max(1, Math.round(termYears * 12));
   const amountFinanced = financedLoan - prepaidFinanceCharges;
   if (amountFinanced <= 0 || monthly <= 0) return 0;
-  // Find monthly rate i where amountFinanced = monthly * (1 - (1+i)^-n) / i  (bisection)
-  const pv = (i: number) => (i === 0 ? monthly * n : (monthly * (1 - Math.pow(1 + i, -n))) / i);
+  const mi = miMonthly > 0 ? miMonthly : 0;
+  const miN = Math.max(0, Math.min(n, Math.round(miMonths)));
+  // amountFinanced = PV of the payment stream at monthly rate i (bisection). The stream
+  // is level P&I for n months plus MI for the first miN months (closed-form annuities).
+  const pv = (i: number) => {
+    if (i === 0) return monthly * n + mi * miN;
+    const level = (monthly * (1 - Math.pow(1 + i, -n))) / i;
+    const miPv = mi > 0 && miN > 0 ? (mi * (1 - Math.pow(1 + i, -miN))) / i : 0;
+    return level + miPv;
+  };
   let lo = 0;
   let hi = 1; // 100%/mo upper bound, plenty
   for (let k = 0; k < 80; k++) {
@@ -224,6 +242,31 @@ export function computeApr(
     else hi = mid;
   }
   return ((lo + hi) / 2) * 12 * 100;
+}
+
+/**
+ * How many months recurring MI is included in the APR payment stream:
+ *  • Conventional/ARM PMI auto-terminates when the scheduled balance reaches 78% of the
+ *    original value (Homeowners Protection Act).
+ *  • FHA MIP runs the life of the loan when LTV > 90% at origination, else ~11 years.
+ *  • USDA annual fee runs the life of the loan.
+ */
+function miAprMonths(
+  loanType: LoanType,
+  ltv: number,
+  schedule: AmortRow[],
+  homeValue: number,
+): number {
+  const n = schedule.length;
+  if (loanType === 'fha') return ltv > 90 ? n : Math.min(132, n);
+  if (loanType === 'usda') return n;
+  if (loanType === 'conventional' || loanType === 'arm') {
+    if (homeValue <= 0) return n;
+    const threshold = 0.78 * homeValue;
+    const idx = schedule.findIndex((row) => row.balance <= threshold);
+    return idx === -1 ? n : idx + 1;
+  }
+  return 0;
 }
 
 export interface AmortRow {
@@ -300,7 +343,10 @@ export function computeScenario(s: Scenario): ScenarioResult {
   const creditScore = parseInt(s.credit, 10) || 700;
   const ltv = ltvPct(baseLoan, homeValue);
 
-  const mi = mortgageInsurance(s.loanType, baseLoan, homeValue, s.downPct || 0, creditScore, termYears);
+  // Derive the down-payment % from the dollars that actually built baseLoan, so the VA
+  // funding-fee tier can't disagree with a separately-stored downPct field.
+  const downPct = homeValue > 0 ? ((s.downPayment || 0) / homeValue) * 100 : s.downPct || 0;
+  const mi = mortgageInsurance(s.loanType, baseLoan, homeValue, downPct, creditScore, termYears);
   const financedLoan = baseLoan + mi.upfrontFinanced;
 
   const pi = monthlyPayment(financedLoan, s.rate || 0, termYears);
@@ -325,7 +371,9 @@ export function computeScenario(s: Scenario): ScenarioResult {
   const prepaidFinanceCharges = closingItemized
     ? financeCharges(s.closingCosts as ClosingCostItem[], baseLoan, homeValue) + mi.upfrontFinanced
     : mi.upfrontFinanced + baseLoan * 0.005 + 1200;
-  const apr = computeApr(financedLoan, pi, termYears, prepaidFinanceCharges);
+  // Recurring MI is a finance charge — include it in the APR stream for the months it applies.
+  const miMonths = mi.monthly > 0 ? miAprMonths(s.loanType, ltv, schedule, homeValue) : 0;
+  const apr = computeApr(financedLoan, pi, termYears, prepaidFinanceCharges, mi.monthly, miMonths);
   const creditsApplied = (s.lenderCredit || 0) + (s.sellerCredit || 0) + (s.otherCredits || 0);
   const cashToClose = Math.max(0, (s.downPayment || 0) + closingCosts - creditsApplied);
 
