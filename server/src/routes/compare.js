@@ -17,16 +17,32 @@ const PAGE_W = 612;
 
 /** Branded side-by-side loan comparison sheet a borrower can keep. */
 router.post('/pdf', requireAuth, (req, res) => {
-  const {
-    title = 'Loan Comparison',
-    borrowerName = '',
-    date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-    names = [],
-    metrics = [],
-    bestIndex = -1,
-    lender = {},
-    logo = null,
-  } = req.body || {};
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const title = String(body.title ?? 'Loan Comparison').slice(0, 120);
+  const borrowerName = String(body.borrowerName ?? '').slice(0, 120);
+  const date =
+    typeof body.date === 'string'
+      ? body.date.slice(0, 60)
+      : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const logo = body.logo ?? null;
+
+  // Normalize everything the PDF touches to safe primitives BEFORE we start the
+  // stream — a malformed field must fail as a clean 400, never as a corrupt PDF
+  // (any throw after doc.pipe(res) would leave the response half-written).
+  const names = (Array.isArray(body.names) ? body.names : []).slice(0, 6).map((n) => String(n ?? ''));
+  const metrics = (Array.isArray(body.metrics) ? body.metrics : [])
+    .filter((m) => m && typeof m === 'object' && !Array.isArray(m))
+    .slice(0, 60)
+    .map((m) => ({
+      label: String(m.label ?? ''),
+      values: (Array.isArray(m.values) ? m.values : []).map((v) => String(v ?? '')),
+    }));
+  const bestIndex = Number.isInteger(body.bestIndex) ? body.bestIndex : -1;
+  const lender = body.lender && typeof body.lender === 'object' && !Array.isArray(body.lender) ? body.lender : {};
+
+  if (!names.length || !metrics.length) {
+    return res.status(400).json({ error: 'Nothing to render — provide scenario names and metrics.' });
+  }
 
   const cols = Math.max(1, Math.min(6, names.length));
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: 48, bottom: 56, left: LEFT, right: LEFT } });

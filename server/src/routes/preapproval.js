@@ -21,24 +21,35 @@ const PAGE_H = 792;
 const FOOTER_H = 104;
 
 router.post('/pdf', requireAuth, (req, res) => {
-  const {
-    style = 'mortgage-expert',
-    showHeadshot = true,
-    date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
-    title = '',
-    reLine = 'Pre-Approval',
-    subjectAddress = '',
-    salutation = 'To Whom It May Concern:',
-    paragraphs = [],
-    terms = null,
-    validity = '',
-    closing = 'Best regards,',
-    borrowerName = '—',
-    officer = {},
-    lender = {},
-    agent = null,
-    logo = null,
-  } = req.body || {};
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  // Coerce every field the PDF touches to a safe value up front. Destructuring
+  // defaults only cover `undefined`, so an explicit `null` (e.g. "officer": null)
+  // would otherwise throw mid-stream and corrupt the PDF. obj() null-guards objects.
+  const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+  const str = (v, fallback = '') => (v == null ? fallback : String(v));
+
+  const style = body.style === 'classic' ? 'classic' : 'mortgage-expert';
+  const showHeadshot = body.showHeadshot !== false;
+  const date =
+    typeof body.date === 'string'
+      ? body.date.slice(0, 80)
+      : new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const title = str(body.title);
+  const reLine = str(body.reLine, 'Pre-Approval');
+  const subjectAddress = str(body.subjectAddress);
+  const salutation = str(body.salutation, 'To Whom It May Concern:');
+  const paragraphs = (Array.isArray(body.paragraphs) ? body.paragraphs : []).slice(0, 40).map((p) => str(p));
+  const terms = (Array.isArray(body.terms) ? body.terms : [])
+    .filter((t) => t && typeof t === 'object' && !Array.isArray(t))
+    .slice(0, 40)
+    .map((t) => ({ label: str(t.label), value: str(t.value) }));
+  const validity = str(body.validity);
+  const closing = str(body.closing, 'Best regards,');
+  const borrowerName = str(body.borrowerName, '—');
+  const officer = obj(body.officer);
+  const lender = obj(body.lender);
+  const agent = obj(body.agent);
+  const logo = body.logo ?? null;
 
   // Custom uploaded letterhead logo (data URL) overrides the built-in file.
   let logoSource = fs.existsSync(LOGO) ? LOGO : null;
@@ -55,8 +66,10 @@ router.post('/pdf', requireAuth, (req, res) => {
 
   const classic = style === 'classic';
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: 56, bottom: FOOTER_H + 8, left: LEFT, right: 64 } });
+  // Filename must be a safe token — control chars (\n, etc.) make setHeader throw.
+  const lastName = (borrowerName.trim().split(/\s+/).pop() || '').replace(/[^A-Za-z0-9_-]/g, '') || 'letter';
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="preapproval-${String(borrowerName).split(' ').pop() || 'letter'}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="preapproval-${lastName}.pdf"`);
   doc.pipe(res);
 
   const phoneEmail = [lender.phone, lender.email].filter(Boolean).join('   ·   ');
