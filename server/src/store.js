@@ -32,11 +32,39 @@ export function sharedWebhookToken() {
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// DATA_DIR is configurable so production can point it at a persistent volume
-// (e.g. a Render disk). Without a persistent disk the free tier wipes this on
-// every restart/redeploy — which resets accounts, webhook tokens, and loans.
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const REPO_DATA_DIR = path.join(__dirname, '..', 'data');
+// Common persistent-disk mount points to auto-detect (Render, Fly, etc.).
+const KNOWN_MOUNTS = ['/var/data', '/data'];
+
+// Resolve where the JSON store lives. Order of preference:
+//   1. DATA_DIR (explicit override — always wins).
+//   2. A known persistent-disk mount that actually exists, so data survives
+//      restarts even if the operator forgot to also set DATA_DIR.
+//   3. The in-repo data/ folder (fine for local dev; EPHEMERAL on hosts that
+//      reset the filesystem on redeploy — see dataDirInfo()).
+function resolveDataDir() {
+  if (process.env.DATA_DIR) return process.env.DATA_DIR;
+  for (const p of KNOWN_MOUNTS) {
+    try {
+      if (fs.statSync(p).isDirectory()) return p;
+    } catch {
+      /* not mounted */
+    }
+  }
+  return REPO_DATA_DIR;
+}
+const DATA_DIR = resolveDataDir();
 const DB_FILE = path.join(DATA_DIR, 'db.json');
+
+/** Describe the storage location + whether it looks durable, for startup logging. */
+export function dataDirInfo() {
+  const explicit = !!process.env.DATA_DIR;
+  const onKnownMount = KNOWN_MOUNTS.some((m) => DATA_DIR === m || DATA_DIR.startsWith(m + '/'));
+  // Persistent when an operator pointed us somewhere on purpose, or we landed on a
+  // real mounted disk. The in-repo folder is treated as ephemeral in production.
+  const persistent = explicit || onKnownMount;
+  return { dir: DATA_DIR, persistent, explicit, onKnownMount };
+}
 
 const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, shares: {}, counters: { preApprovals: 0 } };
 
@@ -60,7 +88,11 @@ export function load() {
 
 export function persist() {
   ensureDir();
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+  // Atomic write: fill a temp file then rename over the target, so a crash
+  // mid-write can never leave a truncated/corrupt db.json.
+  const tmp = `${DB_FILE}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+  fs.renameSync(tmp, DB_FILE);
 }
 
 // ---- users -------------------------------------------------------------

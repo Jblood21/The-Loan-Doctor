@@ -10,7 +10,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
-import { seed } from './store.js';
+import { seed, dataDirInfo } from './store.js';
 import authRoutes from './routes/auth.js';
 import settingsRoutes from './routes/settings.js';
 import scenarioRoutes from './routes/scenarios.js';
@@ -85,6 +85,18 @@ app.listen(PORT, () => {
   const isProd = process.env.NODE_ENV === 'production';
   console.log(`\n  LoanDr. API → http://localhost:${PORT}`);
   console.log(`  Health      → http://localhost:${PORT}/api/health`);
+
+  // Storage durability — the #1 cause of "it forgot my login". Make it loud in the logs.
+  const store = dataDirInfo();
+  if (store.persistent) {
+    console.log(`  Storage      → ${store.dir}  [persistent — accounts & data survive restarts]`);
+  } else if (isProd) {
+    console.warn(`  ⚠ Storage    → ${store.dir}  [EPHEMERAL] — this resets on every redeploy, so logins and data will NOT be saved.`);
+    console.warn('    Fix: attach a persistent disk mounted at /var/data (or set DATA_DIR to a mounted path) in your host settings, then redeploy.');
+  } else {
+    console.log(`  Storage      → ${store.dir}  [local dev]`);
+  }
+
   if (isProd) {
     // Never print real credentials — just confirm which accounts can log in so you
     // can verify your Render env vars from the logs.
