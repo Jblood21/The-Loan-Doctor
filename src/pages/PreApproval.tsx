@@ -100,6 +100,7 @@ export default function PreApproval() {
   });
   const [losResults, setLosResults] = useState<Borrower[]>(STUB_BORROWERS);
   const [losMode, setLosMode] = useState<'live' | 'zapier' | 'demo'>('demo');
+  const [losOpen, setLosOpen] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [webhookCount, setWebhookCount] = useState(0);
   const [webhookLoading, setWebhookLoading] = useState(false);
@@ -174,26 +175,38 @@ export default function PreApproval() {
   const resetTemplate = () => setCustomized(false);
   const isClassic = styleId === 'classic';
 
-  // LOS borrower search (backend with stub fallback).
+  // Load the full borrower list once when connected; we filter it client-side so
+  // the search dropdown is instant. (Re-fetches if provider/connection changes.)
   useEffect(() => {
     if (pa.source !== 'los' || !pa.losConnected) return;
     let cancelled = false;
     (async () => {
       try {
-        const { results, mode } = await api.losSearch(pa.losProvider, pa.losQuery);
+        const { results, mode } = await api.losSearch(pa.losProvider, '');
         if (!cancelled) {
           if (results) setLosResults(results);
           if (mode) setLosMode(mode);
         }
       } catch {
-        const q = pa.losQuery.trim().toLowerCase();
-        setLosResults(q ? STUB_BORROWERS.filter((b) => b.name.toLowerCase().includes(q) || b.meta.toLowerCase().includes(q)) : STUB_BORROWERS);
+        if (!cancelled) setLosResults(STUB_BORROWERS);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [pa.source, pa.losConnected, pa.losProvider, pa.losQuery]);
+  }, [pa.source, pa.losConnected, pa.losProvider]);
+
+  // Filter the loaded borrowers by the search text — matches name, loan number,
+  // and address, and is dash/space-insensitive so "LN20471" finds "Loan #LN-20471".
+  const losMatches = useMemo(() => {
+    const q = pa.losQuery.trim().toLowerCase();
+    if (!q) return losResults;
+    const qs = q.replace(/[-\s]/g, '');
+    return losResults.filter((b) => {
+      const hay = `${b.name} ${b.meta} ${b.address}`.toLowerCase();
+      return hay.includes(q) || hay.replace(/[-\s]/g, '').includes(qs);
+    });
+  }, [losResults, pa.losQuery]);
 
   // Fetch (or generate) this user's inbound webhook URL. Surfaces loading/errors
   // instead of failing silently, and can be retried with the Refresh button.
@@ -459,20 +472,55 @@ export default function PreApproval() {
                       Disconnect
                     </button>
                   </div>
-                  <TextField className="mb-3 !h-11 !text-[14px]" placeholder="Search borrower by name or loan #" value={pa.losQuery} onChange={(e) => set({ losQuery: e.target.value })} />
-                  <div className="flex flex-col gap-2">
-                    {losResults.map((b) => (
-                      <div key={b.name} className="flex items-center justify-between rounded-[10px] border border-border-input bg-elevated px-3.5 py-[11px]">
-                        <div>
-                          <div className="text-[13.5px] font-semibold text-text-primary">{b.name}</div>
-                          <div className="text-[12px] text-text-muted">{b.meta}</div>
-                        </div>
-                        <Button variant="secondary" size="sm" className="!border-brand-blue !bg-[rgba(47,128,237,0.12)] !text-brand-blue-light" onClick={() => set({ borrowerName: b.name, propertyAddress: b.address })}>
-                          Use
-                        </Button>
+                  <div className="relative">
+                    <TextField
+                      className="!h-11 !text-[14px]"
+                      placeholder="Search by name or loan #…"
+                      value={pa.losQuery}
+                      onChange={(e) => {
+                        set({ losQuery: e.target.value });
+                        setLosOpen(true);
+                      }}
+                      onFocus={() => setLosOpen(true)}
+                      onBlur={() => window.setTimeout(() => setLosOpen(false), 150)}
+                      aria-label="Search borrowers by name or loan number"
+                    />
+                    {losOpen && (
+                      <div className="absolute left-0 right-0 z-20 mt-1 max-h-[264px] overflow-y-auto rounded-[10px] border border-border-input bg-elevated shadow-letter">
+                        {losMatches.length === 0 ? (
+                          <div className="px-3.5 py-3 text-[12.5px] text-text-muted">
+                            {losResults.length === 0
+                              ? 'No borrowers yet — they appear here once your Zap sends them in.'
+                              : `No borrower matches “${pa.losQuery}”.`}
+                          </div>
+                        ) : (
+                          losMatches.map((b, i) => (
+                            <button
+                              key={`${b.name}-${b.meta}-${i}`}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                set({ borrowerName: b.name, propertyAddress: b.address, losQuery: '' });
+                                setLosOpen(false);
+                              }}
+                              className="flex w-full items-center justify-between gap-3 border-b border-[rgba(140,165,195,0.08)] px-3.5 py-2.5 text-left transition-colors last:border-0 hover:bg-[rgba(47,128,237,0.12)]"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-[13.5px] font-semibold text-text-primary">{b.name}</span>
+                                <span className="block truncate text-[12px] text-text-muted">
+                                  {[b.meta, b.address].filter(Boolean).join(' · ')}
+                                </span>
+                              </span>
+                              <span className="flex-none text-[12px] font-semibold text-brand-blue-light">Use →</span>
+                            </button>
+                          ))
+                        )}
                       </div>
-                    ))}
-                    {losResults.length === 0 && <div className="py-2 text-[12.5px] text-text-muted">No borrowers match.</div>}
+                    )}
+                  </div>
+                  <div className="mt-2 text-[11.5px] text-text-dim">
+                    {losResults.length} borrower{losResults.length === 1 ? '' : 's'} available
+                    {losMode === 'demo' && ' · sample data until your Zap sends real loans'}
                   </div>
                 </div>
               )}
