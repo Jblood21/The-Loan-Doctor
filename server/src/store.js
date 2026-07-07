@@ -23,6 +23,14 @@ function webhookTokenFor(userId) {
   return `whk_${createHmac('sha256', secret).update(`webhook:${userId}`).digest('hex').slice(0, 32)}`;
 }
 
+/** One shared webhook for the whole deployment — the same URL for everyone. Loans
+ *  posted here land in a single shared pool that every user sees. */
+export const SHARED_LOS_KEY = '__shared__';
+export function sharedWebhookToken() {
+  const secret = process.env.JWT_SECRET || 'dev-secret-change-me-in-production';
+  return `whk_${createHmac('sha256', secret).update('webhook:shared').digest('hex').slice(0, 32)}`;
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // DATA_DIR is configurable so production can point it at a persistent volume
 // (e.g. a Render disk). Without a persistent disk the free tier wipes this on
