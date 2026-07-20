@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
-import { incPreApprovals } from '../store.js';
+import { incPreApprovals, addPreApproval, getPreApprovals } from '../store.js';
 import { requireAuth } from '../auth.js';
 
 const router = Router();
@@ -50,6 +50,7 @@ router.post('/pdf', requireAuth, (req, res) => {
   const lender = obj(body.lender);
   const agent = obj(body.agent);
   const logo = body.logo ?? null;
+  const loan = obj(body.loan); // structured loan snapshot for the issued-pre-approvals history
 
   // Custom uploaded letterhead logo (data URL) overrides the built-in file.
   let logoSource = fs.existsSync(LOGO) ? LOGO : null;
@@ -219,6 +220,29 @@ router.post('/pdf', requireAuth, (req, res) => {
 
   doc.end();
   incPreApprovals();
+
+  // Record the issued pre-approval so it shows in the history, tied to the borrower.
+  const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  addPreApproval(req.user.id, {
+    borrowerName,
+    propertyAddress: subjectAddress || str(loan.propertyAddress),
+    loanType: str(loan.loanType),
+    transaction: str(loan.transaction),
+    price: n(loan.price),
+    loanAmount: n(loan.loanAmount),
+    downPayment: n(loan.downPayment),
+    rate: n(loan.rate),
+    term: str(loan.term),
+    monthlyPayment: n(loan.monthlyPayment),
+    apr: n(loan.apr),
+    reLine,
+    validityDays: n(loan.validityDays),
+  });
+});
+
+// Issued-pre-approval history for the signed-in loan officer (newest first).
+router.get('/history', requireAuth, (req, res) => {
+  res.json({ history: getPreApprovals(req.user.id) });
 });
 
 export default router;

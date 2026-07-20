@@ -66,7 +66,7 @@ export function dataDirInfo() {
   return { dir: DATA_DIR, persistent, explicit, onKnownMount };
 }
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, shares: {}, counters: { preApprovals: 0 } };
+const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -232,6 +232,20 @@ export function createShare(userId, snapshot) {
 }
 export function getShare(id) {
   return db.shares[id] || null;
+}
+
+// ---- issued pre-approvals (history per loan officer) -------------------
+export function getPreApprovals(userId) {
+  return db.preApprovals[userId] || [];
+}
+/** Record an issued pre-approval; newest first, capped. Returns the saved record. */
+export function addPreApproval(userId, record) {
+  const rec = { id: randomUUID().replace(/-/g, '').slice(0, 12), issuedAt: new Date().toISOString(), ...record };
+  const list = db.preApprovals[userId] || [];
+  list.unshift(rec);
+  db.preApprovals[userId] = list.slice(0, 500);
+  persist();
+  return rec;
 }
 
 // ---- counters ----------------------------------------------------------

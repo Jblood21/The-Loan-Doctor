@@ -3,7 +3,7 @@
 // In development the Vite dev server proxies /api to the Express backend, so
 // API_BASE can stay empty. In production set VITE_API_BASE to the API origin.
 
-import type { Scenario, Settings, User } from '@/types';
+import type { PreApprovalRecord, Scenario, Settings, User } from '@/types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
 const TOKEN_KEY = 'loandr.token';
@@ -102,6 +102,7 @@ export const api = {
 
   // pre-approval PDF — returns a Blob
   preApprovalPdf: (payload: unknown) => request<Blob>('POST', '/preapproval/pdf', payload),
+  preApprovalHistory: () => request<{ history: PreApprovalRecord[] }>('GET', '/preapproval/history'),
 
   // comparison PDF + shareable quote links
   comparePdf: (payload: unknown) => request<Blob>('POST', '/compare/pdf', payload),

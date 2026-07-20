@@ -114,6 +114,25 @@ export interface AdminStat {
   delta: string;
 }
 
+/** A pre-approval letter that was issued — the historical record tied to a borrower. */
+export interface PreApprovalRecord {
+  id: string;
+  borrowerName: string;
+  propertyAddress: string;
+  loanType: string;
+  transaction: string;
+  price: number;
+  loanAmount: number;
+  downPayment: number;
+  rate: number;
+  term: string;
+  monthlyPayment: number;
+  apr: number;
+  reLine: string;
+  validityDays: number;
+  issuedAt: string;
+}
+
 export interface PreApprovalState {
   source: 'scenario' | 'los' | 'import';
   scenarioIdx: number;

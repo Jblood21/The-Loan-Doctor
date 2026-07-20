@@ -26,7 +26,8 @@ import { fmt, longDateWeekday } from '@/lib/format';
 import { rankBorrowers } from '@/lib/borrowerSearch';
 import { parseMismo } from '@/lib/mismo';
 import type { MismoResult } from '@/lib/mismo';
-import type { PreApprovalState } from '@/types';
+import { groupByBorrower, diffRecords } from '@/lib/preApprovalHistory';
+import type { PreApprovalRecord, PreApprovalState } from '@/types';
 
 // The Mortgage Expert brand palette.
 const GREEN = '#1f3d25';
@@ -111,7 +112,26 @@ export default function PreApproval() {
   const [imported, setImported] = useState<MismoResult | null>(null);
   const [importError, setImportError] = useState('');
   const [dragging, setDragging] = useState(false);
+  const [view, setView] = useState<'create' | 'issued'>('create');
+  const [history, setHistory] = useState<PreApprovalRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   const set = (patch: Partial<PreApprovalState>) => setPa((s) => ({ ...s, ...patch }));
+
+  const loadHistory = () => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    return api
+      .preApprovalHistory()
+      .then(({ history: h }) => setHistory(h || []))
+      .catch(() => setHistoryError('Could not load issued pre-approvals. The server may be waking up — try Refresh.'))
+      .finally(() => setHistoryLoading(false));
+  };
+  // Load history the first time the Issued tab is opened.
+  useEffect(() => {
+    if (view === 'issued' && !history.length && !historyError) loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   // When a MISMO file has been imported, its loan drives the letter; otherwise use
   // the selected saved scenario.
@@ -319,6 +339,20 @@ export default function PreApproval() {
       },
       agent: letter.agent,
       logo: settings.logoDataUrl || undefined,
+      // Structured loan snapshot recorded in the issued-pre-approvals history.
+      loan: {
+        propertyAddress: pa.propertyAddress,
+        loanType: computeScenario(srcScenario).typeLabel,
+        transaction: srcScenario.transaction,
+        price: srcScenario.homePrice,
+        loanAmount: computeScenario(srcScenario).baseLoan,
+        downPayment: srcScenario.downPayment,
+        rate: srcScenario.rate,
+        term: srcScenario.term,
+        monthlyPayment: computeScenario(srcScenario).totalMonthly,
+        apr: computeScenario(srcScenario).apr,
+        validityDays: parseInt(expDays, 10) || 0,
+      },
     };
     try {
       const blob = await api.preApprovalPdf(payload);
@@ -328,6 +362,8 @@ export default function PreApproval() {
       a.download = `preapproval-${(pa.borrowerName || 'letter').split(' ').pop()}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+      // Refresh history so the just-issued letter shows in the Issued tab.
+      loadHistory();
     } catch {
       alert('PDF service unavailable — start the API server (npm run dev). Using the browser print dialog instead.');
       window.print();
@@ -408,7 +444,21 @@ export default function PreApproval() {
         subtitle="Pull a borrower, pick a program template and style, customize the wording, then generate a branded letter."
       />
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_1.05fr]">
+      <SegmentedControl
+        className="mb-6 max-w-[440px]"
+        options={[
+          { value: 'create', label: 'Create Letter' },
+          { value: 'issued', label: history.length ? `Issued (${history.length})` : 'Issued' },
+        ]}
+        value={view}
+        onChange={(v) => setView(v as 'create' | 'issued')}
+      />
+
+      {view === 'issued' && (
+        <IssuedPreApprovals history={history} loading={historyLoading} error={historyError} onRefresh={loadHistory} />
+      )}
+
+      <div className={view === 'create' ? 'grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_1.05fr]' : 'hidden'}>
         {/* LEFT — form */}
         <Card className="p-6">
           <SectionLabel className="mb-3">DATA SOURCE</SectionLabel>
@@ -814,5 +864,115 @@ export default function PreApproval() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Issued-pre-approvals history: grouped by borrower, each with the loan summary and
+// what changed between successive letters.
+function IssuedPreApprovals({
+  history,
+  loading,
+  error,
+  onRefresh,
+}: {
+  history: PreApprovalRecord[];
+  loading: boolean;
+  error: string;
+  onRefresh: () => void;
+}) {
+  const groups = useMemo(() => groupByBorrower(history), [history]);
+  const [openKey, setOpenKey] = useState<string | null>(null);
+
+  const fmtDate = (iso: string) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  const summary = (r: PreApprovalRecord) =>
+    [r.loanType, r.loanAmount ? fmt(r.loanAmount) : '', r.rate ? `${r.rate}%` : '', r.term ? `${r.term} yr` : '', r.transaction]
+      .filter(Boolean)
+      .join(' · ');
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-[22px] py-4">
+        <div>
+          <div className="text-[15px] font-semibold text-text-heading">Issued Pre-Approvals</div>
+          <div className="text-[12.5px] text-text-muted">Every letter you generate — grouped by borrower, with what changed each time.</div>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading}>
+          {loading ? 'Loading…' : 'Refresh'}
+        </Button>
+      </div>
+
+      {error ? (
+        <div className="px-[22px] py-6 text-[13.5px] text-danger">{error}</div>
+      ) : !groups.length ? (
+        <div className="px-[22px] py-10 text-center text-[13.5px] text-text-muted">
+          {loading ? 'Loading…' : 'No pre-approvals issued yet. Generate a letter and it will be logged here, tied to the borrower.'}
+        </div>
+      ) : (
+        <div className="flex flex-col">
+          {groups.map((g) => {
+            const isOpen = openKey === g.key;
+            return (
+              <div key={g.key} className="border-b border-border last:border-0">
+                <button
+                  onClick={() => setOpenKey(isOpen ? null : g.key)}
+                  className="flex w-full items-center justify-between gap-3 px-[22px] py-4 text-left transition-colors hover:bg-[rgba(47,128,237,0.06)]"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14.5px] font-semibold text-text-primary">{g.borrowerName}</span>
+                      <span className="rounded-full bg-[rgba(47,128,237,0.14)] px-2 py-0.5 text-[11px] font-semibold text-brand-blue-light">
+                        {g.count} letter{g.count === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 truncate text-[12.5px] text-text-muted">
+                      {summary(g.latest)}
+                      {g.latest.propertyAddress ? ` · ${g.latest.propertyAddress}` : ''}
+                    </div>
+                  </div>
+                  <div className="flex flex-none items-center gap-3">
+                    <span className="text-[12px] text-text-dim">{fmtDate(g.latest.issuedAt)}</span>
+                    <span className="text-[12px] text-text-muted">{isOpen ? '▲' : '▼'}</span>
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="bg-[rgba(140,165,195,0.04)] px-[22px] pb-4 pt-1">
+                    {g.records.map((r, i) => {
+                      const older = g.records[i + 1]; // newest-first, so i+1 is the previous letter
+                      const changes = diffRecords(r, older);
+                      return (
+                        <div key={r.id} className="border-l-2 border-[rgba(45,212,191,0.4)] py-2 pl-3.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[12.5px] font-semibold text-text-soft">
+                              {i === 0 ? 'Latest' : `Version ${g.records.length - i}`} · {fmtDate(r.issuedAt)}
+                            </span>
+                            <span className="num text-[12.5px] text-text-muted">{r.monthlyPayment ? `${fmt(r.monthlyPayment)}/mo` : ''}</span>
+                          </div>
+                          <div className="mt-0.5 text-[12px] text-text-muted">{summary(r)}</div>
+                          {changes.length > 0 ? (
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {changes.map((c) => (
+                                <span key={c.label} className="rounded-[6px] bg-[rgba(251,191,36,0.14)] px-2 py-0.5 text-[11px] text-[#d9a53a]">
+                                  {c.label}: {c.from} → {c.to}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            older && <div className="mt-1 text-[11px] text-text-dim">No changes from the prior letter.</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }
