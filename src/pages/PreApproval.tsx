@@ -24,6 +24,8 @@ import {
 import type { PronounChoice } from '@/lib/letter';
 import { fmt, longDateWeekday } from '@/lib/format';
 import { rankBorrowers } from '@/lib/borrowerSearch';
+import { parseMismo } from '@/lib/mismo';
+import type { MismoResult } from '@/lib/mismo';
 import type { PreApprovalState } from '@/types';
 
 // The Mortgage Expert brand palette.
@@ -106,9 +108,39 @@ export default function PreApproval() {
   const [webhookError, setWebhookError] = useState('');
   const [copied, setCopied] = useState(false);
   const [includeAgent, setIncludeAgent] = useState(true);
+  const [imported, setImported] = useState<MismoResult | null>(null);
+  const [importError, setImportError] = useState('');
   const set = (patch: Partial<PreApprovalState>) => setPa((s) => ({ ...s, ...patch }));
 
-  const srcScenario = scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
+  // When a MISMO file has been imported, its loan drives the letter; otherwise use
+  // the selected saved scenario.
+  const srcScenario =
+    pa.source === 'import' && imported
+      ? imported.scenario
+      : scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
+
+  // Read a MISMO 3.4 XML file entirely in the browser (borrower PII never leaves the
+  // device) and pull the borrower, property, and loan terms into the letter.
+  const onMismoFile = (file: File | undefined) => {
+    if (!file) return;
+    setImportError('');
+    const reader = new FileReader();
+    reader.onerror = () => setImportError('Could not read that file. Try again.');
+    reader.onload = () => {
+      try {
+        const result = parseMismo(String(reader.result || ''));
+        if (!result) {
+          setImportError('That doesn’t look like a MISMO 3.4 loan file — no borrower or loan amount found.');
+          return;
+        }
+        setImported(result);
+        set({ borrowerName: result.borrowerName || '', propertyAddress: result.propertyAddress || '' });
+      } catch {
+        setImportError('Couldn’t parse that file. Make sure it’s a MISMO 3.4 XML export.');
+      }
+    };
+    reader.readAsText(file);
+  };
   const today = new Date();
   const hasAgent = !!(settings.agentName && settings.agentName.trim());
 
@@ -384,10 +416,52 @@ export default function PreApproval() {
             options={[
               { value: 'scenario', label: 'From a Scenario' },
               { value: 'los', label: 'From your LOS' },
+              { value: 'import', label: 'Import a file' },
             ]}
             value={pa.source}
             onChange={(v) => set({ source: v as PreApprovalState['source'] })}
           />
+
+          {pa.source === 'import' && (
+            <div className="mb-[22px]">
+              <div className="rounded-xl border border-dashed border-[#2f4663] bg-input p-[18px]">
+                <div className="text-[13.5px] font-semibold text-text-soft">Import a MISMO 3.4 loan file</div>
+                <p className="mt-1 text-[12px] leading-[1.5] text-text-muted">
+                  Works without Zapier — export the loan as a MISMO 3.4 (.xml) file from Arive (or any LOS) and drop it here.
+                  The borrower, property, loan amount, rate, and term fill in automatically. Your file is read on this device
+                  and never uploaded.
+                </p>
+                <label className="mt-3 inline-flex cursor-pointer">
+                  <input
+                    type="file"
+                    accept=".xml,text/xml,application/xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      onMismoFile(e.target.files?.[0]);
+                      e.target.value = '';
+                    }}
+                  />
+                  <span className="inline-flex h-[42px] items-center rounded-[10px] border border-border bg-elevated px-4 text-[13.5px] font-semibold text-text-primary transition-colors hover:border-brand-teal">
+                    Choose MISMO file…
+                  </span>
+                </label>
+
+                {importError ? (
+                  <div className="mt-3 rounded-[10px] border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] px-3.5 py-2.5 text-[12.5px] text-danger">
+                    {importError}
+                  </div>
+                ) : imported ? (
+                  <div className="mt-3 rounded-[10px] border border-[rgba(52,211,153,0.28)] bg-[rgba(52,211,153,0.1)] px-3.5 py-2.5 text-[12.5px] text-good">
+                    <span className="font-semibold">Imported ✓</span> {imported.summary}
+                    {imported.loanNumber ? ` · Loan #${imported.loanNumber}` : ''}
+                    <div className="mt-0.5 text-[11.5px] text-text-muted">
+                      Edit any field below before generating the letter.
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
 
           {pa.source === 'scenario' && (
             <div className="mb-[22px]">

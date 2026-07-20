@@ -115,7 +115,7 @@ export interface AdminStat {
 }
 
 export interface PreApprovalState {
-  source: 'scenario' | 'los';
+  source: 'scenario' | 'los' | 'import';
   scenarioIdx: number;
   losProvider: 'arive' | 'encompass' | 'calyx' | 'byte';
   losConnected: boolean;
