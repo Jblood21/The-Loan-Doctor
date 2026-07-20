@@ -23,6 +23,7 @@ import {
 } from '@/lib/letter';
 import type { PronounChoice } from '@/lib/letter';
 import { fmt, longDateWeekday } from '@/lib/format';
+import { rankBorrowers } from '@/lib/borrowerSearch';
 import type { PreApprovalState } from '@/types';
 
 // The Mortgage Expert brand palette.
@@ -196,17 +197,10 @@ export default function PreApproval() {
     };
   }, [pa.source, pa.losConnected, pa.losProvider]);
 
-  // Filter the loaded borrowers by the search text — matches name, loan number,
-  // and address, and is dash/space-insensitive so "LN20471" finds "Loan #LN-20471".
-  const losMatches = useMemo(() => {
-    const q = pa.losQuery.trim().toLowerCase();
-    if (!q) return losResults;
-    const qs = q.replace(/[-\s]/g, '');
-    return losResults.filter((b) => {
-      const hay = `${b.name} ${b.meta} ${b.address}`.toLowerCase();
-      return hay.includes(q) || hay.replace(/[-\s]/g, '').includes(qs);
-    });
-  }, [losResults, pa.losQuery]);
+  // Rank the loaded borrowers against the search text: empty shows everyone, and as
+  // you type it narrows to the closest names first — order-independent across words,
+  // dash/space-insensitive for loan numbers, and typo-tolerant (see borrowerSearch).
+  const losMatches = useMemo(() => rankBorrowers(losResults, pa.losQuery), [losResults, pa.losQuery]);
 
   // Fetch (or generate) this user's inbound webhook URL. Surfaces loading/errors
   // instead of failing silently, and can be retried with the Refresh button.
