@@ -43,11 +43,9 @@ interface Borrower {
   address: string;
 }
 
-const STUB_BORROWERS: Borrower[] = [
-  { name: 'Michael & Laura Thompson', meta: 'Loan #LN-20471 · $425,000', address: '48 Birchwood Ln, Madison, WI 53703' },
-  { name: 'Aisha Bennett', meta: 'Loan #LN-20493 · $310,000', address: '210 Cedar St, Austin, TX 78702' },
-  { name: 'Robert & Diane Alvarez', meta: 'Loan #LN-20510 · $560,000', address: '12 Lakeshore Dr, Tampa, FL 33602' },
-];
+// No hardcoded sample borrowers — the LOS list shows ONLY real loans pushed in
+// from Zapier, so nothing fake ever appears in the pipeline.
+const STUB_BORROWERS: Borrower[] = [];
 
 /** Compact labeled toggle switch. */
 function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
@@ -535,11 +533,11 @@ export default function PreApproval() {
           <div className="mb-5 flex flex-col gap-4">
             <div>
               <Label>Borrower Name(s)</Label>
-              <TextField placeholder="Robert Boot" value={pa.borrowerName} onChange={(e) => set({ borrowerName: e.target.value })} />
+              <TextField placeholder="Borrower's full name" value={pa.borrowerName} onChange={(e) => set({ borrowerName: e.target.value })} />
             </div>
             <div>
               <Label>Subject Property Address</Label>
-              <TextField placeholder="205 Grand Avenue, Arco, ID 83213" value={pa.propertyAddress} onChange={(e) => set({ propertyAddress: e.target.value })} />
+              <TextField placeholder="Property address" value={pa.propertyAddress} onChange={(e) => set({ propertyAddress: e.target.value })} />
             </div>
           </div>
 

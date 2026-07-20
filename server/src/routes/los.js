@@ -5,12 +5,8 @@ import { ariveConfigured, ariveSearch } from '../los/arive.js';
 
 const router = Router();
 
-// Demo borrower pipeline used when nothing real is connected yet.
-const STUB = [
-  { name: 'Michael & Laura Thompson', meta: 'Loan #LN-20471 · $425,000', address: '48 Birchwood Ln, Madison, WI 53703' },
-  { name: 'Aisha Bennett', meta: 'Loan #LN-20493 · $310,000', address: '210 Cedar St, Austin, TX 78702' },
-  { name: 'Robert & Diane Alvarez', meta: 'Loan #LN-20510 · $560,000', address: '12 Lakeshore Dr, Tampa, FL 33602' },
-];
+// No demo/sample borrowers anywhere — the list only ever contains real loans
+// pushed in from Zapier, so nothing fake can appear in any environment.
 
 function filterByQuery(list, q) {
   const query = String(q || '').trim().toLowerCase();
@@ -144,10 +140,8 @@ router.get('/borrowers', requireAuth, async (req, res) => {
   }
   const pushed = getLosBorrowers(SHARED_LOS_KEY);
   if (pushed.length) return res.json({ results: filterByQuery(pushed, req.query.q), mode: 'zapier' });
-  // No real loans pushed yet. In production don't show fake sample borrowers — an
-  // honest empty state instead; the placeholder list is dev-only.
-  const isProd = process.env.NODE_ENV === 'production';
-  res.json({ results: isProd ? [] : filterByQuery(STUB, req.query.q), mode: 'demo' });
+  // No real loans pushed yet — honest empty state (never fake sample borrowers).
+  res.json({ results: [], mode: 'demo' });
 });
 
 export default router;
