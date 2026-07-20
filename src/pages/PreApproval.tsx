@@ -110,6 +110,7 @@ export default function PreApproval() {
   const [includeAgent, setIncludeAgent] = useState(true);
   const [imported, setImported] = useState<MismoResult | null>(null);
   const [importError, setImportError] = useState('');
+  const [dragging, setDragging] = useState(false);
   const set = (patch: Partial<PreApprovalState>) => setPa((s) => ({ ...s, ...patch }));
 
   // When a MISMO file has been imported, its loan drives the letter; otherwise use
@@ -424,12 +425,29 @@ export default function PreApproval() {
 
           {pa.source === 'import' && (
             <div className="mb-[22px]">
-              <div className="rounded-xl border border-dashed border-[#2f4663] bg-input p-[18px]">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!dragging) setDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  onMismoFile(e.dataTransfer.files?.[0]);
+                }}
+                className={`rounded-xl border border-dashed p-[18px] transition-colors ${
+                  dragging ? 'border-brand-teal bg-[rgba(45,212,191,0.08)]' : 'border-[#2f4663] bg-input'
+                }`}
+              >
                 <div className="text-[13.5px] font-semibold text-text-soft">Import a MISMO 3.4 loan file</div>
                 <p className="mt-1 text-[12px] leading-[1.5] text-text-muted">
-                  Works without Zapier — export the loan as a MISMO 3.4 (.xml) file from Arive (or any LOS) and drop it here.
-                  The borrower, property, loan amount, rate, and term fill in automatically. Your file is read on this device
-                  and never uploaded.
+                  Works without Zapier — export the loan as a MISMO 3.4 (.xml) file from Arive (or any LOS), then{' '}
+                  <strong>drag it onto this box</strong> or use the button below. The borrower, property, loan amount, rate, and
+                  term fill in automatically. Your file is read on this device and never uploaded.
                 </p>
                 <label className="mt-3 inline-flex cursor-pointer">
                   <input
@@ -442,7 +460,7 @@ export default function PreApproval() {
                     }}
                   />
                   <span className="inline-flex h-[42px] items-center rounded-[10px] border border-border bg-elevated px-4 text-[13.5px] font-semibold text-text-primary transition-colors hover:border-brand-teal">
-                    Choose MISMO file…
+                    {dragging ? 'Drop to import…' : 'Choose MISMO file…'}
                   </span>
                 </label>
 
