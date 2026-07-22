@@ -22,6 +22,13 @@ import shareRoutes from './routes/share.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+// Build/version stamp so you can verify which commit is actually live (Render sets
+// RENDER_GIT_COMMIT/RENDER_GIT_BRANCH automatically). Visit /api/health to check.
+const BUILD = {
+  commit: (process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || 'unknown').slice(0, 7),
+  branch: process.env.RENDER_GIT_BRANCH || process.env.GIT_BRANCH || 'unknown',
+  startedAt: new Date().toISOString(),
+};
 app.set('trust proxy', 1); // behind Render/other TLS proxy — needed for correct client IPs (rate limiting)
 
 // Security headers. CSP is left off because the SPA uses inline styles; the other
@@ -42,7 +49,7 @@ app.use(express.json({ limit: '1mb' }));
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true, legacyHeaders: false });
 const webhookLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, ...BUILD }));
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/scenarios', scenarioRoutes);
