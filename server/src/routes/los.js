@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getLos, setLos, getLosBorrowers, upsertLosBorrowers, clearLosBorrowers, findUserByWebhookToken, sharedWebhookToken, SHARED_LOS_KEY } from '../store.js';
+import { getLos, setLos, getLosBorrowers, upsertLosBorrowers, clearLosBorrowers, findUserByWebhookToken, sharedWebhookToken, SHARED_LOS_KEY, addWebhookLog, getWebhookLog } from '../store.js';
 import { requireAuth } from '../auth.js';
 import { ariveConfigured, ariveSearch } from '../los/arive.js';
 
@@ -13,24 +13,60 @@ function filterByQuery(list, q) {
   return query ? list.filter((b) => b.name.toLowerCase().includes(query) || (b.meta || '').toLowerCase().includes(query)) : list;
 }
 
-/** Map an inbound Zapier/LOS record (flat or nested) to a borrower. */
+// Build a lookup of the record's fields keyed by a normalized name (lowercase,
+// alphanumeric only), flattening one level of common nested objects. This makes
+// matching immune to how the Zap labels fields — "Borrower Name", "borrower_name",
+// "borrowerName", "BORROWER NAME" all resolve the same.
+function flattenFields(rec = {}) {
+  const out = {};
+  const norm = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const absorb = (obj) => {
+    if (!obj || typeof obj !== 'object') return;
+    for (const [k, v] of Object.entries(obj)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) continue; // nested handled below
+      if (out[norm(k)] == null || out[norm(k)] === '') out[norm(k)] = v;
+    }
+  };
+  absorb(rec);
+  for (const nk of ['borrower', 'property', 'data', 'loan', 'fields', 'contact', 'applicant', 'lead']) {
+    if (rec[nk] && typeof rec[nk] === 'object') absorb(rec[nk]);
+  }
+  return out;
+}
+function pick(fields, ...names) {
+  for (const n of names) {
+    const key = String(n).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (fields[key] != null && String(fields[key]).trim() !== '') return fields[key];
+  }
+  return '';
+}
+
+/** Map an inbound Zapier/LOS record (any field-naming style, flat or nested) to a borrower. */
 function mapInbound(rec = {}) {
-  const b = rec.borrower || rec;
-  const p = rec.property || rec;
+  const f = flattenFields(rec);
+  const first = pick(f, 'firstName', 'borrowerFirstName', 'applicantFirstName', 'givenName');
+  const last = pick(f, 'lastName', 'borrowerLastName', 'applicantLastName', 'surname', 'familyName');
   const name =
-    (rec.borrowerName || rec.borrower_name || rec.name || [b.firstName || rec.firstName, b.lastName || rec.lastName].filter(Boolean).join(' ')).toString().trim() ||
-    'Borrower';
-  const loanNo = rec.loanNumber || rec.loan_number || rec.loanId || rec.id || '';
-  const amount = rec.loanAmount || rec.loan_amount || rec.amount;
+    String(
+      pick(f, 'borrowerName', 'borrowerFullName', 'name', 'fullName', 'clientName', 'contactName', 'applicantName', 'primaryBorrower', 'borrower') ||
+        [first, last].filter(Boolean).join(' '),
+    ).trim() || 'Borrower';
+  const loanNo = pick(f, 'loanNumber', 'loanId', 'loanNo', 'loanNum', 'fileNumber', 'fileNo', 'applicationNumber', 'loanIdentifier');
+  const amount = pick(f, 'loanAmount', 'baseLoanAmount', 'amount', 'loanAmt', 'totalLoanAmount', 'noteAmount');
   const address =
-    rec.propertyAddress ||
-    rec.property_address ||
-    rec.address ||
-    p.fullAddress ||
-    [rec.propertyStreet || p.street, rec.propertyCity || p.city, rec.propertyState || p.state, rec.propertyZip || p.zip].filter(Boolean).join(', ') ||
-    '';
-  const amountNum = Number(amount);
-  const hasAmount = amount != null && amount !== '' && Number.isFinite(amountNum);
+    String(
+      pick(f, 'propertyAddress', 'address', 'fullAddress', 'subjectAddress', 'subjectPropertyAddress', 'streetAddress', 'propertyStreetAddress') ||
+        [
+          pick(f, 'street', 'propertyStreet', 'addressLine1', 'addressLineText', 'streetAddress1'),
+          pick(f, 'city', 'propertyCity', 'cityName'),
+          pick(f, 'state', 'propertyState', 'stateCode'),
+          pick(f, 'zip', 'zipCode', 'postalCode', 'propertyZip'),
+        ]
+          .filter(Boolean)
+          .join(', '),
+    ).trim();
+  const amountNum = Number(String(amount).replace(/[^0-9.\-]/g, ''));
+  const hasAmount = amount !== '' && Number.isFinite(amountNum) && amountNum > 0;
   const meta = [loanNo && `Loan #${loanNo}`, hasAmount && `$${amountNum.toLocaleString('en-US')}`].filter(Boolean).join(' · ');
   return { name, meta, address: String(address || ''), loanNumber: String(loanNo || '') };
 }
@@ -65,17 +101,29 @@ router.post('/webhook/:token', (req, res) => {
   const body = req.body || {};
   const records = Array.isArray(body) ? body : body.borrowers || body.loans || [body];
   const now = Date.now();
-  const mapped = records
-    .map(mapInbound)
+  const mappedAll = records.map(mapInbound);
+  const mapped = mappedAll
     .filter((b) => b.name && b.name !== 'Borrower')
     .map((b, i) => ({ id: `${now}-${i}`, receivedAt: now, ...b }));
+
+  // Log the raw payload so the pipeline is inspectable — you can see the exact field
+  // names Zapier sent, how many records arrived, and how many were understood.
+  addWebhookLog({
+    at: new Date(now).toISOString(),
+    recordsReceived: records.length,
+    borrowersStored: mapped.length,
+    fieldNames: Object.keys(flattenFields(records[0] || {})).slice(0, 40),
+    extractedNames: mappedAll.map((b) => b.name).slice(0, 20),
+    sample: JSON.stringify(records[0] || {}).slice(0, 1500),
+  });
+
   // A test POST with no recognizable fields still succeeds (200) with a hint, so a
   // Zapier setup test doesn't hard-fail — but nothing is stored until real fields arrive.
   if (!mapped.length) {
     return res.json({
       ok: true,
       received: 0,
-      warning: 'No borrower fields recognized. Map borrowerName, loanNumber, loanAmount, and propertyAddress in your Zap.',
+      warning: 'No borrower fields recognized. Map a borrower name (and ideally loan number, amount, address) in your Zap.',
     });
   }
   upsertLosBorrowers(target, mapped);
@@ -101,6 +149,10 @@ router.post('/webhook-info/regenerate', requireAuth, (req, res) => {
 router.post('/webhook-info/clear', requireAuth, (req, res) => {
   clearLosBorrowers(SHARED_LOS_KEY);
   res.json({ ok: true });
+});
+// Recent raw webhook activity — lets you see exactly what Zapier has been sending.
+router.get('/webhook-info/log', requireAuth, (req, res) => {
+  res.json({ log: getWebhookLog(), count: getLosBorrowers(SHARED_LOS_KEY).length });
 });
 
 // ---- connect / search ---------------------------------------------------

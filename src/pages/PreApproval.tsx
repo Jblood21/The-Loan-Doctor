@@ -112,6 +112,11 @@ export default function PreApproval() {
   const [imported, setImported] = useState<MismoResult | null>(null);
   const [importError, setImportError] = useState('');
   const [dragging, setDragging] = useState(false);
+  const [activityLog, setActivityLog] = useState<
+    { at: string; recordsReceived: number; borrowersStored: number; fieldNames: string[]; extractedNames: string[]; sample: string }[]
+  >([]);
+  const [showActivity, setShowActivity] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
   const [view, setView] = useState<'create' | 'issued'>('create');
   const [history, setHistory] = useState<PreApprovalRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -279,6 +284,20 @@ export default function PreApproval() {
     loadWebhook();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pa.source]);
+
+  const loadActivity = () => {
+    setActivityLoading(true);
+    api
+      .losWebhookLog()
+      .then(({ log }) => setActivityLog(log || []))
+      .catch(() => {})
+      .finally(() => setActivityLoading(false));
+  };
+  const toggleActivity = () => {
+    const next = !showActivity;
+    setShowActivity(next);
+    if (next) loadActivity();
+  };
 
   const copyWebhook = async () => {
     try {
@@ -581,8 +600,57 @@ export default function PreApproval() {
                   {webhookError ? (
                     <div className="mt-1.5 text-[11px] leading-[1.5] text-danger">{webhookError}</div>
                   ) : (
-                    <div className="mt-1.5 text-[11px] text-text-dim">
-                      {webhookCount} borrower{webhookCount === 1 ? '' : 's'} in the shared pipeline · same feed for your whole team.
+                    <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-text-dim">
+                      <span>
+                        {webhookCount} borrower{webhookCount === 1 ? '' : 's'} in the shared pipeline · same feed for your whole team.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={toggleActivity}
+                        className="flex-none cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light underline"
+                      >
+                        {showActivity ? 'Hide activity' : 'See what Zapier sent'}
+                      </button>
+                    </div>
+                  )}
+
+                  {showActivity && (
+                    <div className="mt-2 rounded-[9px] border border-border-input bg-app p-2.5">
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-[11.5px] font-semibold text-text-soft">Recent webhook activity</span>
+                        <button
+                          type="button"
+                          onClick={loadActivity}
+                          className="cursor-pointer border-none bg-transparent text-[11px] text-brand-blue-light underline"
+                        >
+                          {activityLoading ? '…' : 'Refresh'}
+                        </button>
+                      </div>
+                      {activityLog.length === 0 ? (
+                        <div className="py-1 text-[11px] text-text-muted">
+                          {activityLoading ? 'Loading…' : 'No sends recorded yet. Trigger your Zap (or hit “Test” in Zapier) and refresh.'}
+                        </div>
+                      ) : (
+                        <div className="flex max-h-[220px] flex-col gap-1.5 overflow-y-auto">
+                          {activityLog.map((e, i) => (
+                            <div key={i} className="rounded-[7px] bg-input px-2.5 py-1.5 text-[11px] leading-[1.5]">
+                              <div className="flex items-center justify-between text-text-soft">
+                                <span>{new Date(e.at).toLocaleString()}</span>
+                                <span className={e.borrowersStored ? 'text-good' : 'text-[#fbbf24]'}>
+                                  {e.recordsReceived} sent · {e.borrowersStored} added
+                                </span>
+                              </div>
+                              {e.extractedNames?.length > 0 && (
+                                <div className="mt-0.5 text-text-muted">Names: {e.extractedNames.join(', ')}</div>
+                              )}
+                              <div className="mt-0.5 text-text-dim">Fields seen: {e.fieldNames?.join(', ') || '—'}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-1.5 text-[10.5px] leading-[1.5] text-text-dim">
+                        If a send shows “0 added”, your Zap didn’t include a recognizable borrower name — check the field mapping.
+                      </div>
                     </div>
                   )}
                 </div>

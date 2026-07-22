@@ -66,7 +66,7 @@ export function dataDirInfo() {
   return { dir: DATA_DIR, persistent, explicit, onKnownMount };
 }
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
+const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: [], shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -176,12 +176,17 @@ export function getLos(userId) {
 export function getLosBorrowers(userId) {
   return db.losBorrowers[userId] || [];
 }
-/** Upsert borrowers (dedupe by loan number, else name+address); newest first, capped. */
+// Dedup key: a loan number identifies a loan, but we also include the name so two
+// DIFFERENT people can never collapse into one just because a Zap sent a blank or
+// constant loan-number field (the previous "only one borrower shows" failure mode).
+const borrowerKey = (b) =>
+  b.loanNumber ? `ln:${b.loanNumber}|${(b.name || '').toLowerCase()}` : `na:${(b.name || '').toLowerCase()}|${(b.address || '').toLowerCase()}`;
+
+/** Upsert borrowers; existing entries with the same key are updated, newest first, capped. */
 export function upsertLosBorrowers(userId, items) {
   const existing = db.losBorrowers[userId] || [];
-  const key = (b) => (b.loanNumber ? `ln:${b.loanNumber}` : `na:${b.name}|${b.address}`);
-  const map = new Map(existing.map((b) => [key(b), b]));
-  for (const it of items) map.set(key(it), { ...map.get(key(it)), ...it });
+  const map = new Map(existing.map((b) => [borrowerKey(b), b]));
+  for (const it of items) map.set(borrowerKey(it), { ...map.get(borrowerKey(it)), ...it });
   const merged = Array.from(map.values()).sort((a, b) => (b.receivedAt || 0) - (a.receivedAt || 0)).slice(0, 300);
   db.losBorrowers[userId] = merged;
   persist();
@@ -190,6 +195,19 @@ export function upsertLosBorrowers(userId, items) {
 export function clearLosBorrowers(userId) {
   db.losBorrowers[userId] = [];
   persist();
+}
+
+// ---- webhook activity log (diagnostics) --------------------------------
+// Keeps the most recent raw inbound payloads so you can SEE exactly what Zapier
+// sent (field names + values) and how many borrowers were extracted from each.
+export function addWebhookLog(entry) {
+  const list = db.losWebhookLog || [];
+  list.unshift(entry);
+  db.losWebhookLog = list.slice(0, 25);
+  persist();
+}
+export function getWebhookLog() {
+  return db.losWebhookLog || [];
 }
 
 // ---- per-user webhook token (identifies the Zap source) ----------------

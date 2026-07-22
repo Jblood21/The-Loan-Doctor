@@ -97,6 +97,11 @@ export const api = {
       `/los/borrowers?provider=${encodeURIComponent(provider)}&q=${encodeURIComponent(query)}`,
     ),
   losWebhookInfo: () => request<{ token: string; url: string; count: number }>('GET', '/los/webhook-info'),
+  losWebhookLog: () =>
+    request<{
+      count: number;
+      log: { at: string; recordsReceived: number; borrowersStored: number; fieldNames: string[]; extractedNames: string[]; sample: string }[];
+    }>('GET', '/los/webhook-info/log'),
   losRegenerateWebhook: () => request<{ token: string; url: string }>('POST', '/los/webhook-info/regenerate'),
   losClearBorrowers: () => request<{ ok: boolean }>('POST', '/los/webhook-info/clear'),
 
