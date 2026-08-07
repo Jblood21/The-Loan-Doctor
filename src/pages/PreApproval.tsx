@@ -45,6 +45,13 @@ interface Borrower {
   name: string;
   meta: string;
   address: string;
+  // Extra details pushed in from the LOS/Zap, surfaced in the search results.
+  amount?: string;
+  phone?: string;
+  email?: string;
+  loanType?: string;
+  purpose?: string;
+  rate?: string;
 }
 
 // No hardcoded sample borrowers — the LOS list shows ONLY real loans pushed in
@@ -731,26 +738,52 @@ export default function PreApproval() {
                               : `No borrower matches “${pa.losQuery}”.`}
                           </div>
                         ) : (
-                          losMatches.map((b, i) => (
-                            <button
-                              key={`${b.name}-${b.meta}-${i}`}
-                              type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                set({ borrowerName: b.name, propertyAddress: b.address, losQuery: '' });
-                                setLosOpen(false);
-                              }}
-                              className="flex w-full items-center justify-between gap-3 border-b border-[rgba(140,165,195,0.08)] px-3.5 py-2.5 text-left transition-colors last:border-0 hover:bg-[rgba(47,128,237,0.12)]"
-                            >
-                              <span className="min-w-0">
-                                <span className="block truncate text-[13.5px] font-semibold text-text-primary">{b.name}</span>
-                                <span className="block truncate text-[12px] text-text-muted">
-                                  {[b.meta, b.address].filter(Boolean).join(' · ')}
+                          losMatches.map((b, i) => {
+                            const loanFacts = [b.loanType, b.purpose, b.rate].filter(Boolean) as string[];
+                            const contacts = [b.phone, b.email].filter(Boolean) as string[];
+                            return (
+                              <button
+                                key={`${b.name}-${b.meta}-${i}`}
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  set({ borrowerName: b.name, propertyAddress: b.address, losQuery: '' });
+                                  setLosOpen(false);
+                                }}
+                                className="flex w-full items-start justify-between gap-3 border-b border-[rgba(140,165,195,0.08)] px-3.5 py-2.5 text-left transition-colors last:border-0 hover:bg-[rgba(47,128,237,0.12)]"
+                              >
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-[13.5px] font-semibold text-text-primary">{b.name}</span>
+                                  {(b.meta || b.address) && (
+                                    <span className="block truncate text-[12px] text-text-muted">
+                                      {[b.meta, b.address].filter(Boolean).join(' · ')}
+                                    </span>
+                                  )}
+                                  {(loanFacts.length > 0 || contacts.length > 0) && (
+                                    <span className="mt-1 flex flex-wrap items-center gap-1">
+                                      {loanFacts.map((d) => (
+                                        <span
+                                          key={`f-${d}`}
+                                          className="rounded-full bg-[rgba(47,128,237,0.12)] px-2 py-0.5 text-[10.5px] font-semibold text-brand-blue-light"
+                                        >
+                                          {d}
+                                        </span>
+                                      ))}
+                                      {contacts.map((c) => (
+                                        <span
+                                          key={`c-${c}`}
+                                          className="max-w-[160px] truncate rounded-full border border-border-seg px-2 py-0.5 text-[10.5px] text-text-soft"
+                                        >
+                                          {c}
+                                        </span>
+                                      ))}
+                                    </span>
+                                  )}
                                 </span>
-                              </span>
-                              <span className="flex-none text-[12px] font-semibold text-brand-blue-light">Use →</span>
-                            </button>
-                          ))
+                                <span className="mt-0.5 flex-none text-[12px] font-semibold text-brand-blue-light">Use →</span>
+                              </button>
+                            );
+                          })
                         )}
                       </div>
                     )}

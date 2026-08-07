@@ -9,6 +9,11 @@ export interface SearchableBorrower {
   name: string;
   meta?: string;
   address?: string;
+  // Extra fields pushed from the LOS/Zap — also searchable (loan type, phone, etc.).
+  loanType?: string;
+  purpose?: string;
+  phone?: string;
+  email?: string;
 }
 
 const norm = (s: string | undefined) => (s || '').toLowerCase();
@@ -24,15 +29,19 @@ export function isSubsequence(hay: string, needle: string): boolean {
   return i === needle.length;
 }
 
-/** Score one query token against a borrower. Higher is a closer match; -1 = no match. */
-function tokenScore(name: string, words: string[], hay: string, hayNoSep: string, token: string): number {
+/** Score one query token against a borrower. Higher is a closer match; -1 = no match.
+ *  `hay`/`hayNoSep` cover all fields (name, loan #, address, and the extra LOS fields)
+ *  for precise substring matches; `fuzzyNoSep` is the narrower name+loan#+address set
+ *  used for the typo-tolerant fallback, so common letters in emails/phones don't cause
+ *  spurious fuzzy matches. */
+function tokenScore(name: string, words: string[], hay: string, hayNoSep: string, fuzzyNoSep: string, token: string): number {
   const tNoSep = stripSep(token);
   if (name.startsWith(token)) return 100; // name begins with what you typed
   if (words.some((w) => w.startsWith(token))) return 60; // a name word begins with it (last name, etc.)
   if (name.includes(token)) return 45; // appears somewhere in the name
-  if (hay.includes(token)) return 25; // appears in loan #/address
-  if (tNoSep && hayNoSep.includes(tNoSep)) return 20; // loan number, ignoring dashes/spaces
-  if (tNoSep && isSubsequence(hayNoSep, tNoSep)) return 5; // fuzzy / minor typo
+  if (hay.includes(token)) return 25; // appears in loan #/address/loan type/purpose/contact
+  if (tNoSep && hayNoSep.includes(tNoSep)) return 20; // loan/phone number, ignoring dashes/spaces
+  if (tNoSep && isSubsequence(fuzzyNoSep, tNoSep)) return 5; // fuzzy / minor typo (name + loan # + address only)
   return -1;
 }
 
@@ -51,12 +60,14 @@ export function rankBorrowers<T extends SearchableBorrower>(list: T[], query: st
   list.forEach((b, idx) => {
     const name = norm(b.name);
     const words = name.split(/\s+/).filter(Boolean);
-    const hay = `${name} ${norm(b.meta)} ${norm(b.address)}`;
+    // Full haystack (precise substring matches) vs the narrower fuzzy haystack.
+    const hay = `${name} ${norm(b.meta)} ${norm(b.address)} ${norm(b.loanType)} ${norm(b.purpose)} ${norm(b.phone)} ${norm(b.email)}`;
     const hayNoSep = stripSep(hay);
+    const fuzzyNoSep = stripSep(`${name} ${norm(b.meta)} ${norm(b.address)}`);
 
     let total = 0;
     for (const tok of tokens) {
-      const s = tokenScore(name, words, hay, hayNoSep, tok);
+      const s = tokenScore(name, words, hay, hayNoSep, fuzzyNoSep, tok);
       if (s < 0) return; // this word matched nothing → not a candidate
       total += s;
     }
