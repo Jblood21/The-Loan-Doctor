@@ -872,7 +872,7 @@ export default function PreApproval() {
               )}
               {signature && sigMatchesSaved && <span className="text-[11.5px] text-text-dim">Saved to Settings</span>}
             </div>
-            <SignaturePad value={signature} onChange={onSignatureChange} />
+            <SignaturePad value={signature} onChange={onSignatureChange} defaultName={settings.name} />
             <div className="mt-1.5 text-[11.5px] text-text-muted">
               Appears above your name in the letter. Save it once and it auto-fills every future letter.
             </div>
