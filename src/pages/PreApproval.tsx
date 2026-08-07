@@ -7,6 +7,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Select } from '@/components/ui/Select';
 import { TextField, Label } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
+import { SignaturePad } from '@/components/SignaturePad';
 import { useScenarios } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useUI } from '@/context/UIContext';
@@ -88,7 +89,7 @@ function PresetChips({ presets, onPick }: { presets: string[]; onPick: (v: strin
 
 export default function PreApproval() {
   const { scenarios } = useScenarios();
-  const { settings } = useSettings();
+  const { settings, save: saveSettings, saving: savingSettings } = useSettings();
   const { openSettings } = useUI();
   const [pa, setPa] = useState<PreApprovalState>({
     source: 'scenario',
@@ -189,6 +190,27 @@ export default function PreApproval() {
   const [showHeadshot, setShowHeadshot] = useState(true);
   const [showSubjectAddress, setShowSubjectAddress] = useState(true);
   const [expDays, setExpDays] = useState('90');
+
+  // Signature: seeded from the saved settings signature until the user draws/uploads
+  // one here (sigTouched), so a signature set once auto-fills every letter.
+  const [signature, setSignature] = useState('');
+  const [sigTouched, setSigTouched] = useState(false);
+  const [showSignature, setShowSignature] = useState(true);
+  const [sigSaved, setSigSaved] = useState(false);
+  useEffect(() => {
+    if (!sigTouched && settings.signatureDataUrl) setSignature(settings.signatureDataUrl);
+  }, [settings.signatureDataUrl, sigTouched]);
+  const onSignatureChange = (dataUrl: string) => {
+    setSigTouched(true);
+    setSigSaved(false);
+    setSignature(dataUrl);
+  };
+  const saveSignatureToSettings = async () => {
+    await saveSettings({ signatureDataUrl: signature });
+    setSigSaved(true);
+    window.setTimeout(() => setSigSaved(false), 2000);
+  };
+  const sigMatchesSaved = signature === (settings.signatureDataUrl || '');
 
   const tpl = useMemo(
     () => resolveTemplate(templateId, srcScenario, { borrowerName: pa.borrowerName, propertyAddress: pa.propertyAddress, pronoun }),
@@ -346,6 +368,7 @@ export default function PreApproval() {
       terms: letter.terms,
       validity: letter.validity,
       closing: letter.closing,
+      signature: showSignature && signature ? signature : undefined,
       borrowerName: pa.borrowerName || '—',
       officer: { name: letter.officerName, title: letter.officerTitle, nmls: settings.nmls, email: settings.email, phone: settings.phone },
       lender: {
@@ -432,7 +455,10 @@ export default function PreApproval() {
       {letter.validity && <p className="mt-4 text-[13px] leading-[1.6] text-[#444]">{letter.validity}</p>}
 
       <div className="mt-7 text-[13.5px]">{letter.closing}</div>
-      <div className="mt-1 text-[15px] font-bold" style={{ color: GREEN }}>
+      {showSignature && signature && (
+        <img src={signature} alt={`${letter.officerName} signature`} className="mt-1.5 h-[52px] w-auto max-w-[240px] object-contain object-left" />
+      )}
+      <div className={`text-[15px] font-bold ${showSignature && signature ? 'mt-0.5' : 'mt-1'}`} style={{ color: GREEN }}>
         {letter.officerName}
       </div>
       <div className="text-[12.5px] text-[#5b6b7b]">{letter.officerTitle}</div>
@@ -831,6 +857,27 @@ export default function PreApproval() {
             )}
           </div>
 
+          {/* Signature */}
+          <div className="mb-4">
+            <div className="mb-2 flex items-center justify-between">
+              <SectionLabel>SIGNATURE</SectionLabel>
+              {signature && !sigMatchesSaved && (
+                <button
+                  onClick={saveSignatureToSettings}
+                  disabled={savingSettings}
+                  className="cursor-pointer border-none bg-transparent text-[12px] font-semibold text-brand-blue-light underline disabled:opacity-50"
+                >
+                  {savingSettings ? 'Saving…' : sigSaved ? 'Saved ✓' : 'Save to Settings'}
+                </button>
+              )}
+              {signature && sigMatchesSaved && <span className="text-[11.5px] text-text-dim">Saved to Settings</span>}
+            </div>
+            <SignaturePad value={signature} onChange={onSignatureChange} />
+            <div className="mt-1.5 text-[11.5px] text-text-muted">
+              Appears above your name in the letter. Save it once and it auto-fills every future letter.
+            </div>
+          </div>
+
           <div className="mb-4 flex flex-col gap-2.5">
             <Toggle checked={showSubjectAddress} onChange={setShowSubjectAddress} label="Show subject property address" />
             <Toggle checked={showTerms} onChange={setShowTerms} label="Show loan terms table" hint="Type, price, loan amount, down, rate, term" />
@@ -851,6 +898,12 @@ export default function PreApproval() {
               )}
             </div>
             <Toggle checked={showHeadshot} onChange={setShowHeadshot} label="Show photo in footer" />
+            <Toggle
+              checked={showSignature}
+              onChange={setShowSignature}
+              label="Show signature"
+              hint={signature ? 'Handwritten signature above your name' : 'Add one in the Signature section above'}
+            />
             <div className="flex items-center justify-between rounded-[10px] border border-border-input bg-input px-3.5 py-2.5">
               <div className="pr-3">
                 <div className="text-[13px] font-semibold text-text-label">Dual branding (real-estate agent)</div>
