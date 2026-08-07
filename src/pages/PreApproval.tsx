@@ -28,7 +28,8 @@ import { rankBorrowers } from '@/lib/borrowerSearch';
 import { parseMismo } from '@/lib/mismo';
 import type { MismoResult } from '@/lib/mismo';
 import { groupByBorrower, diffRecords } from '@/lib/preApprovalHistory';
-import type { PreApprovalRecord, PreApprovalState } from '@/types';
+import type { PreApprovalRecord, PreApprovalState, Scenario } from '@/types';
+import { losBorrowerToScenario } from '@/lib/losBorrower';
 
 // The Mortgage Expert brand palette.
 const GREEN = '#1f3d25';
@@ -53,6 +54,7 @@ interface Borrower {
   purpose?: string;
   rate?: string;
 }
+
 
 // No hardcoded sample borrowers — the LOS list shows ONLY real loans pushed in
 // from Zapier, so nothing fake ever appears in the pipeline.
@@ -131,6 +133,11 @@ export default function PreApproval() {
   const [historyError, setHistoryError] = useState('');
   // Inline status banner for the action area (replaces jarring native alerts).
   const [actionMsg, setActionMsg] = useState<{ tone: 'error' | 'info'; text: string } | null>(null);
+  // Loan terms captured from a selected LOS borrower (drives the letter math), plus
+  // which fields actually came from the feed (for the disclosure banner).
+  const [losScenario, setLosScenario] = useState<Scenario | null>(null);
+  const [losFeedFields, setLosFeedFields] = useState<string[]>([]);
+  const [losPicked, setLosPicked] = useState(false);
   const set = (patch: Partial<PreApprovalState>) => setPa((s) => ({ ...s, ...patch }));
 
   const loadHistory = () => {
@@ -148,12 +155,14 @@ export default function PreApproval() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
-  // When a MISMO file has been imported, its loan drives the letter; otherwise use
-  // the selected saved scenario.
+  // Letter loan terms come from: an imported MISMO file, else a selected LOS
+  // borrower's feed data, else the chosen saved scenario.
   const srcScenario =
     pa.source === 'import' && imported
       ? imported.scenario
-      : scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
+      : pa.source === 'los' && losScenario
+        ? losScenario
+        : scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
 
   // Read a MISMO 3.4 XML file entirely in the browser (borrower PII never leaves the
   // device) and pull the borrower, property, and loan terms into the letter.
@@ -529,7 +538,14 @@ export default function PreApproval() {
               { value: 'import', label: 'Import a file' },
             ]}
             value={pa.source}
-            onChange={(v) => set({ source: v as PreApprovalState['source'] })}
+            onChange={(v) => {
+              // Switching source clears any LOS-derived loan terms so they don't leak
+              // into a scenario/import letter.
+              setLosScenario(null);
+              setLosFeedFields([]);
+              setLosPicked(false);
+              set({ source: v as PreApprovalState['source'] });
+            }}
           />
 
           {pa.source === 'import' && (
@@ -754,6 +770,13 @@ export default function PreApproval() {
                                 type="button"
                                 onMouseDown={(e) => {
                                   e.preventDefault();
+                                  // Carry the feed's loan terms into the letter math (not just name/address),
+                                  // using the currently-selected saved scenario for anything the feed omits.
+                                  const base = scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
+                                  const built = base ? losBorrowerToScenario(b, base) : null;
+                                  setLosScenario(built?.scenario ?? null);
+                                  setLosFeedFields(built?.fromFeed ?? []);
+                                  setLosPicked(true);
                                   set({ borrowerName: b.name, propertyAddress: b.address, losQuery: '' });
                                   setLosOpen(false);
                                 }}
@@ -800,6 +823,21 @@ export default function PreApproval() {
                       ? 'Waiting for your first loan — send one from your Zap (or hit “Test” in Zapier) and it appears here instantly.'
                       : `${losResults.length} borrower${losResults.length === 1 ? '' : 's'} in your team’s shared pipeline.`}
                   </div>
+
+                  {/* Disclose which loan terms drive the letter after a borrower is picked. */}
+                  {losPicked && losScenario && losFeedFields.length > 0 && (
+                    <div className="mt-3 rounded-[10px] border border-[rgba(52,211,153,0.28)] bg-[rgba(52,211,153,0.1)] px-3.5 py-2.5 text-[12px] leading-[1.55] text-good">
+                      <span className="font-semibold">Letter terms pulled from your LOS:</span> {losFeedFields.join(' · ')}.
+                      <div className="mt-0.5 text-[11px] text-text-muted">
+                        Purchase price, down payment, and term aren’t in the feed — the loan amount is used as-is. Confirm the numbers below before sending.
+                      </div>
+                    </div>
+                  )}
+                  {losPicked && !losScenario && (
+                    <div className="mt-3 rounded-[10px] border border-[rgba(251,191,36,0.28)] bg-[rgba(251,191,36,0.1)] px-3.5 py-2.5 text-[12px] leading-[1.55] text-warn-text">
+                      This borrower’s feed didn’t include loan details, so the letter falls back to a saved scenario’s terms. Confirm them before sending.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
