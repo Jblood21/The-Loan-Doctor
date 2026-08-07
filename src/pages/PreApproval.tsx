@@ -129,6 +129,8 @@ export default function PreApproval() {
   const [history, setHistory] = useState<PreApprovalRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  // Inline status banner for the action area (replaces jarring native alerts).
+  const [actionMsg, setActionMsg] = useState<{ tone: 'error' | 'info'; text: string } | null>(null);
   const set = (patch: Partial<PreApprovalState>) => setPa((s) => ({ ...s, ...patch }));
 
   const loadHistory = () => {
@@ -346,7 +348,7 @@ export default function PreApproval() {
     } catch (err) {
       // A configured provider that can't be reached surfaces the error.
       if (err instanceof ApiError && err.status === 502) {
-        alert(err.message);
+        setActionMsg({ tone: 'error', text: err.message });
         return;
       }
       setLosMode('demo');
@@ -363,6 +365,7 @@ export default function PreApproval() {
   };
 
   const downloadPdf = async () => {
+    setActionMsg(null);
     const payload = {
       style: styleId,
       showHeadshot,
@@ -412,9 +415,13 @@ export default function PreApproval() {
       a.click();
       URL.revokeObjectURL(url);
       // Refresh history so the just-issued letter shows in the Issued tab.
+      setActionMsg(null);
       loadHistory();
     } catch {
-      alert('PDF service unavailable — start the API server (npm run dev). Using the browser print dialog instead.');
+      setActionMsg({
+        tone: 'info',
+        text: 'The letter service is waking up — this can take up to ~30 seconds on the first request. Opening your browser’s print dialog as a fallback; try Download PDF again in a moment.',
+      });
       window.print();
     }
   };
@@ -965,6 +972,18 @@ export default function PreApproval() {
             </div>
           </div>
 
+          {actionMsg && (
+            <div
+              className={`mb-3 rounded-[10px] border px-3.5 py-2.5 text-[12.5px] leading-[1.5] ${
+                actionMsg.tone === 'error'
+                  ? 'border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] text-danger'
+                  : 'border-[rgba(251,191,36,0.28)] bg-[rgba(251,191,36,0.1)] text-warn-text'
+              }`}
+              role="status"
+            >
+              {actionMsg.text}
+            </div>
+          )}
           <div className="flex gap-2.5">
             <Button variant="primary" className="flex-1 !h-[46px]" onClick={downloadPdf}>
               Download PDF

@@ -56,6 +56,21 @@ button {
   font-family: inherit;
 }
 
+/* Visible keyboard focus for custom controls (buttons, segmented options, pills,
+   toggles, links, FAQ accordions). Inputs keep their own .field focus styles.
+   Only shows for keyboard nav (:focus-visible), never on mouse click. */
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+[role='switch']:focus-visible,
+[role='option']:focus-visible,
+[role='tab']:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #5fa8f5;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
 /* hide number-input spinners — fields use explicit $/% adornments instead */
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
