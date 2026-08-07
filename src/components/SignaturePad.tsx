@@ -9,38 +9,107 @@ const CANVAS_W = 560;
 const CANVAS_H = 170;
 const INK = '#1b2733';
 
+type Mode = 'draw' | 'type' | 'upload';
+
+// Bundled script fonts (see index.css @font-face + public/fonts). `size` balances
+// the visual weight across fonts that render large/small at the same pixel size.
+interface SigFont {
+  id: string;
+  family: string;
+  label: string;
+  size: number;
+}
+const SIGNATURE_FONTS: SigFont[] = [
+  { id: 'dancing', family: 'Dancing Script', label: 'Flowing', size: 1.0 },
+  { id: 'greatvibes', family: 'Great Vibes', label: 'Elegant', size: 1.18 },
+  { id: 'sacramento', family: 'Sacramento', label: 'Casual', size: 1.16 },
+];
+
+/**
+ * Render typed text in a script font to a transparent PNG data URL. Awaits the
+ * font so the canvas never falls back to a system default, and pads generously so
+ * tall swashes / descenders aren't clipped.
+ */
+async function renderTypedSignature(text: string, family: string, sizeMul: number): Promise<string> {
+  const px = 96 * sizeMul;
+  const fontStr = `${px}px "${family}"`;
+  try {
+    await document.fonts.load(fontStr, text);
+  } catch {
+    /* fall back to whatever is available */
+  }
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  ctx.font = fontStr;
+  const m = ctx.measureText(text);
+  const padX = px * 0.4;
+  const width = Math.ceil(m.width + padX * 2 + px * 0.2);
+  const height = Math.ceil(px * 1.7);
+  canvas.width = width;
+  canvas.height = height;
+  // Resizing the canvas resets the context state, so re-apply it.
+  ctx.font = fontStr;
+  ctx.fillStyle = INK;
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(text, padX, height - Math.ceil(px * 0.45));
+  return canvas.toDataURL('image/png');
+}
+
 interface SignaturePadProps {
   /** Current signature as a PNG data URL (empty string = none). */
   value: string;
   /** Called with a new data URL when the signature changes, or '' when cleared. */
   onChange: (dataUrl: string) => void;
+  /** Seeds the typed-signature field (e.g. the loan officer's name). */
+  defaultName?: string;
 }
 
 /**
- * Capture a signature two ways — draw it with a mouse/finger, or upload an image.
- * Both produce a transparent PNG data URL so the signature overlays the letter
- * cleanly. The drawn canvas keeps a transparent background (only the ink is
- * painted), so `toDataURL` yields exactly what the letter needs.
+ * Capture a signature three ways — draw it, type it in a script font, or upload an
+ * image. All three produce a transparent PNG data URL so the signature overlays the
+ * letter cleanly and flows through the same preview/PDF pipeline.
  */
-export function SignaturePad({ value, onChange }: SignaturePadProps) {
-  const [mode, setMode] = useState<'draw' | 'upload'>('draw');
+export function SignaturePad({ value, onChange, defaultName = '' }: SignaturePadProps) {
+  const [mode, setMode] = useState<Mode>('draw');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
   const [hasInk, setHasInk] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
-  // Prepare the 2D context once (and whenever we switch back to draw mode).
+  // Typed-signature state.
+  const [typedName, setTypedName] = useState(defaultName);
+  const [fontId, setFontId] = useState(SIGNATURE_FONTS[0].id);
+
+  // Prepare the 2D drawing context (and whenever we switch back to draw mode).
   useEffect(() => {
     if (mode !== 'draw') return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
     ctx.lineWidth = 2.6;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = INK;
   }, [mode]);
+
+  // In type mode, re-render the signature image whenever the text or font changes.
+  useEffect(() => {
+    if (mode !== 'type') return;
+    const text = typedName.trim();
+    if (!text) {
+      onChange('');
+      return;
+    }
+    const font = SIGNATURE_FONTS.find((f) => f.id === fontId) || SIGNATURE_FONTS[0];
+    let cancelled = false;
+    renderTypedSignature(text, font.family, font.size).then((url) => {
+      if (!cancelled && url) onChange(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, typedName, fontId]);
 
   const pointFromEvent = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current!;
@@ -104,24 +173,30 @@ export function SignaturePad({ value, onChange }: SignaturePadProps) {
     reader.readAsDataURL(file);
   };
 
+  const tabs: { id: Mode; label: string }[] = [
+    { id: 'draw', label: 'Draw' },
+    { id: 'type', label: 'Type' },
+    { id: 'upload', label: 'Upload' },
+  ];
+
   return (
     <div className="rounded-[10px] border border-border-input bg-input p-3">
       <div className="mb-2.5 inline-flex rounded-[9px] border border-border-seg bg-app p-0.5 text-[12.5px]">
-        {(['draw', 'upload'] as const).map((m) => (
+        {tabs.map((t) => (
           <button
-            key={m}
+            key={t.id}
             type="button"
-            onClick={() => setMode(m)}
+            onClick={() => setMode(t.id)}
             className={`cursor-pointer rounded-[7px] px-3 py-1 font-semibold transition-colors ${
-              mode === m ? 'bg-brand-blue text-white' : 'text-text-muted hover:text-text-soft'
+              mode === t.id ? 'bg-brand-blue text-white' : 'text-text-muted hover:text-text-soft'
             }`}
           >
-            {m === 'draw' ? 'Draw' : 'Upload'}
+            {t.label}
           </button>
         ))}
       </div>
 
-      {mode === 'draw' ? (
+      {mode === 'draw' && (
         <div>
           <div className="relative overflow-hidden rounded-[8px] border border-border-input bg-white">
             <canvas
@@ -134,7 +209,6 @@ export function SignaturePad({ value, onChange }: SignaturePadProps) {
               onPointerLeave={end}
               className="block h-[150px] w-full cursor-crosshair touch-none"
             />
-            {/* Signing guideline + prompt, hidden once ink is on the canvas. */}
             <div className="pointer-events-none absolute inset-x-5 bottom-8 border-b border-[#c9d2dd]" />
             {!hasInk && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] text-[#9aa7b6]">
@@ -149,7 +223,43 @@ export function SignaturePad({ value, onChange }: SignaturePadProps) {
             </Button>
           </div>
         </div>
-      ) : (
+      )}
+
+      {mode === 'type' && (
+        <div>
+          <input
+            type="text"
+            value={typedName}
+            onChange={(e) => setTypedName(e.target.value)}
+            placeholder="Type your name"
+            aria-label="Signature name"
+            className="h-10 w-full rounded-[8px] border border-border-input bg-app px-3 text-[14px] text-text-primary outline-none transition-shadow focus:border-brand-blue focus:shadow-focus"
+          />
+          <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {SIGNATURE_FONTS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFontId(f.id)}
+                className={`flex h-[68px] flex-col items-center justify-center overflow-hidden rounded-[8px] border bg-white px-2 transition-colors ${
+                  fontId === f.id ? 'border-brand-blue ring-1 ring-brand-blue' : 'border-border-input hover:border-brand-teal'
+                }`}
+              >
+                <span
+                  className="max-w-full truncate leading-none text-[#1b2733]"
+                  style={{ fontFamily: `'${f.family}', cursive`, fontSize: 26 }}
+                >
+                  {typedName.trim() || 'Your Name'}
+                </span>
+                <span className="mt-1 text-[10.5px] font-semibold uppercase tracking-wide text-text-dim">{f.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 text-[11.5px] text-text-dim">Pick a style — it renders into the letter exactly as shown.</div>
+        </div>
+      )}
+
+      {mode === 'upload' && (
         <div>
           <label className="flex cursor-pointer flex-col items-center justify-center rounded-[8px] border border-dashed border-border-input bg-app px-4 py-6 text-center transition-colors hover:border-brand-teal">
             <input

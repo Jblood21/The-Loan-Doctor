@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Script fonts for the typed-signature option (bundled locally, OFL). */
+@font-face {
+  font-family: 'Dancing Script';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/DancingScript.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Great Vibes';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/GreatVibes.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Sacramento';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Sacramento.ttf') format('truetype');
+}
+
 :root {
   color-scheme: dark;
 }
