@@ -76,6 +76,8 @@ export interface Settings {
   officerTitle: string;
   /** Custom letterhead logo as a data URL (overrides the built-in logo). */
   logoDataUrl?: string;
+  /** Saved signature (transparent PNG data URL) auto-filled into pre-approval letters. */
+  signatureDataUrl?: string;
   // Lender Information
   lenderName: string;
   lenderNmls: string;

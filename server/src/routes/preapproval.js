@@ -52,18 +52,25 @@ router.post('/pdf', requireAuth, (req, res) => {
   const logo = body.logo ?? null;
   const loan = obj(body.loan); // structured loan snapshot for the issued-pre-approvals history
 
+  // Decode a data URL into a Buffer PDFKit can draw, or null if it isn't one.
+  const decodeDataUrl = (v) => {
+    if (typeof v !== 'string' || !v.startsWith('data:')) return null;
+    const b64 = v.split(',')[1];
+    if (!b64) return null;
+    try {
+      return Buffer.from(b64, 'base64');
+    } catch {
+      return null;
+    }
+  };
+
   // Custom uploaded letterhead logo (data URL) overrides the built-in file.
   let logoSource = fs.existsSync(LOGO) ? LOGO : null;
-  if (typeof logo === 'string' && logo.startsWith('data:')) {
-    const b64 = logo.split(',')[1];
-    if (b64) {
-      try {
-        logoSource = Buffer.from(b64, 'base64');
-      } catch {
-        /* fall back to default */
-      }
-    }
-  }
+  const logoBuf = decodeDataUrl(logo);
+  if (logoBuf) logoSource = logoBuf;
+
+  // Handwritten/uploaded signature drawn above the officer name (optional).
+  const signatureBuf = decodeDataUrl(body.signature);
 
   const classic = style === 'classic';
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: 56, bottom: FOOTER_H + 8, left: LEFT, right: 64 } });
@@ -205,7 +212,29 @@ router.post('/pdf', requireAuth, (req, res) => {
 
   doc.moveDown(0.5);
   doc.fillColor('#1b2733').font('Helvetica').fontSize(11).text(closing, LEFT, doc.y);
-  doc.moveDown(0.35);
+
+  // Signature above the name: constrain to a signature-sized box (never wider than
+  // the text column) and keep it and the name together on one page.
+  let signaturePlaced = false;
+  if (signatureBuf) {
+    try {
+      const img = doc.openImage(signatureBuf);
+      const maxH = 44;
+      const maxW = 220;
+      const scale = Math.min(maxH / img.height, maxW / img.width, 1);
+      const drawW = img.width * scale;
+      const drawH = img.height * scale;
+      // Page-break if the signature + name wouldn't fit above the footer.
+      if (doc.y + drawH + 22 > PAGE_H - FOOTER_H - 8) doc.addPage();
+      doc.moveDown(0.2);
+      doc.image(signatureBuf, LEFT, doc.y, { width: drawW, height: drawH });
+      doc.y += drawH + 2;
+      signaturePlaced = true;
+    } catch {
+      /* signature optional — fall back to the plain name spacing */
+    }
+  }
+  if (!signaturePlaced) doc.moveDown(0.35);
   doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(13).text(officer.name || lender.name || 'Your Loan Officer', LEFT, doc.y);
   doc.fillColor('#5b6b7b').font('Helvetica').fontSize(10).text(officer.title || 'Mortgage Loan Officer', LEFT, doc.y);
   if (agent && agent.name) {
