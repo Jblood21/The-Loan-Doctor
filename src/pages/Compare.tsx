@@ -113,36 +113,63 @@ export default function Compare() {
     // Structured, per-column data for the redesigned comparison PDF.
     const downPctOf = (s: (typeof results)[0]['s']) =>
       Math.round(s.homePrice > 0 ? ((s.downPayment || 0) / s.homePrice) * 100 : s.downPct || 0);
-    const columns = results.map(({ s, c }) => ({
-      priceLabel: compactPrice(s.homePrice || 0),
-      downLabel: `${downPctOf(s)}% DOWN`,
-      downPayment: fmt(s.downPayment || 0),
-      loanAmount: fmt(c.baseLoan),
-      rate: `${s.rate || 0}%`,
-      apr: pct(c.apr, 3),
-      pi: fmt2(c.pi),
-      mi: c.mi.applies ? fmt2(c.mi.monthly) : '—',
-      taxes: fmt2(c.taxes),
-      insurance: fmt2(c.insurance),
-      hoa: fmt2(c.hoa),
-      totalMonthly: fmt2(c.totalMonthly),
-      closing: fmt2(c.closingCosts),
-      credits: c.creditsApplied > 0 ? `–${fmt2(c.creditsApplied)}` : fmt2(0),
-      netClosing: fmt2(Math.max(0, c.closingCosts - c.creditsApplied)),
-      cashToClose: fmt2(c.cashToClose),
-    }));
 
-    // Header assumptions come from the active scenario (matches the reference's single
-    // "Loan Assumptions" strip); the per-column table still shows each option's detail.
+    // Detect whether the scenarios are homogeneous (a price sweep of one product) or
+    // heterogeneous (e.g. Conventional vs FHA). The header + column labels adapt so a
+    // mixed comparison reads correctly instead of pretending one program/rate applies.
+    const first = results[0];
+    const cents = (n: number) => Math.round((n || 0) * 100);
+    const sameType = results.every(({ s }) => s.loanType === first.s.loanType && s.term === first.s.term);
+    const sameRate = results.every(({ s }) => (s.rate || 0) === (first.s.rate || 0));
+    const sameDown = results.every(({ s }) => downPctOf(s) === downPctOf(first.s));
+    const sameTax = results.every(({ c }) => cents(c.taxes) === cents(first.c.taxes));
+    const sameIns = results.every(({ c }) => cents(c.insurance) === cents(first.c.insurance));
+    const sameHoa = results.every(({ c }) => cents(c.hoa) === cents(first.c.hoa));
+    const mixed = !sameType;
+
+    const columns = results.map(({ s, c }) => {
+      const price = compactPrice(s.homePrice || 0);
+      const dn = downPctOf(s);
+      return {
+        priceLabel: price,
+        downLabel: `${dn}% DOWN`,
+        // Column header (big line + small line) — identifies each column by loan TYPE
+        // when types differ, else by price (the reference's price-sweep look).
+        head1: mixed ? c.typeLabel : price,
+        head2: mixed ? `${price} · ${dn}% down` : `${dn}% DOWN`,
+        cardLabel: mixed ? `${c.typeLabel} · ${price}` : `${price} · ${dn}% DOWN`,
+        downPayment: fmt(s.downPayment || 0),
+        loanAmount: fmt(c.baseLoan),
+        rate: `${s.rate || 0}%`,
+        apr: pct(c.apr, 3),
+        pi: fmt2(c.pi),
+        mi: c.mi.applies ? fmt2(c.mi.monthly) : '—',
+        taxes: fmt2(c.taxes),
+        insurance: fmt2(c.insurance),
+        hoa: fmt2(c.hoa),
+        totalMonthly: fmt2(c.totalMonthly),
+        closing: fmt2(c.closingCosts),
+        credits: c.creditsApplied > 0 ? `–${fmt2(c.creditsApplied)}` : fmt2(0),
+        netClosing: fmt2(Math.max(0, c.closingCosts - c.creditsApplied)),
+        cashToClose: fmt2(c.cashToClose),
+      };
+    });
+
+    // Loan Assumptions strip: show a shared value, or "Varies" when the scenarios differ.
     const assumptions = {
       purchaseOptions: results.map(({ s }) => compactPrice(s.homePrice || 0)).join(', '),
-      downPayment: `${downPctOf(current)}%`,
-      insurance: `${fmt2(r.insurance)} / mo`,
-      taxes: `${fmt2(r.taxes)} / mo`,
-      hoa: r.hoa > 0 ? `${fmt2(r.hoa)} / mo` : '—',
+      downPayment: sameDown ? `${downPctOf(current)}%` : 'Varies',
+      insurance: sameIns ? `${fmt2(r.insurance)} / mo` : 'Varies',
+      taxes: sameTax ? `${fmt2(r.taxes)} / mo` : 'Varies',
+      hoa: sameHoa ? (r.hoa > 0 ? `${fmt2(r.hoa)} / mo` : '—') : 'Varies',
     };
-    const programLabel = `${current.term}-Year ${current.loanType === 'arm' ? 'ARM' : 'Fixed'} ${r.typeLabel}`;
-    const subLine = `FICO ${current.credit}  ·  ${current.transaction === 'refinance' ? 'Refinance' : 'Purchase'}`;
+    // Header program + rate collapse to a single value only when every scenario shares it.
+    const programLabel = sameType
+      ? `${current.term}-Year ${current.loanType === 'arm' ? 'ARM' : 'Fixed'} ${r.typeLabel}`
+      : 'Loan Scenario Comparison';
+    const subLine = sameType
+      ? `FICO ${current.credit}  ·  ${current.transaction === 'refinance' ? 'Refinance' : 'Purchase'}`
+      : `${results.length} scenarios compared side by side`;
 
     // Plain-language insight lines (computed here where fmt lives).
     const baseTotal = results[0]?.c.totalMonthly ?? 0;
@@ -167,7 +194,8 @@ export default function Compare() {
       borrowerName,
       programLabel,
       subLine,
-      rate: `${current.rate || 0}%`,
+      // Empty when rates differ → the PDF hides the single "RATE" box.
+      rate: sameRate ? `${current.rate || 0}%` : '',
       assumptions,
       columns,
       insights: { paymentDiff, keyTakeaway },
