@@ -206,6 +206,21 @@ describe('computeScenario', () => {
     // 1.25% of the 240k base loan = 3,000 financed upfront (not 2.15% = 5,160).
     near(r.mi.upfrontFinanced, 240000 * 0.0125, 1);
   });
+  it('manual $/mo overrides replace the auto tax/insurance estimate; HOA adds to the total', () => {
+    const auto = computeScenario(base);
+    const manual = computeScenario({ ...base, taxMonthly: 238.96, insuranceMonthly: 95, hoaMonthly: 35 });
+    expect(manual.taxes).toBe(238.96);
+    expect(manual.insurance).toBe(95);
+    expect(manual.hoa).toBe(35);
+    // total shifts by exactly the escrow deltas plus the new HOA line
+    near(manual.totalMonthly, auto.totalMonthly - auto.taxes - auto.insurance + 238.96 + 95 + 35, 0.01);
+  });
+  it('auto mode (no overrides) yields hoa 0 and % estimates', () => {
+    const r = computeScenario(base);
+    expect(r.hoa).toBe(0);
+    near(r.taxes, (300000 * 0.0125) / 12, 0.01);
+    near(r.insurance, (300000 * 0.0035) / 12, 0.01);
+  });
 });
 
 describe('computeHecm', () => {

@@ -311,6 +311,7 @@ export interface ScenarioResult {
   pi: number;
   taxes: number;
   insurance: number;
+  hoa: number;
   mi: MortgageInsurance;
   totalMonthly: number;
   apr: number;
@@ -352,9 +353,11 @@ export function computeScenario(s: Scenario): ScenarioResult {
   const pi = monthlyPayment(financedLoan, s.rate || 0, termYears);
   const taxRate = s.taxRatePct ?? DEFAULT_TAX_RATE;
   const insRate = s.insuranceRatePct ?? DEFAULT_INSURANCE_RATE;
-  const taxes = (homeValue * (taxRate / 100)) / 12;
-  const insurance = (homeValue * (insRate / 100)) / 12;
-  const totalMonthly = pi + taxes + insurance + mi.monthly;
+  // A manual $/mo entry (taxMonthly / insuranceMonthly) overrides the auto % estimate.
+  const taxes = s.taxMonthly != null ? Math.max(0, s.taxMonthly) : (homeValue * (taxRate / 100)) / 12;
+  const insurance = s.insuranceMonthly != null ? Math.max(0, s.insuranceMonthly) : (homeValue * (insRate / 100)) / 12;
+  const hoa = Math.max(0, s.hoaMonthly || 0);
+  const totalMonthly = pi + taxes + insurance + hoa + mi.monthly;
 
   const schedule = amortizationSchedule(financedLoan, s.rate || 0, termYears);
   const totalInterest = schedule.length ? schedule[schedule.length - 1].cumulativeInterest : 0;
@@ -385,6 +388,7 @@ export function computeScenario(s: Scenario): ScenarioResult {
     pi,
     taxes,
     insurance,
+    hoa,
     mi,
     totalMonthly,
     apr,
