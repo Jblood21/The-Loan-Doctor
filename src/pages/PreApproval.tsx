@@ -31,9 +31,9 @@ import { groupByBorrower, diffRecords } from '@/lib/preApprovalHistory';
 import type { PreApprovalRecord, PreApprovalState, Scenario } from '@/types';
 import { losBorrowerToScenario } from '@/lib/losBorrower';
 
-// The Mortgage Expert brand palette.
-const GREEN = '#1f3d25';
-const GOLD = '#b18f3f';
+// Summit Home Loans brand palette (navy + steel accent).
+const GREEN = '#13355f'; // primary navy (headings, officer name, footer band)
+const GOLD = '#5f7fa8'; // steel-blue accent (bars, borders, NMLS line)
 
 const PROVIDERS = [
   { value: 'arive', label: 'Arive' },

@@ -30,10 +30,10 @@ const SECTIONS: Section[] = [
     fields: [
       { key: 'name', label: 'Your Name', ph: 'Alan Blood' },
       { key: 'officerTitle', label: 'Title', ph: 'Mortgage Specialist' },
-      { key: 'company', label: 'Company', ph: 'CFG Home Loans' },
-      { key: 'email', label: 'Email', ph: 'you@lender.com' },
-      { key: 'phone', label: 'Phone', ph: '801.706.2802' },
-      { key: 'nmls', label: 'NMLS #', ph: '3146' },
+      { key: 'company', label: 'Company', ph: 'Summit Home Loans' },
+      { key: 'email', label: 'Email', ph: 'you@summithomeloans.com' },
+      { key: 'phone', label: 'Phone', ph: '801-855-8535' },
+      { key: 'nmls', label: 'NMLS #', ph: '103895' },
     ],
   },
   {
@@ -41,9 +41,9 @@ const SECTIONS: Section[] = [
     note: "Your institution's details for branding.",
     cta: 'Save Lender Info',
     fields: [
-      { key: 'lenderName', label: 'Lender Name', ph: 'First National Bank' },
-      { key: 'lenderNmls', label: 'Lender NMLS #', ph: '123456' },
-      { key: 'website', label: 'Website', ph: 'www.example.com' },
+      { key: 'lenderName', label: 'Lender Name', ph: 'Summit Home Loans' },
+      { key: 'lenderNmls', label: 'Lender NMLS #', ph: '1790749' },
+      { key: 'website', label: 'Website', ph: 'summithomeloans.com' },
       { key: 'lenderAddress', label: 'Address', ph: '123 Main St, Suite 100 · City, ST' },
       { key: 'lenderPhone', label: 'Lender Phone', ph: '(800) 555-1234' },
     ],
