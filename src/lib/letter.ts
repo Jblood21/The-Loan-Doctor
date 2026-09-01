@@ -26,7 +26,7 @@ export const LETTER_TEMPLATES: LetterTemplateMeta[] = [
 
 /** Visual letterhead styles offered in the picker. */
 export const LETTERHEAD_STYLES: LetterTemplateMeta[] = [
-  { id: 'mortgage-expert', label: 'The Mortgage Expert (green band)' },
+  { id: 'mortgage-expert', label: 'Summit (navy band)' },
   { id: 'classic', label: 'Classic (centered)' },
 ];
 

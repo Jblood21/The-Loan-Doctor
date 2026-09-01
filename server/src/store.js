@@ -13,7 +13,7 @@ import bcrypt from 'bcryptjs';
 /** Stable, deterministic id for a seeded account so it survives a data wipe with the
  *  same id — keeps a logged-in session valid across restarts (e.g. Render free tier). */
 function stableSeedId(email) {
-  return `seed-${createHash('sha256').update(String(email || '').toLowerCase()).digest('hex').slice(0, 24)}`;
+  return `seed-${createHash('sha256').update(normalizeEmail(email)).digest('hex').slice(0, 24)}`;
 }
 
 /** Deterministic per-user webhook token derived from the server secret + user id.
@@ -32,13 +32,41 @@ export function sharedWebhookToken() {
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// DATA_DIR is configurable so production can point it at a persistent volume
-// (e.g. a Render disk). Without a persistent disk the free tier wipes this on
-// every restart/redeploy — which resets accounts, webhook tokens, and loans.
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const REPO_DATA_DIR = path.join(__dirname, '..', 'data');
+// Common persistent-disk mount points to auto-detect (Render, Fly, etc.).
+const KNOWN_MOUNTS = ['/var/data', '/data'];
+
+// Resolve where the JSON store lives. Order of preference:
+//   1. DATA_DIR (explicit override — always wins).
+//   2. A known persistent-disk mount that actually exists, so data survives
+//      restarts even if the operator forgot to also set DATA_DIR.
+//   3. The in-repo data/ folder (fine for local dev; EPHEMERAL on hosts that
+//      reset the filesystem on redeploy — see dataDirInfo()).
+function resolveDataDir() {
+  if (process.env.DATA_DIR) return process.env.DATA_DIR;
+  for (const p of KNOWN_MOUNTS) {
+    try {
+      if (fs.statSync(p).isDirectory()) return p;
+    } catch {
+      /* not mounted */
+    }
+  }
+  return REPO_DATA_DIR;
+}
+const DATA_DIR = resolveDataDir();
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, shares: {}, counters: { preApprovals: 0 } };
+/** Describe the storage location + whether it looks durable, for startup logging. */
+export function dataDirInfo() {
+  const explicit = !!process.env.DATA_DIR;
+  const onKnownMount = KNOWN_MOUNTS.some((m) => DATA_DIR === m || DATA_DIR.startsWith(m + '/'));
+  // Persistent when an operator pointed us somewhere on purpose, or we landed on a
+  // real mounted disk. The in-repo folder is treated as ephemeral in production.
+  const persistent = explicit || onKnownMount;
+  return { dir: DATA_DIR, persistent, explicit, onKnownMount };
+}
+
+const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: [], shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -60,15 +88,24 @@ export function load() {
 
 export function persist() {
   ensureDir();
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+  // Atomic write: fill a temp file then rename over the target, so a crash
+  // mid-write can never leave a truncated/corrupt db.json.
+  const tmp = `${DB_FILE}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+  fs.renameSync(tmp, DB_FILE);
 }
 
 // ---- users -------------------------------------------------------------
+/** Trim + lowercase an email so stray whitespace/case can't cause a login miss. */
+export function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
 export function getUsers() {
   return db.users;
 }
 export function findUserByEmail(email) {
-  return db.users.find((u) => u.email === String(email || '').toLowerCase());
+  const e = normalizeEmail(email);
+  return db.users.find((u) => u.email === e);
 }
 export function findUserById(id) {
   return db.users.find((u) => u.id === id);
@@ -76,7 +113,7 @@ export function findUserById(id) {
 export function addUser({ id, email, password, passwordHash, name = '', company = '', phone = '', nmls = '', role = 'user', status = 'Active', scenarioCount = 0 }) {
   const user = {
     id: id || randomUUID(),
-    email: String(email).toLowerCase(),
+    email: normalizeEmail(email),
     passwordHash: passwordHash || bcrypt.hashSync(password, 12),
     name,
     company,
@@ -139,12 +176,17 @@ export function getLos(userId) {
 export function getLosBorrowers(userId) {
   return db.losBorrowers[userId] || [];
 }
-/** Upsert borrowers (dedupe by loan number, else name+address); newest first, capped. */
+// Dedup key: a loan number identifies a loan, but we also include the name so two
+// DIFFERENT people can never collapse into one just because a Zap sent a blank or
+// constant loan-number field (the previous "only one borrower shows" failure mode).
+const borrowerKey = (b) =>
+  b.loanNumber ? `ln:${b.loanNumber}|${(b.name || '').toLowerCase()}` : `na:${(b.name || '').toLowerCase()}|${(b.address || '').toLowerCase()}`;
+
+/** Upsert borrowers; existing entries with the same key are updated, newest first, capped. */
 export function upsertLosBorrowers(userId, items) {
   const existing = db.losBorrowers[userId] || [];
-  const key = (b) => (b.loanNumber ? `ln:${b.loanNumber}` : `na:${b.name}|${b.address}`);
-  const map = new Map(existing.map((b) => [key(b), b]));
-  for (const it of items) map.set(key(it), { ...map.get(key(it)), ...it });
+  const map = new Map(existing.map((b) => [borrowerKey(b), b]));
+  for (const it of items) map.set(borrowerKey(it), { ...map.get(borrowerKey(it)), ...it });
   const merged = Array.from(map.values()).sort((a, b) => (b.receivedAt || 0) - (a.receivedAt || 0)).slice(0, 300);
   db.losBorrowers[userId] = merged;
   persist();
@@ -153,6 +195,19 @@ export function upsertLosBorrowers(userId, items) {
 export function clearLosBorrowers(userId) {
   db.losBorrowers[userId] = [];
   persist();
+}
+
+// ---- webhook activity log (diagnostics) --------------------------------
+// Keeps the most recent raw inbound payloads so you can SEE exactly what Zapier
+// sent (field names + values) and how many borrowers were extracted from each.
+export function addWebhookLog(entry) {
+  const list = db.losWebhookLog || [];
+  list.unshift(entry);
+  db.losWebhookLog = list.slice(0, 25);
+  persist();
+}
+export function getWebhookLog() {
+  return db.losWebhookLog || [];
 }
 
 // ---- per-user webhook token (identifies the Zap source) ----------------
@@ -195,6 +250,20 @@ export function createShare(userId, snapshot) {
 }
 export function getShare(id) {
   return db.shares[id] || null;
+}
+
+// ---- issued pre-approvals (history per loan officer) -------------------
+export function getPreApprovals(userId) {
+  return db.preApprovals[userId] || [];
+}
+/** Record an issued pre-approval; newest first, capped. Returns the saved record. */
+export function addPreApproval(userId, record) {
+  const rec = { id: randomUUID().replace(/-/g, '').slice(0, 12), issuedAt: new Date().toISOString(), ...record };
+  const list = db.preApprovals[userId] || [];
+  list.unshift(rec);
+  db.preApprovals[userId] = list.slice(0, 500);
+  persist();
+  return rec;
 }
 
 // ---- counters ----------------------------------------------------------
@@ -245,18 +314,31 @@ function ensureSeedAccount({ id, email, password, role, updatePassword = true, .
 export function seed() {
   load();
   const isProd = process.env.NODE_ENV === 'production';
+
+  // One-shot factory reset: set RESET_DATA=true to wipe ALL data on boot, then
+  // the admin/owner accounts are re-created fresh below. Unset it afterward so it
+  // doesn't wipe on every restart.
+  if (process.env.RESET_DATA === 'true') {
+    db = structuredClone(EMPTY);
+    persist();
+    console.warn('[seed] RESET_DATA=true — wiped ALL data (users, scenarios, loans). Remove RESET_DATA in your environment so it stops wiping on every boot.');
+  }
+
   const wasEmpty = db.users.length === 0;
 
   // --- Admin account (ensured every boot) -----------------------------------
   // In production NEVER fall back to a known default password. If ADMIN_PASSWORD
   // is unset, generate a random one (create-only, never churn it on reboot).
-  const hasAdminPassword = !!process.env.ADMIN_PASSWORD;
-  let adminPassword = process.env.ADMIN_PASSWORD;
+  // Trim env passwords — a trailing space/newline pasted into a host's env UI is a
+  // classic "my password is wrong" cause.
+  const adminPwEnv = (process.env.ADMIN_PASSWORD || '').trim();
+  const hasAdminPassword = !!adminPwEnv;
+  let adminPassword = adminPwEnv;
   if (!adminPassword) {
     adminPassword = isProd ? randomUUID() : 'admin123';
     if (isProd) console.warn('[seed] ADMIN_PASSWORD is not set — using a random admin password. Set ADMIN_PASSWORD and redeploy to choose your own.');
   }
-  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@loandr.app').toLowerCase();
+  const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL || 'admin@loandr.app');
   ensureSeedAccount({
     id: stableSeedId(adminEmail),
     email: adminEmail,
@@ -273,11 +355,13 @@ export function seed() {
   // Env is the source of truth: whatever OWNER_EMAIL/OWNER_PASSWORD are set to,
   // that login works — created if missing, password refreshed if it already
   // exists. This fixes "I set my password in Render but it says incorrect."
-  if (process.env.OWNER_EMAIL && process.env.OWNER_PASSWORD) {
+  const ownerEmail = normalizeEmail(process.env.OWNER_EMAIL);
+  const ownerPassword = (process.env.OWNER_PASSWORD || '').trim();
+  if (ownerEmail && ownerPassword) {
     ensureSeedAccount({
-      id: stableSeedId(process.env.OWNER_EMAIL),
-      email: process.env.OWNER_EMAIL,
-      password: process.env.OWNER_PASSWORD,
+      id: stableSeedId(ownerEmail),
+      email: ownerEmail,
+      password: ownerPassword,
       role: 'user',
       name: process.env.OWNER_NAME || 'Loan Officer',
       company: process.env.OWNER_COMPANY || '',

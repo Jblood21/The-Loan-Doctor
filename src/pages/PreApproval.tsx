@@ -7,6 +7,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Select } from '@/components/ui/Select';
 import { TextField, Label } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
+import { SignaturePad } from '@/components/SignaturePad';
 import { useScenarios } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useUI } from '@/context/UIContext';
@@ -23,11 +24,16 @@ import {
 } from '@/lib/letter';
 import type { PronounChoice } from '@/lib/letter';
 import { fmt, longDateWeekday } from '@/lib/format';
-import type { PreApprovalState } from '@/types';
+import { rankBorrowers } from '@/lib/borrowerSearch';
+import { parseMismo } from '@/lib/mismo';
+import type { MismoResult } from '@/lib/mismo';
+import { groupByBorrower, diffRecords } from '@/lib/preApprovalHistory';
+import type { PreApprovalRecord, PreApprovalState, Scenario } from '@/types';
+import { losBorrowerToScenario } from '@/lib/losBorrower';
 
-// The Mortgage Expert brand palette.
-const GREEN = '#1f3d25';
-const GOLD = '#b18f3f';
+// Summit Home Loans brand palette (navy + steel accent).
+const GREEN = '#13355f'; // primary navy (headings, officer name, footer band)
+const GOLD = '#5f7fa8'; // steel-blue accent (bars, borders, NMLS line)
 
 const PROVIDERS = [
   { value: 'arive', label: 'Arive' },
@@ -40,13 +46,19 @@ interface Borrower {
   name: string;
   meta: string;
   address: string;
+  // Extra details pushed in from the LOS/Zap, surfaced in the search results.
+  amount?: string;
+  phone?: string;
+  email?: string;
+  loanType?: string;
+  purpose?: string;
+  rate?: string;
 }
 
-const STUB_BORROWERS: Borrower[] = [
-  { name: 'Michael & Laura Thompson', meta: 'Loan #LN-20471 · $425,000', address: '48 Birchwood Ln, Madison, WI 53703' },
-  { name: 'Aisha Bennett', meta: 'Loan #LN-20493 · $310,000', address: '210 Cedar St, Austin, TX 78702' },
-  { name: 'Robert & Diane Alvarez', meta: 'Loan #LN-20510 · $560,000', address: '12 Lakeshore Dr, Tampa, FL 33602' },
-];
+
+// No hardcoded sample borrowers — the LOS list shows ONLY real loans pushed in
+// from Zapier, so nothing fake ever appears in the pipeline.
+const STUB_BORROWERS: Borrower[] = [];
 
 /** Compact labeled toggle switch. */
 function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
@@ -86,7 +98,7 @@ function PresetChips({ presets, onPick }: { presets: string[]; onPick: (v: strin
 
 export default function PreApproval() {
   const { scenarios } = useScenarios();
-  const { settings } = useSettings();
+  const { settings, save: saveSettings, saving: savingSettings } = useSettings();
   const { openSettings } = useUI();
   const [pa, setPa] = useState<PreApprovalState>({
     source: 'scenario',
@@ -94,8 +106,8 @@ export default function PreApproval() {
     losProvider: 'arive',
     losConnected: false,
     losQuery: '',
-    borrowerName: 'Robert Boot',
-    propertyAddress: '205 Grand Avenue, Arco, ID 83213',
+    borrowerName: 'John Smith',
+    propertyAddress: '123 Main Street, Anytown, ST 00000',
     expDays: '90',
   });
   const [losResults, setLosResults] = useState<Borrower[]>(STUB_BORROWERS);
@@ -107,9 +119,73 @@ export default function PreApproval() {
   const [webhookError, setWebhookError] = useState('');
   const [copied, setCopied] = useState(false);
   const [includeAgent, setIncludeAgent] = useState(true);
+  const [imported, setImported] = useState<MismoResult | null>(null);
+  const [importError, setImportError] = useState('');
+  const [dragging, setDragging] = useState(false);
+  const [activityLog, setActivityLog] = useState<
+    { at: string; recordsReceived: number; borrowersStored: number; fieldNames: string[]; extractedNames: string[]; sample: string }[]
+  >([]);
+  const [showActivity, setShowActivity] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [view, setView] = useState<'create' | 'issued'>('create');
+  const [history, setHistory] = useState<PreApprovalRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  // Inline status banner for the action area (replaces jarring native alerts).
+  const [actionMsg, setActionMsg] = useState<{ tone: 'error' | 'info'; text: string } | null>(null);
+  // Loan terms captured from a selected LOS borrower (drives the letter math), plus
+  // which fields actually came from the feed (for the disclosure banner).
+  const [losScenario, setLosScenario] = useState<Scenario | null>(null);
+  const [losFeedFields, setLosFeedFields] = useState<string[]>([]);
+  const [losPicked, setLosPicked] = useState(false);
   const set = (patch: Partial<PreApprovalState>) => setPa((s) => ({ ...s, ...patch }));
 
-  const srcScenario = scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
+  const loadHistory = () => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    return api
+      .preApprovalHistory()
+      .then(({ history: h }) => setHistory(h || []))
+      .catch(() => setHistoryError('Could not load issued pre-approvals. The server may be waking up — try Refresh.'))
+      .finally(() => setHistoryLoading(false));
+  };
+  // Load history the first time the Issued tab is opened.
+  useEffect(() => {
+    if (view === 'issued' && !history.length && !historyError) loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
+  // Letter loan terms come from: an imported MISMO file, else a selected LOS
+  // borrower's feed data, else the chosen saved scenario.
+  const srcScenario =
+    pa.source === 'import' && imported
+      ? imported.scenario
+      : pa.source === 'los' && losScenario
+        ? losScenario
+        : scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
+
+  // Read a MISMO 3.4 XML file entirely in the browser (borrower PII never leaves the
+  // device) and pull the borrower, property, and loan terms into the letter.
+  const onMismoFile = (file: File | undefined) => {
+    if (!file) return;
+    setImportError('');
+    const reader = new FileReader();
+    reader.onerror = () => setImportError('Could not read that file. Try again.');
+    reader.onload = () => {
+      try {
+        const result = parseMismo(String(reader.result || ''));
+        if (!result) {
+          setImportError('That doesn’t look like a MISMO 3.4 loan file — no borrower or loan amount found.');
+          return;
+        }
+        setImported(result);
+        set({ borrowerName: result.borrowerName || '', propertyAddress: result.propertyAddress || '' });
+      } catch {
+        setImportError('Couldn’t parse that file. Make sure it’s a MISMO 3.4 XML export.');
+      }
+    };
+    reader.readAsText(file);
+  };
   const today = new Date();
   const hasAgent = !!(settings.agentName && settings.agentName.trim());
 
@@ -132,6 +208,27 @@ export default function PreApproval() {
   const [showHeadshot, setShowHeadshot] = useState(true);
   const [showSubjectAddress, setShowSubjectAddress] = useState(true);
   const [expDays, setExpDays] = useState('90');
+
+  // Signature: seeded from the saved settings signature until the user draws/uploads
+  // one here (sigTouched), so a signature set once auto-fills every letter.
+  const [signature, setSignature] = useState('');
+  const [sigTouched, setSigTouched] = useState(false);
+  const [showSignature, setShowSignature] = useState(true);
+  const [sigSaved, setSigSaved] = useState(false);
+  useEffect(() => {
+    if (!sigTouched && settings.signatureDataUrl) setSignature(settings.signatureDataUrl);
+  }, [settings.signatureDataUrl, sigTouched]);
+  const onSignatureChange = (dataUrl: string) => {
+    setSigTouched(true);
+    setSigSaved(false);
+    setSignature(dataUrl);
+  };
+  const saveSignatureToSettings = async () => {
+    await saveSettings({ signatureDataUrl: signature });
+    setSigSaved(true);
+    window.setTimeout(() => setSigSaved(false), 2000);
+  };
+  const sigMatchesSaved = signature === (settings.signatureDataUrl || '');
 
   const tpl = useMemo(
     () => resolveTemplate(templateId, srcScenario, { borrowerName: pa.borrowerName, propertyAddress: pa.propertyAddress, pronoun }),
@@ -196,17 +293,10 @@ export default function PreApproval() {
     };
   }, [pa.source, pa.losConnected, pa.losProvider]);
 
-  // Filter the loaded borrowers by the search text — matches name, loan number,
-  // and address, and is dash/space-insensitive so "LN20471" finds "Loan #LN-20471".
-  const losMatches = useMemo(() => {
-    const q = pa.losQuery.trim().toLowerCase();
-    if (!q) return losResults;
-    const qs = q.replace(/[-\s]/g, '');
-    return losResults.filter((b) => {
-      const hay = `${b.name} ${b.meta} ${b.address}`.toLowerCase();
-      return hay.includes(q) || hay.replace(/[-\s]/g, '').includes(qs);
-    });
-  }, [losResults, pa.losQuery]);
+  // Rank the loaded borrowers against the search text: empty shows everyone, and as
+  // you type it narrows to the closest names first — order-independent across words,
+  // dash/space-insensitive for loan numbers, and typo-tolerant (see borrowerSearch).
+  const losMatches = useMemo(() => rankBorrowers(losResults, pa.losQuery), [losResults, pa.losQuery]);
 
   // Fetch (or generate) this user's inbound webhook URL. Surfaces loading/errors
   // instead of failing silently, and can be retried with the Refresh button.
@@ -235,6 +325,20 @@ export default function PreApproval() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pa.source]);
 
+  const loadActivity = () => {
+    setActivityLoading(true);
+    api
+      .losWebhookLog()
+      .then(({ log }) => setActivityLog(log || []))
+      .catch(() => {})
+      .finally(() => setActivityLoading(false));
+  };
+  const toggleActivity = () => {
+    const next = !showActivity;
+    setShowActivity(next);
+    if (next) loadActivity();
+  };
+
   const copyWebhook = async () => {
     try {
       await navigator.clipboard.writeText(webhookUrl);
@@ -253,7 +357,7 @@ export default function PreApproval() {
     } catch (err) {
       // A configured provider that can't be reached surfaces the error.
       if (err instanceof ApiError && err.status === 502) {
-        alert(err.message);
+        setActionMsg({ tone: 'error', text: err.message });
         return;
       }
       setLosMode('demo');
@@ -270,6 +374,7 @@ export default function PreApproval() {
   };
 
   const downloadPdf = async () => {
+    setActionMsg(null);
     const payload = {
       style: styleId,
       showHeadshot,
@@ -282,6 +387,7 @@ export default function PreApproval() {
       terms: letter.terms,
       validity: letter.validity,
       closing: letter.closing,
+      signature: showSignature && signature ? signature : undefined,
       borrowerName: pa.borrowerName || '—',
       officer: { name: letter.officerName, title: letter.officerTitle, nmls: settings.nmls, email: settings.email, phone: settings.phone },
       lender: {
@@ -294,6 +400,20 @@ export default function PreApproval() {
       },
       agent: letter.agent,
       logo: settings.logoDataUrl || undefined,
+      // Structured loan snapshot recorded in the issued-pre-approvals history.
+      loan: {
+        propertyAddress: pa.propertyAddress,
+        loanType: computeScenario(srcScenario).typeLabel,
+        transaction: srcScenario.transaction,
+        price: srcScenario.homePrice,
+        loanAmount: computeScenario(srcScenario).baseLoan,
+        downPayment: srcScenario.downPayment,
+        rate: srcScenario.rate,
+        term: srcScenario.term,
+        monthlyPayment: computeScenario(srcScenario).totalMonthly,
+        apr: computeScenario(srcScenario).apr,
+        validityDays: parseInt(expDays, 10) || 0,
+      },
     };
     try {
       const blob = await api.preApprovalPdf(payload);
@@ -303,8 +423,14 @@ export default function PreApproval() {
       a.download = `preapproval-${(pa.borrowerName || 'letter').split(' ').pop()}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+      // Refresh history so the just-issued letter shows in the Issued tab.
+      setActionMsg(null);
+      loadHistory();
     } catch {
-      alert('PDF service unavailable — start the API server (npm run dev). Using the browser print dialog instead.');
+      setActionMsg({
+        tone: 'info',
+        text: 'The letter service is waking up — this can take up to ~30 seconds on the first request. Opening your browser’s print dialog as a fallback; try Download PDF again in a moment.',
+      });
       window.print();
     }
   };
@@ -352,7 +478,10 @@ export default function PreApproval() {
       {letter.validity && <p className="mt-4 text-[13px] leading-[1.6] text-[#444]">{letter.validity}</p>}
 
       <div className="mt-7 text-[13.5px]">{letter.closing}</div>
-      <div className="mt-1 text-[15px] font-bold" style={{ color: GREEN }}>
+      {showSignature && signature && (
+        <img src={signature} alt={`${letter.officerName} signature`} className="mt-1.5 h-[52px] w-auto max-w-[240px] object-contain object-left" />
+      )}
+      <div className={`text-[15px] font-bold ${showSignature && signature ? 'mt-0.5' : 'mt-1'}`} style={{ color: GREEN }}>
         {letter.officerName}
       </div>
       <div className="text-[12.5px] text-[#5b6b7b]">{letter.officerTitle}</div>
@@ -383,7 +512,21 @@ export default function PreApproval() {
         subtitle="Pull a borrower, pick a program template and style, customize the wording, then generate a branded letter."
       />
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_1.05fr]">
+      <SegmentedControl
+        className="mb-6 max-w-[440px]"
+        options={[
+          { value: 'create', label: 'Create Letter' },
+          { value: 'issued', label: history.length ? `Issued (${history.length})` : 'Issued' },
+        ]}
+        value={view}
+        onChange={(v) => setView(v as 'create' | 'issued')}
+      />
+
+      {view === 'issued' && (
+        <IssuedPreApprovals history={history} loading={historyLoading} error={historyError} onRefresh={loadHistory} />
+      )}
+
+      <div className={view === 'create' ? 'grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_1.05fr]' : 'hidden'}>
         {/* LEFT — form */}
         <Card className="p-6">
           <SectionLabel className="mb-3">DATA SOURCE</SectionLabel>
@@ -392,10 +535,76 @@ export default function PreApproval() {
             options={[
               { value: 'scenario', label: 'From a Scenario' },
               { value: 'los', label: 'From your LOS' },
+              { value: 'import', label: 'Import a file' },
             ]}
             value={pa.source}
-            onChange={(v) => set({ source: v as PreApprovalState['source'] })}
+            onChange={(v) => {
+              // Switching source clears any LOS-derived loan terms so they don't leak
+              // into a scenario/import letter.
+              setLosScenario(null);
+              setLosFeedFields([]);
+              setLosPicked(false);
+              set({ source: v as PreApprovalState['source'] });
+            }}
           />
+
+          {pa.source === 'import' && (
+            <div className="mb-[22px]">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!dragging) setDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  onMismoFile(e.dataTransfer.files?.[0]);
+                }}
+                className={`rounded-xl border border-dashed p-[18px] transition-colors ${
+                  dragging ? 'border-brand-teal bg-[rgba(45,212,191,0.08)]' : 'border-[#2f4663] bg-input'
+                }`}
+              >
+                <div className="text-[13.5px] font-semibold text-text-soft">Import a MISMO 3.4 loan file</div>
+                <p className="mt-1 text-[12px] leading-[1.5] text-text-muted">
+                  Works without Zapier — export the loan as a MISMO 3.4 (.xml) file from Arive (or any LOS), then{' '}
+                  <strong>drag it onto this box</strong> or use the button below. The borrower, property, loan amount, rate, and
+                  term fill in automatically. Your file is read on this device and never uploaded.
+                </p>
+                <label className="mt-3 inline-flex cursor-pointer">
+                  <input
+                    type="file"
+                    accept=".xml,text/xml,application/xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      onMismoFile(e.target.files?.[0]);
+                      e.target.value = '';
+                    }}
+                  />
+                  <span className="inline-flex h-[42px] items-center rounded-[10px] border border-border bg-elevated px-4 text-[13.5px] font-semibold text-text-primary transition-colors hover:border-brand-teal">
+                    {dragging ? 'Drop to import…' : 'Choose MISMO file…'}
+                  </span>
+                </label>
+
+                {importError ? (
+                  <div className="mt-3 rounded-[10px] border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] px-3.5 py-2.5 text-[12.5px] text-danger">
+                    {importError}
+                  </div>
+                ) : imported ? (
+                  <div className="mt-3 rounded-[10px] border border-[rgba(52,211,153,0.28)] bg-[rgba(52,211,153,0.1)] px-3.5 py-2.5 text-[12.5px] text-good">
+                    <span className="font-semibold">Imported ✓</span> {imported.summary}
+                    {imported.loanNumber ? ` · Loan #${imported.loanNumber}` : ''}
+                    <div className="mt-0.5 text-[11.5px] text-text-muted">
+                      Edit any field below before generating the letter.
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
 
           {pa.source === 'scenario' && (
             <div className="mb-[22px]">
@@ -420,19 +629,22 @@ export default function PreApproval() {
 
               {pa.losProvider === 'arive' && (
                 <div className="mb-3.5 rounded-[10px] border border-border-input bg-input p-3.5">
-                  <div className="text-[12.5px] font-semibold text-text-label">Connect Arive via Zapier</div>
+                  <div className="text-[12.5px] font-semibold text-text-label">Shared team pipeline · one Zap for everyone</div>
                   <div className="mt-1 text-[11.5px] leading-[1.5] text-text-muted">
-                    Arive has no public API, so push loans in with a Zap: <strong>Trigger</strong> = Arive (new/updated loan) →{' '}
-                    <strong>Action</strong> = “Webhooks by Zapier” (POST) to the URL below. Map borrower name, property address,
-                    loan #, and amount.
+                    This is a <strong>shared</strong> feed: one Zap sends loans in, and everyone on your team sees them here — so
+                    teammates don’t set up anything, they just search below. <strong>Set it up once:</strong> in Zapier,{' '}
+                    <strong>Trigger</strong> = Arive (new/updated loan) → <strong>Action</strong> = “Webhooks by Zapier” (POST) to
+                    the shared URL below. Map borrower name, property address, loan #, and amount. (The URL is the same for every
+                    account.)
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     <input
                       readOnly
                       value={webhookUrl}
-                      placeholder={webhookLoading ? 'Generating your webhook URL…' : 'Click Refresh to generate your webhook URL'}
+                      placeholder={webhookLoading ? 'Loading the shared webhook URL…' : 'Click Refresh to load the shared webhook URL'}
                       onFocus={(e) => e.currentTarget.select()}
                       className="num h-9 flex-1 rounded-[8px] border border-border-input bg-app px-2.5 text-[11.5px] text-text-soft outline-none placeholder:text-text-dim"
+                      aria-label="Shared team webhook URL"
                     />
                     <Button variant="secondary" size="sm" onClick={copyWebhook} disabled={!webhookUrl}>
                       {copied ? 'Copied ✓' : 'Copy'}
@@ -444,8 +656,57 @@ export default function PreApproval() {
                   {webhookError ? (
                     <div className="mt-1.5 text-[11px] leading-[1.5] text-danger">{webhookError}</div>
                   ) : (
-                    <div className="mt-1.5 text-[11px] text-text-dim">
-                      {webhookCount} borrower{webhookCount === 1 ? '' : 's'} received so far.
+                    <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-text-dim">
+                      <span>
+                        {webhookCount} borrower{webhookCount === 1 ? '' : 's'} in the shared pipeline · same feed for your whole team.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={toggleActivity}
+                        className="flex-none cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light underline"
+                      >
+                        {showActivity ? 'Hide activity' : 'See what Zapier sent'}
+                      </button>
+                    </div>
+                  )}
+
+                  {showActivity && (
+                    <div className="mt-2 rounded-[9px] border border-border-input bg-app p-2.5">
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-[11.5px] font-semibold text-text-soft">Recent webhook activity</span>
+                        <button
+                          type="button"
+                          onClick={loadActivity}
+                          className="cursor-pointer border-none bg-transparent text-[11px] text-brand-blue-light underline"
+                        >
+                          {activityLoading ? '…' : 'Refresh'}
+                        </button>
+                      </div>
+                      {activityLog.length === 0 ? (
+                        <div className="py-1 text-[11px] text-text-muted">
+                          {activityLoading ? 'Loading…' : 'No sends recorded yet. Trigger your Zap (or hit “Test” in Zapier) and refresh.'}
+                        </div>
+                      ) : (
+                        <div className="flex max-h-[220px] flex-col gap-1.5 overflow-y-auto">
+                          {activityLog.map((e, i) => (
+                            <div key={i} className="rounded-[7px] bg-input px-2.5 py-1.5 text-[11px] leading-[1.5]">
+                              <div className="flex items-center justify-between text-text-soft">
+                                <span>{new Date(e.at).toLocaleString()}</span>
+                                <span className={e.borrowersStored ? 'text-good' : 'text-[#fbbf24]'}>
+                                  {e.recordsReceived} sent · {e.borrowersStored} added
+                                </span>
+                              </div>
+                              {e.extractedNames?.length > 0 && (
+                                <div className="mt-0.5 text-text-muted">Names: {e.extractedNames.join(', ')}</div>
+                              )}
+                              <div className="mt-0.5 text-text-dim">Fields seen: {e.fieldNames?.join(', ') || '—'}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-1.5 text-[10.5px] leading-[1.5] text-text-dim">
+                        If a send shows “0 added”, your Zap didn’t include a recognizable borrower name — check the field mapping.
+                      </div>
                     </div>
                   )}
                 </div>
@@ -500,26 +761,59 @@ export default function PreApproval() {
                               : `No borrower matches “${pa.losQuery}”.`}
                           </div>
                         ) : (
-                          losMatches.map((b, i) => (
-                            <button
-                              key={`${b.name}-${b.meta}-${i}`}
-                              type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                set({ borrowerName: b.name, propertyAddress: b.address, losQuery: '' });
-                                setLosOpen(false);
-                              }}
-                              className="flex w-full items-center justify-between gap-3 border-b border-[rgba(140,165,195,0.08)] px-3.5 py-2.5 text-left transition-colors last:border-0 hover:bg-[rgba(47,128,237,0.12)]"
-                            >
-                              <span className="min-w-0">
-                                <span className="block truncate text-[13.5px] font-semibold text-text-primary">{b.name}</span>
-                                <span className="block truncate text-[12px] text-text-muted">
-                                  {[b.meta, b.address].filter(Boolean).join(' · ')}
+                          losMatches.map((b, i) => {
+                            const loanFacts = [b.loanType, b.purpose, b.rate].filter(Boolean) as string[];
+                            const contacts = [b.phone, b.email].filter(Boolean) as string[];
+                            return (
+                              <button
+                                key={`${b.name}-${b.meta}-${i}`}
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  // Carry the feed's loan terms into the letter math (not just name/address),
+                                  // using the currently-selected saved scenario for anything the feed omits.
+                                  const base = scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
+                                  const built = base ? losBorrowerToScenario(b, base) : null;
+                                  setLosScenario(built?.scenario ?? null);
+                                  setLosFeedFields(built?.fromFeed ?? []);
+                                  setLosPicked(true);
+                                  set({ borrowerName: b.name, propertyAddress: b.address, losQuery: '' });
+                                  setLosOpen(false);
+                                }}
+                                className="flex w-full items-start justify-between gap-3 border-b border-[rgba(140,165,195,0.08)] px-3.5 py-2.5 text-left transition-colors last:border-0 hover:bg-[rgba(47,128,237,0.12)]"
+                              >
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-[13.5px] font-semibold text-text-primary">{b.name}</span>
+                                  {(b.meta || b.address) && (
+                                    <span className="block truncate text-[12px] text-text-muted">
+                                      {[b.meta, b.address].filter(Boolean).join(' · ')}
+                                    </span>
+                                  )}
+                                  {(loanFacts.length > 0 || contacts.length > 0) && (
+                                    <span className="mt-1 flex flex-wrap items-center gap-1">
+                                      {loanFacts.map((d) => (
+                                        <span
+                                          key={`f-${d}`}
+                                          className="rounded-full bg-[rgba(47,128,237,0.12)] px-2 py-0.5 text-[10.5px] font-semibold text-brand-blue-light"
+                                        >
+                                          {d}
+                                        </span>
+                                      ))}
+                                      {contacts.map((c) => (
+                                        <span
+                                          key={`c-${c}`}
+                                          className="max-w-[160px] truncate rounded-full border border-border-seg px-2 py-0.5 text-[10.5px] text-text-soft"
+                                        >
+                                          {c}
+                                        </span>
+                                      ))}
+                                    </span>
+                                  )}
                                 </span>
-                              </span>
-                              <span className="flex-none text-[12px] font-semibold text-brand-blue-light">Use →</span>
-                            </button>
-                          ))
+                                <span className="mt-0.5 flex-none text-[12px] font-semibold text-brand-blue-light">Use →</span>
+                              </button>
+                            );
+                          })
                         )}
                       </div>
                     )}
@@ -527,8 +821,23 @@ export default function PreApproval() {
                   <div className="mt-2 text-[11.5px] text-text-dim">
                     {losMode === 'demo'
                       ? 'Waiting for your first loan — send one from your Zap (or hit “Test” in Zapier) and it appears here instantly.'
-                      : `${losResults.length} borrower${losResults.length === 1 ? '' : 's'} available from your pipeline.`}
+                      : `${losResults.length} borrower${losResults.length === 1 ? '' : 's'} in your team’s shared pipeline.`}
                   </div>
+
+                  {/* Disclose which loan terms drive the letter after a borrower is picked. */}
+                  {losPicked && losScenario && losFeedFields.length > 0 && (
+                    <div className="mt-3 rounded-[10px] border border-[rgba(52,211,153,0.28)] bg-[rgba(52,211,153,0.1)] px-3.5 py-2.5 text-[12px] leading-[1.55] text-good">
+                      <span className="font-semibold">Letter terms pulled from your LOS:</span> {losFeedFields.join(' · ')}.
+                      <div className="mt-0.5 text-[11px] text-text-muted">
+                        Purchase price, down payment, and term aren’t in the feed — the loan amount is used as-is. Confirm the numbers below before sending.
+                      </div>
+                    </div>
+                  )}
+                  {losPicked && !losScenario && (
+                    <div className="mt-3 rounded-[10px] border border-[rgba(251,191,36,0.28)] bg-[rgba(251,191,36,0.1)] px-3.5 py-2.5 text-[12px] leading-[1.55] text-warn-text">
+                      This borrower’s feed didn’t include loan details, so the letter falls back to a saved scenario’s terms. Confirm them before sending.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -538,11 +847,11 @@ export default function PreApproval() {
           <div className="mb-5 flex flex-col gap-4">
             <div>
               <Label>Borrower Name(s)</Label>
-              <TextField placeholder="Robert Boot" value={pa.borrowerName} onChange={(e) => set({ borrowerName: e.target.value })} />
+              <TextField placeholder="Borrower's full name" value={pa.borrowerName} onChange={(e) => set({ borrowerName: e.target.value })} />
             </div>
             <div>
               <Label>Subject Property Address</Label>
-              <TextField placeholder="205 Grand Avenue, Arco, ID 83213" value={pa.propertyAddress} onChange={(e) => set({ propertyAddress: e.target.value })} />
+              <TextField placeholder="Property address" value={pa.propertyAddress} onChange={(e) => set({ propertyAddress: e.target.value })} />
             </div>
           </div>
 
@@ -626,6 +935,27 @@ export default function PreApproval() {
             )}
           </div>
 
+          {/* Signature */}
+          <div className="mb-4">
+            <div className="mb-2 flex items-center justify-between">
+              <SectionLabel>SIGNATURE</SectionLabel>
+              {signature && !sigMatchesSaved && (
+                <button
+                  onClick={saveSignatureToSettings}
+                  disabled={savingSettings}
+                  className="cursor-pointer border-none bg-transparent text-[12px] font-semibold text-brand-blue-light underline disabled:opacity-50"
+                >
+                  {savingSettings ? 'Saving…' : sigSaved ? 'Saved ✓' : 'Save to Settings'}
+                </button>
+              )}
+              {signature && sigMatchesSaved && <span className="text-[11.5px] text-text-dim">Saved to Settings</span>}
+            </div>
+            <SignaturePad value={signature} onChange={onSignatureChange} defaultName={settings.name} />
+            <div className="mt-1.5 text-[11.5px] text-text-muted">
+              Appears above your name in the letter. Save it once and it auto-fills every future letter.
+            </div>
+          </div>
+
           <div className="mb-4 flex flex-col gap-2.5">
             <Toggle checked={showSubjectAddress} onChange={setShowSubjectAddress} label="Show subject property address" />
             <Toggle checked={showTerms} onChange={setShowTerms} label="Show loan terms table" hint="Type, price, loan amount, down, rate, term" />
@@ -646,6 +976,12 @@ export default function PreApproval() {
               )}
             </div>
             <Toggle checked={showHeadshot} onChange={setShowHeadshot} label="Show photo in footer" />
+            <Toggle
+              checked={showSignature}
+              onChange={setShowSignature}
+              label="Show signature"
+              hint={signature ? 'Handwritten signature above your name' : 'Add one in the Signature section above'}
+            />
             <div className="flex items-center justify-between rounded-[10px] border border-border-input bg-input px-3.5 py-2.5">
               <div className="pr-3">
                 <div className="text-[13px] font-semibold text-text-label">Dual branding (real-estate agent)</div>
@@ -674,6 +1010,18 @@ export default function PreApproval() {
             </div>
           </div>
 
+          {actionMsg && (
+            <div
+              className={`mb-3 rounded-[10px] border px-3.5 py-2.5 text-[12.5px] leading-[1.5] ${
+                actionMsg.tone === 'error'
+                  ? 'border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] text-danger'
+                  : 'border-[rgba(251,191,36,0.28)] bg-[rgba(251,191,36,0.1)] text-warn-text'
+              }`}
+              role="status"
+            >
+              {actionMsg.text}
+            </div>
+          )}
           <div className="flex gap-2.5">
             <Button variant="primary" className="flex-1 !h-[46px]" onClick={downloadPdf}>
               Download PDF
@@ -727,5 +1075,115 @@ export default function PreApproval() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Issued-pre-approvals history: grouped by borrower, each with the loan summary and
+// what changed between successive letters.
+function IssuedPreApprovals({
+  history,
+  loading,
+  error,
+  onRefresh,
+}: {
+  history: PreApprovalRecord[];
+  loading: boolean;
+  error: string;
+  onRefresh: () => void;
+}) {
+  const groups = useMemo(() => groupByBorrower(history), [history]);
+  const [openKey, setOpenKey] = useState<string | null>(null);
+
+  const fmtDate = (iso: string) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  const summary = (r: PreApprovalRecord) =>
+    [r.loanType, r.loanAmount ? fmt(r.loanAmount) : '', r.rate ? `${r.rate}%` : '', r.term ? `${r.term} yr` : '', r.transaction]
+      .filter(Boolean)
+      .join(' · ');
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-[22px] py-4">
+        <div>
+          <div className="text-[15px] font-semibold text-text-heading">Issued Pre-Approvals</div>
+          <div className="text-[12.5px] text-text-muted">Every letter you generate — grouped by borrower, with what changed each time.</div>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading}>
+          {loading ? 'Loading…' : 'Refresh'}
+        </Button>
+      </div>
+
+      {error ? (
+        <div className="px-[22px] py-6 text-[13.5px] text-danger">{error}</div>
+      ) : !groups.length ? (
+        <div className="px-[22px] py-10 text-center text-[13.5px] text-text-muted">
+          {loading ? 'Loading…' : 'No pre-approvals issued yet. Generate a letter and it will be logged here, tied to the borrower.'}
+        </div>
+      ) : (
+        <div className="flex flex-col">
+          {groups.map((g) => {
+            const isOpen = openKey === g.key;
+            return (
+              <div key={g.key} className="border-b border-border last:border-0">
+                <button
+                  onClick={() => setOpenKey(isOpen ? null : g.key)}
+                  className="flex w-full items-center justify-between gap-3 px-[22px] py-4 text-left transition-colors hover:bg-[rgba(47,128,237,0.06)]"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14.5px] font-semibold text-text-primary">{g.borrowerName}</span>
+                      <span className="rounded-full bg-[rgba(47,128,237,0.14)] px-2 py-0.5 text-[11px] font-semibold text-brand-blue-light">
+                        {g.count} letter{g.count === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 truncate text-[12.5px] text-text-muted">
+                      {summary(g.latest)}
+                      {g.latest.propertyAddress ? ` · ${g.latest.propertyAddress}` : ''}
+                    </div>
+                  </div>
+                  <div className="flex flex-none items-center gap-3">
+                    <span className="text-[12px] text-text-dim">{fmtDate(g.latest.issuedAt)}</span>
+                    <span className="text-[12px] text-text-muted">{isOpen ? '▲' : '▼'}</span>
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="bg-[rgba(140,165,195,0.04)] px-[22px] pb-4 pt-1">
+                    {g.records.map((r, i) => {
+                      const older = g.records[i + 1]; // newest-first, so i+1 is the previous letter
+                      const changes = diffRecords(r, older);
+                      return (
+                        <div key={r.id} className="border-l-2 border-[rgba(45,212,191,0.4)] py-2 pl-3.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[12.5px] font-semibold text-text-soft">
+                              {i === 0 ? 'Latest' : `Version ${g.records.length - i}`} · {fmtDate(r.issuedAt)}
+                            </span>
+                            <span className="num text-[12.5px] text-text-muted">{r.monthlyPayment ? `${fmt(r.monthlyPayment)}/mo` : ''}</span>
+                          </div>
+                          <div className="mt-0.5 text-[12px] text-text-muted">{summary(r)}</div>
+                          {changes.length > 0 ? (
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {changes.map((c) => (
+                                <span key={c.label} className="rounded-[6px] bg-[rgba(251,191,36,0.14)] px-2 py-0.5 text-[11px] text-[#d9a53a]">
+                                  {c.label}: {c.from} → {c.to}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            older && <div className="mt-1 text-[11px] text-text-dim">No changes from the prior letter.</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }

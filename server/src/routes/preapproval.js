@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
-import { incPreApprovals } from '../store.js';
+import { incPreApprovals, addPreApproval, getPreApprovals } from '../store.js';
 import { requireAuth } from '../auth.js';
 
 const router = Router();
@@ -12,8 +12,9 @@ const ASSETS = path.join(__dirname, '..', 'assets');
 const LOGO = path.join(ASSETS, 'letterhead-logo.jpg');
 const HEADSHOT = path.join(ASSETS, 'officer-headshot.png');
 
-const GREEN = '#1f3d25';
-const GOLD = '#b18f3f';
+// Summit Home Loans brand palette (navy + steel accent).
+const GREEN = '#13355f';
+const GOLD = '#5f7fa8';
 const LEFT = 64;
 const RIGHT = 548;
 const PAGE_W = 612;
@@ -21,42 +22,63 @@ const PAGE_H = 792;
 const FOOTER_H = 104;
 
 router.post('/pdf', requireAuth, (req, res) => {
-  const {
-    style = 'mortgage-expert',
-    showHeadshot = true,
-    date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
-    title = '',
-    reLine = 'Pre-Approval',
-    subjectAddress = '',
-    salutation = 'To Whom It May Concern:',
-    paragraphs = [],
-    terms = null,
-    validity = '',
-    closing = 'Best regards,',
-    borrowerName = '—',
-    officer = {},
-    lender = {},
-    agent = null,
-    logo = null,
-  } = req.body || {};
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  // Coerce every field the PDF touches to a safe value up front. Destructuring
+  // defaults only cover `undefined`, so an explicit `null` (e.g. "officer": null)
+  // would otherwise throw mid-stream and corrupt the PDF. obj() null-guards objects.
+  const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+  const str = (v, fallback = '') => (v == null ? fallback : String(v));
+
+  const style = body.style === 'classic' ? 'classic' : 'mortgage-expert';
+  const showHeadshot = body.showHeadshot !== false;
+  const date =
+    typeof body.date === 'string'
+      ? body.date.slice(0, 80)
+      : new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const title = str(body.title);
+  const reLine = str(body.reLine, 'Pre-Approval');
+  const subjectAddress = str(body.subjectAddress);
+  const salutation = str(body.salutation, 'To Whom It May Concern:');
+  const paragraphs = (Array.isArray(body.paragraphs) ? body.paragraphs : []).slice(0, 40).map((p) => str(p));
+  const terms = (Array.isArray(body.terms) ? body.terms : [])
+    .filter((t) => t && typeof t === 'object' && !Array.isArray(t))
+    .slice(0, 40)
+    .map((t) => ({ label: str(t.label), value: str(t.value) }));
+  const validity = str(body.validity);
+  const closing = str(body.closing, 'Best regards,');
+  const borrowerName = str(body.borrowerName, '—');
+  const officer = obj(body.officer);
+  const lender = obj(body.lender);
+  const agent = obj(body.agent);
+  const logo = body.logo ?? null;
+  const loan = obj(body.loan); // structured loan snapshot for the issued-pre-approvals history
+
+  // Decode a data URL into a Buffer PDFKit can draw, or null if it isn't one.
+  const decodeDataUrl = (v) => {
+    if (typeof v !== 'string' || !v.startsWith('data:')) return null;
+    const b64 = v.split(',')[1];
+    if (!b64) return null;
+    try {
+      return Buffer.from(b64, 'base64');
+    } catch {
+      return null;
+    }
+  };
 
   // Custom uploaded letterhead logo (data URL) overrides the built-in file.
   let logoSource = fs.existsSync(LOGO) ? LOGO : null;
-  if (typeof logo === 'string' && logo.startsWith('data:')) {
-    const b64 = logo.split(',')[1];
-    if (b64) {
-      try {
-        logoSource = Buffer.from(b64, 'base64');
-      } catch {
-        /* fall back to default */
-      }
-    }
-  }
+  const logoBuf = decodeDataUrl(logo);
+  if (logoBuf) logoSource = logoBuf;
+
+  // Handwritten/uploaded signature drawn above the officer name (optional).
+  const signatureBuf = decodeDataUrl(body.signature);
 
   const classic = style === 'classic';
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: 56, bottom: FOOTER_H + 8, left: LEFT, right: 64 } });
+  // Filename must be a safe token — control chars (\n, etc.) make setHeader throw.
+  const lastName = (borrowerName.trim().split(/\s+/).pop() || '').replace(/[^A-Za-z0-9_-]/g, '') || 'letter';
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="preapproval-${String(borrowerName).split(' ').pop() || 'letter'}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="preapproval-${lastName}.pdf"`);
   doc.pipe(res);
 
   const phoneEmail = [lender.phone, lender.email].filter(Boolean).join('   ·   ');
@@ -191,7 +213,29 @@ router.post('/pdf', requireAuth, (req, res) => {
 
   doc.moveDown(0.5);
   doc.fillColor('#1b2733').font('Helvetica').fontSize(11).text(closing, LEFT, doc.y);
-  doc.moveDown(0.35);
+
+  // Signature above the name: constrain to a signature-sized box (never wider than
+  // the text column) and keep it and the name together on one page.
+  let signaturePlaced = false;
+  if (signatureBuf) {
+    try {
+      const img = doc.openImage(signatureBuf);
+      const maxH = 44;
+      const maxW = 220;
+      const scale = Math.min(maxH / img.height, maxW / img.width, 1);
+      const drawW = img.width * scale;
+      const drawH = img.height * scale;
+      // Page-break if the signature + name wouldn't fit above the footer.
+      if (doc.y + drawH + 22 > PAGE_H - FOOTER_H - 8) doc.addPage();
+      doc.moveDown(0.2);
+      doc.image(signatureBuf, LEFT, doc.y, { width: drawW, height: drawH });
+      doc.y += drawH + 2;
+      signaturePlaced = true;
+    } catch {
+      /* signature optional — fall back to the plain name spacing */
+    }
+  }
+  if (!signaturePlaced) doc.moveDown(0.35);
   doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(13).text(officer.name || lender.name || 'Your Loan Officer', LEFT, doc.y);
   doc.fillColor('#5b6b7b').font('Helvetica').fontSize(10).text(officer.title || 'Mortgage Loan Officer', LEFT, doc.y);
   if (agent && agent.name) {
@@ -206,6 +250,29 @@ router.post('/pdf', requireAuth, (req, res) => {
 
   doc.end();
   incPreApprovals();
+
+  // Record the issued pre-approval so it shows in the history, tied to the borrower.
+  const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  addPreApproval(req.user.id, {
+    borrowerName,
+    propertyAddress: subjectAddress || str(loan.propertyAddress),
+    loanType: str(loan.loanType),
+    transaction: str(loan.transaction),
+    price: n(loan.price),
+    loanAmount: n(loan.loanAmount),
+    downPayment: n(loan.downPayment),
+    rate: n(loan.rate),
+    term: str(loan.term),
+    monthlyPayment: n(loan.monthlyPayment),
+    apr: n(loan.apr),
+    reLine,
+    validityDays: n(loan.validityDays),
+  });
+});
+
+// Issued-pre-approval history for the signed-in loan officer (newest first).
+router.get('/history', requireAuth, (req, res) => {
+  res.json({ history: getPreApprovals(req.user.id) });
 });
 
 export default router;

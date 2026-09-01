@@ -10,7 +10,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
-import { seed } from './store.js';
+import { seed, dataDirInfo } from './store.js';
 import authRoutes from './routes/auth.js';
 import settingsRoutes from './routes/settings.js';
 import scenarioRoutes from './routes/scenarios.js';
@@ -22,6 +22,13 @@ import shareRoutes from './routes/share.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+// Build/version stamp so you can verify which commit is actually live (Render sets
+// RENDER_GIT_COMMIT/RENDER_GIT_BRANCH automatically). Visit /api/health to check.
+const BUILD = {
+  commit: (process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || 'unknown').slice(0, 7),
+  branch: process.env.RENDER_GIT_BRANCH || process.env.GIT_BRANCH || 'unknown',
+  startedAt: new Date().toISOString(),
+};
 app.set('trust proxy', 1); // behind Render/other TLS proxy — needed for correct client IPs (rate limiting)
 
 // Security headers. CSP is left off because the SPA uses inline styles; the other
@@ -42,7 +49,7 @@ app.use(express.json({ limit: '1mb' }));
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true, legacyHeaders: false });
 const webhookLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, ...BUILD }));
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/scenarios', scenarioRoutes);
@@ -80,15 +87,43 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Fail fast in production if JWT_SECRET wasn't set to a real value. Otherwise both
+// the login tokens and the derived LOS webhook token are signed with a public,
+// committed default, which allows trivial admin-token forgery and predictable
+// webhook URLs. Local dev keeps working via the dev-only fallback in auth/store.
+const DEV_JWT_DEFAULT = 'dev-secret-change-me-in-production';
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEV_JWT_DEFAULT)) {
+  console.error('\n  ✖ Refusing to start: JWT_SECRET is missing or set to the known default in production.');
+  console.error('    Set a long, random JWT_SECRET in your host environment (e.g. `openssl rand -hex 48`) and redeploy.\n');
+  process.exit(1);
+}
+
 seed();
 app.listen(PORT, () => {
   const isProd = process.env.NODE_ENV === 'production';
   console.log(`\n  LoanDr. API → http://localhost:${PORT}`);
   console.log(`  Health      → http://localhost:${PORT}/api/health`);
+
+  // Storage durability — the #1 cause of "it forgot my login". Make it loud in the logs.
+  const store = dataDirInfo();
+  if (store.persistent) {
+    console.log(`  Storage      → ${store.dir}  [persistent — accounts & data survive restarts]`);
+  } else if (isProd) {
+    console.warn(`  ⚠ Storage    → ${store.dir}  [EPHEMERAL] — this resets on every redeploy, so logins and data will NOT be saved.`);
+    console.warn('    Fix: attach a persistent disk mounted at /var/data (or set DATA_DIR to a mounted path) in your host settings, then redeploy.');
+  } else {
+    console.log(`  Storage      → ${store.dir}  [local dev]`);
+  }
+
   if (isProd) {
-    // Never print real credentials to production logs.
-    console.log('  Seeded admin account (sign in with your configured ADMIN_EMAIL / ADMIN_PASSWORD).');
-    if (process.env.OWNER_EMAIL) console.log(`  Owner login → ${process.env.OWNER_EMAIL} (your OWNER_PASSWORD)`);
+    // Never print real credentials — just confirm which accounts can log in so you
+    // can verify your Render env vars from the logs.
+    console.log(`  Admin login ready → ${(process.env.ADMIN_EMAIL || 'admin@loandr.app').trim().toLowerCase()} (use your ADMIN_PASSWORD)`);
+    if (process.env.OWNER_EMAIL && process.env.OWNER_PASSWORD) {
+      console.log(`  Owner login ready → ${process.env.OWNER_EMAIL.trim().toLowerCase()} (use your OWNER_PASSWORD)`);
+    } else {
+      console.warn('  ⚠ No owner login configured — set OWNER_EMAIL and OWNER_PASSWORD in your environment to get a personal login.');
+    }
   } else {
     console.log('  Seeded accounts (dev):');
     console.log(`    admin  → ${process.env.ADMIN_EMAIL || 'admin@loandr.app'} / ${process.env.ADMIN_PASSWORD || 'admin123'}`);

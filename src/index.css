@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Script fonts for the typed-signature option (bundled locally, OFL). */
+@font-face {
+  font-family: 'Dancing Script';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/DancingScript.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Great Vibes';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/GreatVibes.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Sacramento';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Sacramento.ttf') format('truetype');
+}
+
 :root {
   color-scheme: dark;
 }
@@ -31,6 +54,21 @@ select,
 textarea,
 button {
   font-family: inherit;
+}
+
+/* Visible keyboard focus for custom controls (buttons, segmented options, pills,
+   toggles, links, FAQ accordions). Inputs keep their own .field focus styles.
+   Only shows for keyboard nav (:focus-visible), never on mouse click. */
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+[role='switch']:focus-visible,
+[role='option']:focus-visible,
+[role='tab']:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #5fa8f5;
+  outline-offset: 2px;
+  border-radius: 8px;
 }
 
 /* hide number-input spinners — fields use explicit $/% adornments instead */

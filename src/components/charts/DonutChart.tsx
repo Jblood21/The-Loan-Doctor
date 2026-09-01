@@ -7,7 +7,7 @@ export interface DonutSegment {
 }
 
 /** Validated categorical palette (CVD-safe, passes light+dark lightness bands). */
-export const PAYMENT_COLORS = ['#0f9e8f', '#3373c4', '#b3781e', '#7c53e0'];
+export const PAYMENT_COLORS = ['#0f9e8f', '#3373c4', '#b3781e', '#7c53e0', '#5b7186'];
 
 interface Props {
   segments: DonutSegment[];

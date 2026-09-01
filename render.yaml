@@ -43,14 +43,15 @@ services:
         sync: false
 
       # ---- Access control ------------------------------------------------
-      # Public self-signup is OFF; people register only with the SIGNUP_CODE
-      # below, which they enter on the Create-account screen. Change this to
-      # something private in Render → Environment, or clear it to fully close
-      # signups. (Your own owner login never needs the code.)
+      # Public self-signup is OFF. To invite people without opening signups to
+      # everyone, set a PRIVATE SIGNUP_CODE in Render → Environment (they enter it
+      # on the Create-account screen); leave it unset to fully close signups. Your
+      # own owner login never needs the code. Do NOT commit a real code here — a
+      # guessable value committed to the repo effectively opens registration.
       - key: ALLOW_SIGNUP
         value: "false"
       - key: SIGNUP_CODE
-        value: "123456"
+        sync: false
       # No demo/sample accounts in production.
       - key: SEED_DEMO_USER
         value: "false"

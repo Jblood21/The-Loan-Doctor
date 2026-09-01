@@ -3,7 +3,7 @@
 // In development the Vite dev server proxies /api to the Express backend, so
 // API_BASE can stay empty. In production set VITE_API_BASE to the API origin.
 
-import type { Scenario, Settings, User } from '@/types';
+import type { PreApprovalRecord, Scenario, Settings, User } from '@/types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
 const TOKEN_KEY = 'loandr.token';
@@ -83,8 +83,7 @@ export const api = {
   updateScenario: (id: string, scenario: Scenario) => request<{ scenario: Scenario }>('PUT', `/scenarios/${id}`, scenario),
   deleteScenario: (id: string) => request<void>('DELETE', `/scenarios/${id}`),
 
-  // admin
-  adminLogin: (password: string) => request<{ token: string }>('POST', '/admin/login', { password }),
+  // admin (JWT role=admin gated)
   adminStats: () => request<{ stats: { label: string; value: string; delta: string }[] }>('GET', '/admin/stats'),
   adminUsers: () => request<{ users: User[] }>('GET', '/admin/users'),
 
@@ -98,11 +97,17 @@ export const api = {
       `/los/borrowers?provider=${encodeURIComponent(provider)}&q=${encodeURIComponent(query)}`,
     ),
   losWebhookInfo: () => request<{ token: string; url: string; count: number }>('GET', '/los/webhook-info'),
+  losWebhookLog: () =>
+    request<{
+      count: number;
+      log: { at: string; recordsReceived: number; borrowersStored: number; fieldNames: string[]; extractedNames: string[]; sample: string }[];
+    }>('GET', '/los/webhook-info/log'),
   losRegenerateWebhook: () => request<{ token: string; url: string }>('POST', '/los/webhook-info/regenerate'),
   losClearBorrowers: () => request<{ ok: boolean }>('POST', '/los/webhook-info/clear'),
 
   // pre-approval PDF — returns a Blob
   preApprovalPdf: (payload: unknown) => request<Blob>('POST', '/preapproval/pdf', payload),
+  preApprovalHistory: () => request<{ history: PreApprovalRecord[] }>('GET', '/preapproval/history'),
 
   // comparison PDF + shareable quote links
   comparePdf: (payload: unknown) => request<Blob>('POST', '/compare/pdf', payload),

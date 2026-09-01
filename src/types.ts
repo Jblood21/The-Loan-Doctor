@@ -51,6 +51,12 @@ export interface Scenario {
   taxRatePct?: number;
   /** Optional per-scenario override for homeowners insurance rate (%/yr of home value). */
   insuranceRatePct?: number;
+  /** Manual monthly property tax ($/mo). When set, overrides the auto % calculation. */
+  taxMonthly?: number;
+  /** Manual monthly homeowners insurance ($/mo). When set, overrides the auto % calculation. */
+  insuranceMonthly?: number;
+  /** Monthly HOA dues ($/mo). 0/undefined = none. */
+  hoaMonthly?: number;
 }
 
 export interface HecmInputs {
@@ -76,6 +82,8 @@ export interface Settings {
   officerTitle: string;
   /** Custom letterhead logo as a data URL (overrides the built-in logo). */
   logoDataUrl?: string;
+  /** Saved signature (transparent PNG data URL) auto-filled into pre-approval letters. */
+  signatureDataUrl?: string;
   // Lender Information
   lenderName: string;
   lenderNmls: string;
@@ -114,8 +122,27 @@ export interface AdminStat {
   delta: string;
 }
 
+/** A pre-approval letter that was issued — the historical record tied to a borrower. */
+export interface PreApprovalRecord {
+  id: string;
+  borrowerName: string;
+  propertyAddress: string;
+  loanType: string;
+  transaction: string;
+  price: number;
+  loanAmount: number;
+  downPayment: number;
+  rate: number;
+  term: string;
+  monthlyPayment: number;
+  apr: number;
+  reLine: string;
+  validityDays: number;
+  issuedAt: string;
+}
+
 export interface PreApprovalState {
-  source: 'scenario' | 'los';
+  source: 'scenario' | 'los' | 'import';
   scenarioIdx: number;
   losProvider: 'arive' | 'encompass' | 'calyx' | 'byte';
   losConnected: boolean;

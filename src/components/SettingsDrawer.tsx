@@ -30,10 +30,10 @@ const SECTIONS: Section[] = [
     fields: [
       { key: 'name', label: 'Your Name', ph: 'Alan Blood' },
       { key: 'officerTitle', label: 'Title', ph: 'Mortgage Specialist' },
-      { key: 'company', label: 'Company', ph: 'CFG Home Loans' },
-      { key: 'email', label: 'Email', ph: 'you@lender.com' },
-      { key: 'phone', label: 'Phone', ph: '801.706.2802' },
-      { key: 'nmls', label: 'NMLS #', ph: '3146' },
+      { key: 'company', label: 'Company', ph: 'Summit Home Loans' },
+      { key: 'email', label: 'Email', ph: 'you@summithomeloans.com' },
+      { key: 'phone', label: 'Phone', ph: '801-855-8535' },
+      { key: 'nmls', label: 'NMLS #', ph: '103895' },
     ],
   },
   {
@@ -41,9 +41,9 @@ const SECTIONS: Section[] = [
     note: "Your institution's details for branding.",
     cta: 'Save Lender Info',
     fields: [
-      { key: 'lenderName', label: 'Lender Name', ph: 'First National Bank' },
-      { key: 'lenderNmls', label: 'Lender NMLS #', ph: '123456' },
-      { key: 'website', label: 'Website', ph: 'www.example.com' },
+      { key: 'lenderName', label: 'Lender Name', ph: 'Summit Home Loans' },
+      { key: 'lenderNmls', label: 'Lender NMLS #', ph: '1790749' },
+      { key: 'website', label: 'Website', ph: 'summithomeloans.com' },
       { key: 'lenderAddress', label: 'Address', ph: '123 Main St, Suite 100 · City, ST' },
       { key: 'lenderPhone', label: 'Lender Phone', ph: '(800) 555-1234' },
     ],
@@ -214,27 +214,6 @@ export function SettingsDrawer() {
             <Button variant="primary" size="md" className="mt-[14px]" disabled={saving} onClick={() => save()}>
               {saving ? 'Saving…' : 'Save Default Fees'}
             </Button>
-          </div>
-
-          <div className="mb-2 flex items-center justify-between rounded-xl border border-border bg-elevated px-4 py-[14px]">
-            <div>
-              <div className="text-[14px] font-bold text-text-primary">Dark mode</div>
-              <div className="text-[12.5px] text-text-muted">LoanDr. ships dark by default.</div>
-            </div>
-            <button
-              role="switch"
-              aria-checked={settings.darkMode}
-              onClick={() => save({ darkMode: !settings.darkMode })}
-              className={`relative h-6 w-11 rounded-full transition-colors ${
-                settings.darkMode ? 'bg-brand-blue' : 'bg-border-input'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
-                  settings.darkMode ? 'left-[22px]' : 'left-0.5'
-                }`}
-              />
-            </button>
           </div>
         </div>
       </div>

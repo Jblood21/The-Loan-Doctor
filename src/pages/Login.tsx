@@ -23,6 +23,7 @@ export default function Login() {
   const [company, setCompany] = useState('');
   const [code, setCode] = useState('');
   const [remember, setRemember] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -31,15 +32,19 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setSubmitting(true);
+    const cleanEmail = email.trim();
     try {
       if (mode === 'login') {
-        await login(email, password, remember);
+        await login(cleanEmail, password, remember);
       } else {
-        await register({ email, password, name, company, code });
+        await register({ email: cleanEmail, password, name: name.trim(), company: company.trim(), code: code.trim() });
       }
       navigate('/compare', { replace: true });
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : 'Something went wrong. Is the API running?';
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : 'Can’t reach the server right now. It may be waking up — wait a moment and try again.';
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -153,17 +158,28 @@ export default function Login() {
           />
 
           <Label>Password</Label>
-          <TextField
-            size="lg"
-            type="password"
-            name="password"
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            className="mb-3.5"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div className="relative mb-3.5">
+            <TextField
+              size="lg"
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              className="!pr-[68px]"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent px-1 text-[12.5px] font-semibold text-brand-blue-light"
+            >
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </div>
 
           {mode === 'login' && (
             <div className="mb-[26px] flex items-center justify-between text-[13px]">

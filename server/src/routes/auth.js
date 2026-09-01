@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { addUser, findUserByEmail, findUserById, publicUser, updateUser } from '../store.js';
+import { addUser, findUserByEmail, findUserById, publicUser, updateUser, normalizeEmail } from '../store.js';
 import { requireAuth, signToken } from '../auth.js';
 
 const router = Router();
@@ -14,7 +14,8 @@ const SIGNUP_CODE = process.env.SIGNUP_CODE || '';
 const SIGNUPS_OPEN = process.env.ALLOW_SIGNUP !== 'false';
 
 router.post('/register', (req, res) => {
-  const { email, password, name = '', company = '', code = '' } = req.body || {};
+  const { password, name = '', company = '', code = '' } = req.body || {};
+  const email = normalizeEmail(req.body?.email);
 
   if (SIGNUP_CODE) {
     if (String(code).trim() !== SIGNUP_CODE) {
