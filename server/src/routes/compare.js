@@ -54,6 +54,9 @@ router.post('/pdf', requireAuth, (req, res) => {
     return {
       priceLabel: str(o.priceLabel),
       downLabel: str(o.downLabel),
+      head1: str(o.head1) || str(o.priceLabel),
+      head2: str(o.head2) || str(o.downLabel),
+      cardLabel: str(o.cardLabel) || `${str(o.priceLabel)} · ${str(o.downLabel)}`,
       downPayment: str(o.downPayment),
       loanAmount: str(o.loanAmount),
       rate: str(o.rate),
@@ -163,8 +166,8 @@ router.post('/pdf', requireAuth, (req, res) => {
   doc.restore();
   doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9.5).text('LOAN DETAILS', LEFT + 10, y + 11, { width: labelW - 12, lineBreak: false });
   columns.forEach((c, i) => {
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(11 * F).text(c.priceLabel, colX(i), y + 5, { width: colW, align: 'center', lineBreak: false });
-    doc.fillColor('#c7d4e6').font('Helvetica-Bold').fontSize(7 * F).text(c.downLabel, colX(i), y + 19, { width: colW, align: 'center', lineBreak: false });
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(11 * F).text(c.head1, colX(i), y + 5, { width: colW, align: 'center', lineBreak: false });
+    doc.fillColor('#c7d4e6').font('Helvetica-Bold').fontSize(7 * F).text(c.head2, colX(i), y + 19, { width: colW, align: 'center', lineBreak: false });
   });
   y += headH;
 
@@ -212,7 +215,7 @@ router.post('/pdf', requireAuth, (req, res) => {
     doc.roundedRect(cx, y, cardW, cardH, 6).fill(CARD_BG);
     doc.roundedRect(cx, y, cardW, cardH, 6).lineWidth(1).strokeColor(CARD_BORDER).stroke();
     doc.restore();
-    doc.fillColor(LABEL).font('Helvetica-Bold').fontSize(7 * F).text(`${c.priceLabel} · ${c.downLabel}`, cx + 4, y + 8, { width: cardW - 8, align: 'center', lineBreak: false });
+    doc.fillColor(LABEL).font('Helvetica-Bold').fontSize(7 * F).text(c.cardLabel, cx + 4, y + 8, { width: cardW - 8, align: 'center', lineBreak: false });
     doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(14 * F).text(c.cashToClose, cx + 4, y + 20, { width: cardW - 8, align: 'center', lineBreak: false });
   });
   y += cardH + 12;
