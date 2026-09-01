@@ -87,6 +87,17 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Fail fast in production if JWT_SECRET wasn't set to a real value. Otherwise both
+// the login tokens and the derived LOS webhook token are signed with a public,
+// committed default, which allows trivial admin-token forgery and predictable
+// webhook URLs. Local dev keeps working via the dev-only fallback in auth/store.
+const DEV_JWT_DEFAULT = 'dev-secret-change-me-in-production';
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEV_JWT_DEFAULT)) {
+  console.error('\n  ✖ Refusing to start: JWT_SECRET is missing or set to the known default in production.');
+  console.error('    Set a long, random JWT_SECRET in your host environment (e.g. `openssl rand -hex 48`) and redeploy.\n');
+  process.exit(1);
+}
+
 seed();
 app.listen(PORT, () => {
   const isProd = process.env.NODE_ENV === 'production';

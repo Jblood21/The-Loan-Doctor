@@ -10,7 +10,12 @@ const router = Router();
 
 function filterByQuery(list, q) {
   const query = String(q || '').trim().toLowerCase();
-  return query ? list.filter((b) => b.name.toLowerCase().includes(query) || (b.meta || '').toLowerCase().includes(query)) : list;
+  if (!query) return list;
+  return list.filter((b) =>
+    [b.name, b.meta, b.address, b.loanType, b.purpose, b.phone, b.email]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(query)),
+  );
 }
 
 // Build a lookup of the record's fields keyed by a normalized name (lowercase,
@@ -68,7 +73,28 @@ function mapInbound(rec = {}) {
   const amountNum = Number(String(amount).replace(/[^0-9.\-]/g, ''));
   const hasAmount = amount !== '' && Number.isFinite(amountNum) && amountNum > 0;
   const meta = [loanNo && `Loan #${loanNo}`, hasAmount && `$${amountNum.toLocaleString('en-US')}`].filter(Boolean).join(' · ');
-  return { name, meta, address: String(address || ''), loanNumber: String(loanNo || '') };
+
+  // Extra contact + loan details, so the search result shows more of what the Zap sent.
+  const phone = String(pick(f, 'phone', 'borrowerPhone', 'phoneNumber', 'mobile', 'mobilePhone', 'cell', 'cellPhone', 'cellphone', 'homePhone', 'contactPhone', 'primaryPhone') || '');
+  const email = String(pick(f, 'email', 'borrowerEmail', 'emailAddress', 'contactEmail', 'primaryEmail', 'mail') || '');
+  const loanType = String(pick(f, 'loanType', 'mortgageType', 'mortgageAppliedFor', 'loanProgram', 'program', 'productType', 'product', 'productName') || '');
+  const purpose = String(pick(f, 'loanPurpose', 'purpose', 'loanPurposeType', 'transactionType', 'loanTransaction') || '');
+  const rateRaw = pick(f, 'rate', 'noteRate', 'interestRate', 'intRate');
+  const rateNum = Number(String(rateRaw).replace(/[^0-9.\-]/g, ''));
+  const rate = rateRaw !== '' && Number.isFinite(rateNum) && rateNum > 0 ? `${rateNum}%` : '';
+
+  return {
+    name,
+    meta,
+    address: String(address || ''),
+    loanNumber: String(loanNo || ''),
+    amount: hasAmount ? `$${amountNum.toLocaleString('en-US')}` : '',
+    phone,
+    email,
+    loanType,
+    purpose,
+    rate,
+  };
 }
 
 // ---- inbound webhook (public; one shared URL for the whole deployment) ---

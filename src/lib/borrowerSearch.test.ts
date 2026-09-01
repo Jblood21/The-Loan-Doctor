@@ -47,6 +47,17 @@ describe('rankBorrowers', () => {
   it('excludes non-matches', () => {
     expect(rankBorrowers(people, 'zzzzz')).toHaveLength(0);
   });
+
+  it('searches the extra LOS fields (loan type, purpose, phone, email)', () => {
+    const enriched = [
+      { name: 'John Smith', meta: 'Loan #LN-20471', address: '48 Birchwood Ln', loanType: 'FHA', purpose: 'Purchase', phone: '555-123-4567', email: 'john@example.com' },
+      { name: 'Sarah Johnson', meta: 'Loan #LN-20493', address: '210 Cedar St', loanType: 'Conventional', purpose: 'Refinance', phone: '555-987-6543', email: 'sarah@example.com' },
+    ];
+    expect(rankBorrowers(enriched, 'fha').map((b) => b.name)).toEqual(['John Smith']);
+    expect(rankBorrowers(enriched, 'refinance').map((b) => b.name)).toEqual(['Sarah Johnson']);
+    expect(rankBorrowers(enriched, 'sarah@example').map((b) => b.name)).toEqual(['Sarah Johnson']);
+    expect(rankBorrowers(enriched, '9876543').map((b) => b.name)).toEqual(['Sarah Johnson']); // phone, dashes ignored
+  });
 });
 
 describe('isSubsequence', () => {

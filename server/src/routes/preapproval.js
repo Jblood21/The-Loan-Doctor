@@ -12,8 +12,9 @@ const ASSETS = path.join(__dirname, '..', 'assets');
 const LOGO = path.join(ASSETS, 'letterhead-logo.jpg');
 const HEADSHOT = path.join(ASSETS, 'officer-headshot.png');
 
-const GREEN = '#1f3d25';
-const GOLD = '#b18f3f';
+// Summit Home Loans brand palette (navy + steel accent).
+const GREEN = '#13355f';
+const GOLD = '#5f7fa8';
 const LEFT = 64;
 const RIGHT = 548;
 const PAGE_W = 612;

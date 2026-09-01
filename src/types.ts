@@ -51,6 +51,12 @@ export interface Scenario {
   taxRatePct?: number;
   /** Optional per-scenario override for homeowners insurance rate (%/yr of home value). */
   insuranceRatePct?: number;
+  /** Manual monthly property tax ($/mo). When set, overrides the auto % calculation. */
+  taxMonthly?: number;
+  /** Manual monthly homeowners insurance ($/mo). When set, overrides the auto % calculation. */
+  insuranceMonthly?: number;
+  /** Monthly HOA dues ($/mo). 0/undefined = none. */
+  hoaMonthly?: number;
 }
 
 export interface HecmInputs {

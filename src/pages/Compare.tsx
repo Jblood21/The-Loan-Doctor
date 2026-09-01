@@ -7,7 +7,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { PillGroup } from '@/components/ui/Pill';
 import { NumberField } from '@/components/ui/NumberField';
 import { Select } from '@/components/ui/Select';
-import { Label } from '@/components/ui/TextField';
+import { Label, TextField } from '@/components/ui/TextField';
 import { ClosingCostsEditor, cloneFees } from '@/components/ClosingCostsEditor';
 import { useScenarios, MAX_SCENARIOS } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
@@ -37,6 +37,12 @@ const TERMS = [
   { value: '15', label: '15 Years' },
   { value: '10', label: '10 Years' },
 ];
+/** "$450,000" → "$450K" when round to the thousand, else the full currency string. */
+function compactPrice(n: number): string {
+  const v = Math.round(n || 0);
+  return v >= 1000 && v % 1000 === 0 ? `$${v / 1000}K` : fmt(v);
+}
+
 const CREDIT_BANDS = [
   { value: '800', label: '800–850 · Exceptional' },
   { value: '760', label: '760–799 · Excellent' },
@@ -53,14 +59,24 @@ export default function Compare() {
   const { settings, save } = useSettings();
   const { openSettings } = useUI();
   const [savedDefault, setSavedDefault] = useState(false);
+  const [borrowerName, setBorrowerName] = useState('');
 
   const r = computeScenario(current);
   const priceLabel = current.transaction === 'refinance' ? 'Home Value' : 'Purchase Price';
 
+  // Taxes & insurance: auto (% of value) by default, or a manual $/mo the user types.
+  // Toggling to manual seeds the field with the current auto estimate so nothing jumps.
+  const taxManual = current.taxMonthly != null;
+  const insManual = current.insuranceMonthly != null;
+  const setTaxManual = (on: boolean) => patch({ taxMonthly: on ? Math.round(r.taxes * 100) / 100 : undefined });
+  const setInsManual = (on: boolean) => patch({ insuranceMonthly: on ? Math.round(r.insurance * 100) / 100 : undefined });
+
   const [busy, setBusy] = useState<'pdf' | 'share' | null>(null);
   const [shareMsg, setShareMsg] = useState('');
 
-  // Build the side-by-side comparison matrix from every scenario.
+  // Build the side-by-side comparison from every scenario. Returns both the legacy
+  // names/metrics matrix (used by the shareable quote) and a structured payload the
+  // redesigned "Home Financing Comparison" PDF renders.
   const buildComparison = () => {
     const results = scenarios.map((s) => ({ s, c: computeScenario(s) }));
     const names = results.map(({ s }) => s.name);
@@ -75,6 +91,7 @@ export default function Compare() {
       { label: 'Principal & Interest', get: ({ c }) => fmt2(c.pi) },
       { label: 'Property Taxes', get: ({ c }) => fmt2(c.taxes) },
       { label: 'Homeowners Insurance', get: ({ c }) => fmt2(c.insurance) },
+      { label: 'HOA', get: ({ c }) => fmt2(c.hoa) },
       { label: 'Mortgage Insurance', get: ({ c }) => (c.mi.applies ? fmt2(c.mi.monthly) : 'None') },
       { label: 'Total Monthly', get: ({ c }) => fmt2(c.totalMonthly) },
       { label: 'APR (est.)', get: ({ c }) => pct(c.apr, 3) },
@@ -89,19 +106,83 @@ export default function Compare() {
       nmls: settings.lenderNmls || settings.nmls,
       website: settings.website,
       address: settings.lenderAddress,
+      officer: settings.name,
+      officerNmls: settings.nmls,
     };
-    return { names, metrics, bestIndex, lender };
+
+    // Structured, per-column data for the redesigned comparison PDF.
+    const downPctOf = (s: (typeof results)[0]['s']) =>
+      Math.round(s.homePrice > 0 ? ((s.downPayment || 0) / s.homePrice) * 100 : s.downPct || 0);
+    const columns = results.map(({ s, c }) => ({
+      priceLabel: compactPrice(s.homePrice || 0),
+      downLabel: `${downPctOf(s)}% DOWN`,
+      downPayment: fmt(s.downPayment || 0),
+      loanAmount: fmt(c.baseLoan),
+      rate: `${s.rate || 0}%`,
+      apr: pct(c.apr, 3),
+      pi: fmt2(c.pi),
+      mi: c.mi.applies ? fmt2(c.mi.monthly) : '—',
+      taxes: fmt2(c.taxes),
+      insurance: fmt2(c.insurance),
+      hoa: fmt2(c.hoa),
+      totalMonthly: fmt2(c.totalMonthly),
+      closing: fmt2(c.closingCosts),
+      credits: c.creditsApplied > 0 ? `–${fmt2(c.creditsApplied)}` : fmt2(0),
+      netClosing: fmt2(Math.max(0, c.closingCosts - c.creditsApplied)),
+      cashToClose: fmt2(c.cashToClose),
+    }));
+
+    // Header assumptions come from the active scenario (matches the reference's single
+    // "Loan Assumptions" strip); the per-column table still shows each option's detail.
+    const assumptions = {
+      purchaseOptions: results.map(({ s }) => compactPrice(s.homePrice || 0)).join(', '),
+      downPayment: `${downPctOf(current)}%`,
+      insurance: `${fmt2(r.insurance)} / mo`,
+      taxes: `${fmt2(r.taxes)} / mo`,
+      hoa: r.hoa > 0 ? `${fmt2(r.hoa)} / mo` : '—',
+    };
+    const programLabel = `${current.term}-Year ${current.loanType === 'arm' ? 'ARM' : 'Fixed'} ${r.typeLabel}`;
+    const subLine = `FICO ${current.credit}  ·  ${current.transaction === 'refinance' ? 'Refinance' : 'Purchase'}`;
+
+    // Plain-language insight lines (computed here where fmt lives).
+    const baseTotal = results[0]?.c.totalMonthly ?? 0;
+    const paymentDiff = results
+      .slice(1)
+      .map(({ s, c }) => {
+        const d = c.totalMonthly - baseTotal;
+        if (Math.abs(d) < 0.005) return `${compactPrice(s.homePrice || 0)} matches ${compactPrice(results[0].s.homePrice || 0)}.`;
+        return `${compactPrice(s.homePrice || 0)} is ${fmt2(Math.abs(d))}/mo ${d > 0 ? 'more' : 'less'} than ${compactPrice(results[0].s.homePrice || 0)}.`;
+      });
+    const cheapest = results[bestIndex];
+    const keyTakeaway =
+      results.length > 1
+        ? `Lowest payment: ${compactPrice(cheapest.s.homePrice || 0)} at ${fmt2(cheapest.c.totalMonthly)}/mo.`
+        : '';
+
+    return {
+      names,
+      metrics,
+      bestIndex,
+      lender,
+      borrowerName,
+      programLabel,
+      subLine,
+      rate: `${current.rate || 0}%`,
+      assumptions,
+      columns,
+      insights: { paymentDiff, keyTakeaway },
+    };
   };
 
   const exportComparisonPdf = async () => {
     setBusy('pdf');
     setShareMsg('');
     try {
-      const blob = await api.comparePdf({ title: 'Loan Comparison', ...buildComparison(), logo: settings.logoDataUrl || undefined });
+      const blob = await api.comparePdf({ title: 'Home Financing Comparison', ...buildComparison(), logo: settings.logoDataUrl || undefined });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'loan-comparison.pdf';
+      a.download = `home-financing-comparison${borrowerName ? '-' + borrowerName.split(' ').pop() : ''}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -212,6 +293,16 @@ export default function Compare() {
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.35fr_1fr]">
         {/* LEFT — form */}
         <Card className="p-6">
+          {/* Borrower — prints as "Prepared for …" on the comparison PDF */}
+          <div className="mb-[22px]">
+            <Label>Prepared For (Borrower)</Label>
+            <TextField
+              placeholder="Borrower's name (appears on the PDF)"
+              value={borrowerName}
+              onChange={(e) => setBorrowerName(e.target.value)}
+            />
+          </div>
+
           {/* transaction + borrowers */}
           <div className="mb-[22px] flex flex-wrap items-center justify-between gap-4">
             <SegmentedControl<TransactionType>
@@ -286,6 +377,61 @@ export default function Compare() {
             </div>
           </div>
 
+          {/* TAXES, INSURANCE & HOA — auto estimates, or toggle to a manual $/mo */}
+          <Divider className="my-6" />
+          <SectionLabel className="mb-4">TAXES, INSURANCE &amp; HOA</SectionLabel>
+          <div className="flex flex-col gap-4">
+            {([
+              { key: 'tax', label: 'Property Taxes', manual: taxManual, setManual: setTaxManual, autoVal: r.taxes, field: 'taxMonthly', stored: current.taxMonthly, hint: 'Auto · 1.25%/yr of value' },
+              { key: 'ins', label: 'Homeowners Insurance', manual: insManual, setManual: setInsManual, autoVal: r.insurance, field: 'insuranceMonthly', stored: current.insuranceMonthly, hint: 'Auto · 0.35%/yr of value' },
+            ] as const).map((row) => (
+              <div key={row.key} className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-[140px]">
+                  <div className="text-[13px] font-semibold text-text-soft">{row.label}</div>
+                  <div className="text-[11.5px] text-text-dim">{row.manual ? 'Manual amount' : row.hint}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <SegmentedControl
+                    size="sm"
+                    options={[
+                      { value: 'auto', label: 'Auto' },
+                      { value: 'manual', label: 'Manual' },
+                    ]}
+                    value={row.manual ? 'manual' : 'auto'}
+                    onChange={(v) => row.setManual(v === 'manual')}
+                  />
+                  <div className="flex w-[132px] items-center gap-1">
+                    <NumberField
+                      size="sm"
+                      prefix="$"
+                      readOnly={!row.manual}
+                      value={row.manual ? row.stored ?? 0 : Math.round(row.autoVal * 100) / 100}
+                      onChange={row.manual ? (v) => patch({ [row.field]: v === '' ? 0 : parseFloat(v) }) : undefined}
+                      ariaLabel={`${row.label} per month`}
+                    />
+                    <span className="text-[11.5px] text-text-dim">/mo</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-[140px]">
+                <div className="text-[13px] font-semibold text-text-soft">HOA Dues</div>
+                <div className="text-[11.5px] text-text-dim">Monthly, if any</div>
+              </div>
+              <div className="flex w-[132px] items-center gap-1 sm:mr-[76px]">
+                <NumberField
+                  size="sm"
+                  prefix="$"
+                  value={current.hoaMonthly ?? 0}
+                  onChange={(v) => patch({ hoaMonthly: v === '' ? 0 : parseFloat(v) })}
+                  ariaLabel="HOA dues per month"
+                />
+                <span className="text-[11.5px] text-text-dim">/mo</span>
+              </div>
+            </div>
+          </div>
+
           <Divider className="my-6" />
           <div className="flex items-center justify-between">
             <SectionLabel>RATE BUYDOWN &amp; CREDITS</SectionLabel>
@@ -357,8 +503,9 @@ export default function Compare() {
             <div className="mt-5 flex flex-col gap-px">
               {[
                 { label: 'Principal & Interest', value: fmt2(r.pi), color: 'text-text-primary' },
-                { label: 'Property Taxes (est.)', value: fmt2(r.taxes), color: 'text-text-softer' },
-                { label: 'Homeowners Insurance (est.)', value: fmt2(r.insurance), color: 'text-text-softer' },
+                { label: `Property Taxes${taxManual ? '' : ' (est.)'}`, value: fmt2(r.taxes), color: 'text-text-softer' },
+                { label: `Homeowners Insurance${insManual ? '' : ' (est.)'}`, value: fmt2(r.insurance), color: 'text-text-softer' },
+                ...(r.hoa > 0 ? [{ label: 'HOA Dues', value: fmt2(r.hoa), color: 'text-text-softer' }] : []),
                 miApplies
                   ? { label: `${r.mi.label} (est.)`, value: fmt2(r.mi.monthly), color: 'text-warn-text' }
                   : { label: 'Mortgage Insurance', value: 'None', color: 'text-[#5f9e7a]' },
@@ -384,6 +531,7 @@ export default function Compare() {
                 { label: 'Property Taxes', value: r.taxes, color: PAYMENT_COLORS[1] },
                 { label: 'Homeowners Insurance', value: r.insurance, color: PAYMENT_COLORS[2] },
                 ...(miApplies ? [{ label: r.mi.label, value: r.mi.monthly, color: PAYMENT_COLORS[3] }] : []),
+                ...(r.hoa > 0 ? [{ label: 'HOA', value: r.hoa, color: PAYMENT_COLORS[4] }] : []),
               ]}
               centerValue={fmt(r.totalMonthly)}
               centerLabel="/mo"
