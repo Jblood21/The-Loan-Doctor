@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useUI } from '@/context/UIContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useAuth } from '@/context/AuthContext';
@@ -48,26 +49,6 @@ const SECTIONS: Section[] = [
       { key: 'lenderPhone', label: 'Lender Phone', ph: '(800) 555-1234' },
     ],
   },
-  {
-    title: 'Dual Branding',
-    note: 'Add a real-estate agent to generated documents.',
-    cta: 'Save Agent Info',
-    fields: [
-      { key: 'agentName', label: 'Agent Name', ph: 'Jane Doe' },
-      { key: 'brokerage', label: 'Brokerage', ph: 'ABC Realty' },
-      { key: 'agentPhone', label: 'Phone', ph: '(555) 987-6543' },
-    ],
-  },
-  {
-    title: 'Title & Settlement',
-    note: 'Used to estimate title fees in cash-to-close.',
-    cta: 'Save Title Info',
-    fields: [
-      { key: 'titleCompany', label: 'Title Company', ph: 'Secure Title LLC' },
-      { key: 'titleAgentName', label: 'Settlement Agent', ph: 'Pat Closing' },
-      { key: 'titleFeesPct', label: 'Title Fees (% of loan)', ph: '0.5', type: 'number' },
-    ],
-  },
 ];
 
 export function SettingsDrawer() {
@@ -75,9 +56,35 @@ export function SettingsDrawer() {
   const { settings, update, save, saving } = useSettings();
   const { user } = useAuth();
 
+  const [agentForm, setAgentForm] = useState({ name: '', brokerage: '', phone: '', email: '' });
+
   if (!settingsOpen) return null;
 
   const name = settings.name || user?.name || 'Loan Officer';
+
+  // Saved real-estate-agent contacts (add / delete). Selected for a letter on the
+  // Pre-Approval page.
+  const agents = settings.agents ?? [];
+  const newId = () =>
+    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `a-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const addAgent = () => {
+    const agentName = agentForm.name.trim();
+    if (!agentName) return;
+    save({
+      agents: [
+        ...agents,
+        {
+          id: newId(),
+          name: agentName,
+          brokerage: agentForm.brokerage.trim(),
+          phone: agentForm.phone.trim(),
+          email: agentForm.email.trim() || undefined,
+        },
+      ],
+    });
+    setAgentForm({ name: '', brokerage: '', phone: '', email: '' });
+  };
+  const deleteAgent = (id: string) => save({ agents: agents.filter((a) => a.id !== id) });
 
   // Read an uploaded image, downscale it to a letterhead-friendly size, and save it
   // as a data URL. PNG keeps transparency; falls back to JPEG if the file is large.
@@ -163,6 +170,82 @@ export function SettingsDrawer() {
               </Button>
             </div>
           ))}
+
+          {/* Real-estate agent contacts — saved here, selectable on the Pre-Approval page */}
+          <div className="mb-6">
+            <div className="mb-1 text-[14px] font-bold text-text-primary">Real-Estate Agents</div>
+            <div className="mb-[14px] text-[12.5px] text-text-muted">
+              Save agents to co-brand pre-approval letters. Pick one from the dropdown on the Pre-Approval page.
+            </div>
+
+            {agents.length > 0 ? (
+              <div className="mb-3 flex flex-col gap-2">
+                {agents.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between gap-3 rounded-[10px] border border-border bg-elevated px-3.5 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-[13.5px] font-semibold text-text-primary">{a.name}</div>
+                      <div className="truncate text-[12px] text-text-muted">
+                        {[a.brokerage, a.phone, a.email].filter(Boolean).join(' · ') || 'No details'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteAgent(a.id)}
+                      aria-label={`Delete ${a.name}`}
+                      className="flex-shrink-0 cursor-pointer border-none bg-transparent text-[12.5px] font-semibold text-text-muted underline hover:text-danger"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mb-3 rounded-[10px] border border-dashed border-border-input px-3.5 py-3 text-[12.5px] text-text-muted">
+                No agents saved yet — add one below.
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 rounded-[10px] border border-border-input bg-input p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <TextField
+                  placeholder="Agent name"
+                  value={agentForm.name}
+                  onChange={(e) => setAgentForm((f) => ({ ...f, name: e.target.value }))}
+                  className="!h-[40px] !text-[13.5px]"
+                />
+                <TextField
+                  placeholder="Brokerage"
+                  value={agentForm.brokerage}
+                  onChange={(e) => setAgentForm((f) => ({ ...f, brokerage: e.target.value }))}
+                  className="!h-[40px] !text-[13.5px]"
+                />
+                <TextField
+                  placeholder="Phone"
+                  value={agentForm.phone}
+                  onChange={(e) => setAgentForm((f) => ({ ...f, phone: e.target.value }))}
+                  className="!h-[40px] !text-[13.5px]"
+                />
+                <TextField
+                  placeholder="Email (optional)"
+                  value={agentForm.email}
+                  onChange={(e) => setAgentForm((f) => ({ ...f, email: e.target.value }))}
+                  className="!h-[40px] !text-[13.5px]"
+                />
+              </div>
+              <Button
+                variant="secondary"
+                size="md"
+                className="mt-1 self-start"
+                disabled={saving || !agentForm.name.trim()}
+                onClick={addAgent}
+              >
+                {saving ? 'Saving…' : 'Add Agent'}
+              </Button>
+            </div>
+          </div>
 
           <div className="mb-6">
             <div className="mb-1 text-[14px] font-bold text-text-primary">Letterhead Logo</div>
