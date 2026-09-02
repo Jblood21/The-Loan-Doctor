@@ -230,6 +230,27 @@ export default function PreApproval() {
   };
   const sigMatchesSaved = signature === (settings.signatureDataUrl || '');
 
+  // Footer photo (loan officer) — uploaded per account and persisted to Settings.
+  const onHeadshotFile = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setActionMsg({ tone: 'error', text: 'Please choose an image file for the footer photo.' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setActionMsg({ tone: 'error', text: 'That photo is over 5 MB — please use a smaller image.' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => setActionMsg({ tone: 'error', text: 'Could not read that image. Try another file.' });
+    reader.onload = () => {
+      setActionMsg(null);
+      saveSettings({ headshotDataUrl: String(reader.result || '') });
+    };
+    reader.readAsDataURL(file);
+  };
+  const resetHeadshot = () => saveSettings({ headshotDataUrl: '' });
+
   const tpl = useMemo(
     () => resolveTemplate(templateId, srcScenario, { borrowerName: pa.borrowerName, propertyAddress: pa.propertyAddress, pronoun }),
     [templateId, srcScenario, pa.borrowerName, pa.propertyAddress, pronoun],
@@ -400,6 +421,7 @@ export default function PreApproval() {
       },
       agent: letter.agent,
       logo: settings.logoDataUrl || undefined,
+      headshot: settings.headshotDataUrl || undefined,
       // Structured loan snapshot recorded in the issued-pre-approvals history.
       loan: {
         propertyAddress: pa.propertyAddress,
@@ -975,7 +997,44 @@ export default function PreApproval() {
                 </div>
               )}
             </div>
-            <Toggle checked={showHeadshot} onChange={setShowHeadshot} label="Show photo in footer" />
+            <div className="rounded-[10px] border border-border-input bg-input">
+              <Toggle checked={showHeadshot} onChange={setShowHeadshot} label="Show photo in footer" hint="Your loan-officer photo, bottom of the letter" />
+              {showHeadshot && (
+                <div className="flex items-center gap-3 border-t border-border-input px-3.5 py-2.5">
+                  <img
+                    src={settings.headshotDataUrl || '/brand/officer-headshot.png'}
+                    alt="Footer photo"
+                    className="h-11 w-11 flex-shrink-0 rounded-full border border-border-input object-cover object-top"
+                  />
+                  <div className="min-w-0 flex-1 text-[11.5px] text-text-muted">
+                    {settings.headshotDataUrl ? 'Custom photo' : 'Using the default photo'}
+                  </div>
+                  <label className="inline-flex cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        onHeadshotFile(e.target.files?.[0]);
+                        e.target.value = '';
+                      }}
+                    />
+                    <span className="inline-flex h-8 items-center rounded-[8px] border border-border-input bg-elevated px-3 text-[12px] font-semibold text-text-softer transition-colors hover:border-brand-blue">
+                      {savingSettings ? 'Saving…' : 'Upload photo'}
+                    </span>
+                  </label>
+                  {settings.headshotDataUrl && (
+                    <button
+                      type="button"
+                      onClick={resetHeadshot}
+                      className="cursor-pointer border-none bg-transparent text-[11.5px] font-semibold text-text-muted underline"
+                    >
+                      Default
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <Toggle
               checked={showSignature}
               onChange={setShowSignature}
@@ -1054,7 +1113,7 @@ export default function PreApproval() {
               {isClassic ? (
                 <div className="mt-auto px-10 pb-7 pt-4 text-center" style={{ borderTop: `3px solid ${GOLD}` }}>
                   {showHeadshot && (
-                    <img src="/brand/officer-headshot.png" alt={settings.name} className="mx-auto mb-2 h-[54px] w-[54px] rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
+                    <img src={settings.headshotDataUrl || '/brand/officer-headshot.png'} alt={settings.name} className="mx-auto mb-2 h-[54px] w-[54px] rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
                   )}
                   <div className="text-[11.5px] leading-[1.55]" style={{ color: GREEN }}>
                     {contactLines}
@@ -1064,7 +1123,7 @@ export default function PreApproval() {
                 <div className="mt-auto" style={{ background: GREEN, borderTop: `4px solid ${GOLD}` }}>
                   <div className="flex items-center gap-4 px-9 py-5">
                     {showHeadshot && (
-                      <img src="/brand/officer-headshot.png" alt={settings.name} className="h-[62px] w-[62px] flex-shrink-0 rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
+                      <img src={settings.headshotDataUrl || '/brand/officer-headshot.png'} alt={settings.name} className="h-[62px] w-[62px] flex-shrink-0 rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
                     )}
                     <div className="text-[11.5px] leading-[1.5] text-white">{contactLines}</div>
                   </div>

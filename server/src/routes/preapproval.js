@@ -73,6 +73,10 @@ router.post('/pdf', requireAuth, (req, res) => {
   // Handwritten/uploaded signature drawn above the officer name (optional).
   const signatureBuf = decodeDataUrl(body.signature);
 
+  // Uploaded loan-officer photo (data URL) overrides the built-in footer headshot.
+  const headshotBuf = decodeDataUrl(body.headshot);
+  const headshotSource = headshotBuf || (fs.existsSync(HEADSHOT) ? HEADSHOT : null);
+
   const classic = style === 'classic';
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: 56, bottom: FOOTER_H + 8, left: LEFT, right: 64 } });
   // Filename must be a safe token — control chars (\n, etc.) make setHeader throw.
@@ -95,13 +99,13 @@ router.post('/pdf', requireAuth, (req, res) => {
       const top = PAGE_H - FOOTER_H;
       doc.moveTo(LEFT, top).lineTo(RIGHT, top).lineWidth(3).strokeColor(GOLD).stroke();
       let ty = top + 10;
-      if (showHeadshot && fs.existsSync(HEADSHOT)) {
+      if (showHeadshot && headshotSource) {
         try {
           const r = 16;
           const cx = PAGE_W / 2;
           doc.save();
           doc.circle(cx, ty + r, r).clip();
-          doc.image(HEADSHOT, cx - r, ty, { cover: [r * 2, r * 2], align: 'center', valign: 'top' });
+          doc.image(headshotSource, cx - r, ty, { cover: [r * 2, r * 2], align: 'center', valign: 'top' });
           doc.restore();
           doc.circle(cx, ty + r, r).lineWidth(1.5).strokeColor(GOLD).stroke();
           ty += r * 2 + 5;
@@ -122,14 +126,14 @@ router.post('/pdf', requireAuth, (req, res) => {
       doc.rect(0, bandY, PAGE_W, FOOTER_H).fill(GREEN);
       doc.rect(0, bandY, PAGE_W, 4).fill(GOLD);
       let tx = LEFT;
-      if (showHeadshot && fs.existsSync(HEADSHOT)) {
+      if (showHeadshot && headshotSource) {
         try {
           const r = 31;
           const cx = LEFT + r;
           const cy = bandY + FOOTER_H / 2;
           doc.save();
           doc.circle(cx, cy, r).clip();
-          doc.image(HEADSHOT, cx - r, cy - r, { cover: [r * 2, r * 2], align: 'center', valign: 'top' });
+          doc.image(headshotSource, cx - r, cy - r, { cover: [r * 2, r * 2], align: 'center', valign: 'top' });
           doc.restore();
           doc.circle(cx, cy, r).lineWidth(2).strokeColor(GOLD).stroke();
           tx = LEFT + r * 2 + 18;
