@@ -109,6 +109,17 @@ export const api = {
   preApprovalPdf: (payload: unknown) => request<Blob>('POST', '/preapproval/pdf', payload),
   preApprovalHistory: () => request<{ history: PreApprovalRecord[] }>('GET', '/preapproval/history'),
 
+  // AI assistant (Claude, server-side) for the loan comparison
+  aiCompare: (question: string, context: string) => request<{ answer: string }>('POST', '/ai/compare', { question, context }),
+
+  // U.S. Census median household income by county
+  censusCounties: (state: string) => request<{ year: string; counties: { fips: string; name: string }[] }>('GET', `/census/counties?state=${encodeURIComponent(state)}`),
+  censusIncome: (state: string, county: string) =>
+    request<{ name: string; medianIncome: number | null; moe: number | null; year: string; source: string }>(
+      'GET',
+      `/census/income?state=${encodeURIComponent(state)}&county=${encodeURIComponent(county)}`,
+    ),
+
   // comparison PDF + shareable quote links
   comparePdf: (payload: unknown) => request<Blob>('POST', '/compare/pdf', payload),
   createShare: (payload: unknown) => request<{ id: string; url: string }>('POST', '/share', payload),

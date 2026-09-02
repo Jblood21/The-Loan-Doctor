@@ -19,6 +19,8 @@ import losRoutes from './routes/los.js';
 import preApprovalRoutes from './routes/preapproval.js';
 import compareRoutes from './routes/compare.js';
 import shareRoutes from './routes/share.js';
+import aiRoutes from './routes/ai.js';
+import censusRoutes from './routes/census.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -50,6 +52,9 @@ app.use(express.json({ limit: '6mb' }));
 // Throttle auth endpoints against brute-force, and the public webhook against abuse.
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true, legacyHeaders: false });
 const webhookLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+// The AI assistant costs money per call — cap it; Census is a courtesy limit.
+const aiLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+const censusLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, ...BUILD }));
 app.use('/api/auth', authLimiter, authRoutes);
@@ -61,6 +66,8 @@ app.use('/api/los', losRoutes);
 app.use('/api/preapproval', preApprovalRoutes);
 app.use('/api/compare', compareRoutes);
 app.use('/api/share', shareRoutes);
+app.use('/api/ai', aiLimiter, aiRoutes);
+app.use('/api/census', censusLimiter, censusRoutes);
 
 // Unknown API routes → JSON 404 (before the static SPA fallback).
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
