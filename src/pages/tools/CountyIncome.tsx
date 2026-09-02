@@ -31,8 +31,8 @@ export default function CountyIncome({ open, onClose }: CalcProps) {
       .then(({ counties: c }) => {
         if (!cancelled) setCounties(c || []);
       })
-      .catch(() => {
-        if (!cancelled) setError('Could not load counties from the Census Bureau. Try again shortly.');
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load counties from the Census Bureau.');
       })
       .finally(() => {
         if (!cancelled) setCountiesLoading(false);
@@ -53,8 +53,8 @@ export default function CountyIncome({ open, onClose }: CalcProps) {
       .then((r) => {
         if (!cancelled) setResult(r);
       })
-      .catch(() => {
-        if (!cancelled) setError('Could not load income data from the Census Bureau. Try again shortly.');
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load income data from the Census Bureau.');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
