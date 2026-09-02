@@ -45,54 +45,76 @@ function GroupLabel({ children }: { children: string }) {
 
 export function Sidebar() {
   const { logout, isAdmin } = useAuth();
-  const { openSettings } = useUI();
+  const { openSettings, navOpen, closeNav } = useUI();
 
   return (
-    <aside className="sticky top-0 flex h-screen w-[236px] flex-shrink-0 flex-col border-r border-border bg-sidebar p-4 pt-[22px]">
-      <div className="px-2 pb-[22px] pt-1.5">
-        <Logo size={34} wordmark={19} />
-      </div>
-
-      <GroupLabel>WORKSPACE</GroupLabel>
-      <nav className="flex flex-col gap-[3px]">
-        {WORKSPACE.map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} className={navClass}>
-            <Icon size={18} />
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-
-      {isAdmin && (
-        <>
-          <GroupLabel>ADMIN</GroupLabel>
-          <nav className="flex flex-col gap-[3px]">
-            {ADMIN.map(({ to, label, icon: Icon }) => (
-              <NavLink key={to} to={to} className={navClass}>
-                <Icon size={18} />
-                {label}
-              </NavLink>
-            ))}
-          </nav>
-        </>
+    <>
+      {/* Scrim behind the drawer on mobile only. */}
+      {navOpen && (
+        <div
+          onClick={closeNav}
+          aria-hidden
+          className="fixed inset-0 z-40 bg-[rgba(4,9,15,0.6)] backdrop-blur-[2px] lg:hidden"
+        />
       )}
 
-      <div className="mt-auto flex flex-col gap-[3px] border-t border-border pt-4">
-        <button
-          onClick={openSettings}
-          className="flex items-center gap-3 rounded-[9px] border-none bg-transparent px-3 py-[10px] text-left text-[14px] font-medium text-text-soft transition-colors hover:bg-[rgba(140,165,195,0.07)]"
-        >
-          <SettingsIcon size={18} />
-          Settings
-        </button>
-        <button
-          onClick={logout}
-          className="flex items-center gap-3 rounded-[9px] border-none bg-transparent px-3 py-[10px] text-left text-[14px] font-medium text-text-soft transition-colors hover:bg-[rgba(248,113,113,0.1)] hover:text-danger"
-        >
-          <LogOut size={18} />
-          Sign out
-        </button>
-      </div>
-    </aside>
+      <aside
+        className={[
+          // On phones the sidebar is an off-canvas drawer; on lg+ it's a sticky column.
+          'fixed inset-y-0 left-0 z-50 flex h-screen w-[236px] flex-shrink-0 flex-col border-r border-border bg-sidebar p-4 pt-[22px]',
+          'transform transition-transform duration-200 ease-out',
+          navOpen ? 'translate-x-0' : '-translate-x-full',
+          'lg:sticky lg:top-0 lg:z-auto lg:translate-x-0',
+        ].join(' ')}
+      >
+        <div className="px-2 pb-[22px] pt-1.5">
+          <Logo size={34} wordmark={19} />
+        </div>
+
+        <GroupLabel>WORKSPACE</GroupLabel>
+        <nav className="flex flex-col gap-[3px]">
+          {WORKSPACE.map(({ to, label, icon: Icon }) => (
+            <NavLink key={to} to={to} onClick={closeNav} className={navClass}>
+              <Icon size={18} />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+
+        {isAdmin && (
+          <>
+            <GroupLabel>ADMIN</GroupLabel>
+            <nav className="flex flex-col gap-[3px]">
+              {ADMIN.map(({ to, label, icon: Icon }) => (
+                <NavLink key={to} to={to} onClick={closeNav} className={navClass}>
+                  <Icon size={18} />
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+          </>
+        )}
+
+        <div className="mt-auto flex flex-col gap-[3px] border-t border-border pt-4">
+          <button
+            onClick={() => {
+              closeNav();
+              openSettings();
+            }}
+            className="flex items-center gap-3 rounded-[9px] border-none bg-transparent px-3 py-[10px] text-left text-[14px] font-medium text-text-soft transition-colors hover:bg-[rgba(140,165,195,0.07)]"
+          >
+            <SettingsIcon size={18} />
+            Settings
+          </button>
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 rounded-[9px] border-none bg-transparent px-3 py-[10px] text-left text-[14px] font-medium text-text-soft transition-colors hover:bg-[rgba(248,113,113,0.1)] hover:text-danger"
+          >
+            <LogOut size={18} />
+            Sign out
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

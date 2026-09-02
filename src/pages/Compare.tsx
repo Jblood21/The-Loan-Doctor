@@ -319,15 +319,15 @@ export default function Compare() {
         </div>
       )}
 
-      {/* Scenario tabs */}
-      <div className="mb-[22px] flex items-center gap-2 border-b border-border">
+      {/* Scenario tabs — scroll horizontally on narrow screens instead of wrapping */}
+      <div className="mb-[22px] flex items-center gap-2 overflow-x-auto border-b border-border">
         {scenarios.map((sc, i) => {
           const isActive = i === active;
           return (
-            <div key={i} className="group relative flex items-center">
+            <div key={i} className="group relative flex flex-shrink-0 items-center">
               <button
                 onClick={() => select(i)}
-                className="-mb-px cursor-pointer border-none bg-transparent px-[18px] py-[11px] text-[14px] font-semibold"
+                className="-mb-px cursor-pointer whitespace-nowrap border-none bg-transparent px-[18px] py-[11px] text-[14px] font-semibold"
                 style={{
                   borderBottom: `2px solid ${isActive ? '#2dd4bf' : 'transparent'}`,
                   color: isActive ? '#fff' : '#8ba0b6',
@@ -505,7 +505,7 @@ export default function Compare() {
             <SectionLabel>RATE BUYDOWN &amp; CREDITS</SectionLabel>
             <Badge tone="neutral">optional</Badge>
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-3.5">
+          <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
             {([
               ['Lender Credit', 'lenderCredit'],
               ['Seller Credit', 'sellerCredit'],
