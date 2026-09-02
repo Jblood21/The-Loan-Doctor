@@ -1,21 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { fmt } from '@/lib/format';
-import { api } from '@/lib/api';
+import { censusCounties, censusIncome, type IncomeResult } from '@/lib/census';
 import { CalcSelect, Headline, ResultPanel, Row, type CalcProps } from './_shared';
 
 // Supported states → 2-digit Census FIPS code.
 const STATES: { value: string; label: string }[] = [
   ['49', 'Utah'], ['16', 'Idaho'], ['48', 'Texas'], ['12', 'Florida'], ['06', 'California'],
 ].map(([value, label]) => ({ value, label }));
-
-interface IncomeResult {
-  name: string;
-  medianIncome: number | null;
-  moe: number | null;
-  year: string;
-  source: string;
-}
 
 export default function CountyIncome({ open, onClose }: CalcProps) {
   const [state, setState] = useState('');
@@ -35,8 +27,7 @@ export default function CountyIncome({ open, onClose }: CalcProps) {
     if (!state) return;
     let cancelled = false;
     setCountiesLoading(true);
-    api
-      .censusCounties(state)
+    censusCounties(state)
       .then(({ counties: c }) => {
         if (!cancelled) setCounties(c || []);
       })
@@ -58,8 +49,7 @@ export default function CountyIncome({ open, onClose }: CalcProps) {
     if (!state || !county) return;
     let cancelled = false;
     setLoading(true);
-    api
-      .censusIncome(state, county)
+    censusIncome(state, county)
       .then((r) => {
         if (!cancelled) setResult(r);
       })
