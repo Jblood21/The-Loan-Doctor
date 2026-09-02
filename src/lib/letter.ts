@@ -169,6 +169,9 @@ export interface LetterOptions {
   showValidity?: boolean;
   expDays?: number;
   showSubjectAddress?: boolean;
+  /** Selected real-estate agent to co-brand with (from the saved contacts). Falls back
+   *  to the legacy single settings.agent fields when not provided. */
+  agent?: LetterAgent | null;
 }
 
 export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, opts: LetterOptions): PreApprovalLetter {
@@ -187,14 +190,18 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
   const exp = new Date(now.getTime() + expDays * 86_400_000);
   const validity = `This pre-approval is valid through ${longDate(exp)} and is subject to property appraisal, title review, and final underwriting verification.`;
 
-  const hasAgent = !!(settings.agentName && settings.agentName.trim());
-  const includeAgent = opts.includeAgent && hasAgent;
-  const agent: LetterAgent | null = includeAgent
-    ? { name: settings.agentName, brokerage: settings.brokerage, phone: settings.agentPhone }
-    : null;
-  const partnerLine = includeAgent
-    ? `Prepared in partnership with ${settings.agentName}${settings.brokerage ? `, ${settings.brokerage}` : ''}.`
-    : '';
+  // The selected agent (from the saved contacts) wins; otherwise fall back to the legacy
+  // single agent fields on settings.
+  const chosenAgent: LetterAgent | null =
+    opts.agent && opts.agent.name && opts.agent.name.trim()
+      ? opts.agent
+      : settings.agentName && settings.agentName.trim()
+        ? { name: settings.agentName, brokerage: settings.brokerage, phone: settings.agentPhone }
+        : null;
+  const includeAgent = opts.includeAgent && !!chosenAgent;
+  const agent: LetterAgent | null = includeAgent ? chosenAgent : null;
+  const partnerLine =
+    includeAgent && agent ? `Prepared in partnership with ${agent.name}${agent.brokerage ? `, ${agent.brokerage}` : ''}.` : '';
 
   return {
     date: (opts.dateText || '').trim() || longDateWeekday(now),

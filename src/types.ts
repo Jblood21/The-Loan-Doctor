@@ -92,18 +92,26 @@ export interface Settings {
   website: string;
   lenderAddress: string;
   lenderPhone: string;
-  // Dual Branding (real-estate agent)
+  // Dual Branding — the agent currently selected for co-branding (legacy single fields,
+  // kept as a fallback; the saved-contacts list below is the primary source).
   agentName: string;
   brokerage: string;
   agentPhone: string;
-  // Title / Settlement
-  titleCompany: string;
-  titleFeesPct: number;
-  titleAgentName: string;
+  /** Saved real-estate-agent contacts, selectable for dual branding on a letter. */
+  agents?: AgentContact[];
   // Default closing-cost fee schedule used to seed new scenarios.
   feeDefaults: ClosingCostItem[];
   // Preferences
   darkMode: boolean;
+}
+
+/** A saved real-estate-agent contact for dual-branding a pre-approval letter. */
+export interface AgentContact {
+  id: string;
+  name: string;
+  brokerage: string;
+  phone: string;
+  email?: string;
 }
 
 export interface User {
