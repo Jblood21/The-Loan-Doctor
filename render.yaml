@@ -61,6 +61,23 @@ services:
       - key: PUBLIC_BASE_URL
         sync: false
 
+      # ---- AI assistant (Compare tab) ------------------------------------
+      # Set your Anthropic API key to turn on the "Ask AI" assistant on the
+      # Compare page. Until it's set, the assistant shows "not turned on yet".
+      # Costs a small amount per question. Optional ANTHROPIC_MODEL picks a
+      # cheaper/faster model, e.g. claude-haiku-4-5 (default is claude-opus-5).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # - key: ANTHROPIC_MODEL
+      #   value: claude-haiku-4-5
+
+      # ---- County median-income tool -------------------------------------
+      # Pulls real data from the U.S. Census Bureau; works with no key. Set a
+      # (free) CENSUS_API_KEY to raise rate limits, or CENSUS_YEAR to pin the
+      # ACS 5-year vintage (default 2023).
+      # - key: CENSUS_API_KEY
+      #   sync: false
+
       # ---- Persistent storage --------------------------------------------
       # Data lives on the mounted disk below, so accounts, webhook tokens, saved
       # scenarios, and received loans survive restarts and redeploys.

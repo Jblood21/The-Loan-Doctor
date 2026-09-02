@@ -14,7 +14,7 @@ import { useSettings } from '@/context/SettingsContext';
 import { useUI } from '@/context/UIContext';
 import { computeScenario, defaultClosingCosts } from '@/lib/finance';
 import { DonutChart, PAYMENT_COLORS } from '@/components/charts/DonutChart';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { fmt, fmt2, pct } from '@/lib/format';
 import type { ClosingCostItem, LoanProgram, LoanType, TransactionType } from '@/types';
 
@@ -73,6 +73,11 @@ export default function Compare() {
 
   const [busy, setBusy] = useState<'pdf' | 'share' | null>(null);
   const [shareMsg, setShareMsg] = useState('');
+  // AI assistant state.
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   // Build the side-by-side comparison from every scenario. Returns both the legacy
   // names/metrics matrix (used by the shareable quote) and a structured payload the
@@ -232,6 +237,41 @@ export default function Compare() {
       setShareMsg('Could not create a share link. Save your scenarios and try again.');
     } finally {
       setBusy(null);
+    }
+  };
+
+  // Compact text summary of every scenario, sent to the AI as context.
+  const buildAiContext = () => {
+    const lines = scenarios.map((s, i) => {
+      const c = computeScenario(s);
+      const isRefi = s.transaction === 'refinance';
+      const dn = Math.round(s.homePrice > 0 ? ((s.downPayment || 0) / s.homePrice) * 100 : s.downPct || 0);
+      const mi = c.mi.applies ? `${c.mi.label} ${fmt2(c.mi.monthly)}` : 'no MI';
+      return (
+        `Scenario "${s.name || `Scenario ${i + 1}`}": ${c.typeLabel} ${isRefi ? 'refinance' : 'purchase'}, ` +
+        `${isRefi ? 'home value' : 'price'} ${fmt(s.homePrice || 0)}, loan ${fmt(c.baseLoan)}, ${dn}% down (${fmt(s.downPayment || 0)}), ` +
+        `rate ${s.rate || 0}%, ${s.term}-yr. Monthly — P&I ${fmt2(c.pi)}, taxes ${fmt2(c.taxes)}, insurance ${fmt2(c.insurance)}` +
+        `${c.hoa > 0 ? `, HOA ${fmt2(c.hoa)}` : ''}, ${mi}, total ${fmt2(c.totalMonthly)}/mo. APR ${pct(c.apr, 3)}. ` +
+        `Cash to close ${fmt(c.cashToClose)}. Total interest over the loan ${fmt(c.totalInterest)}.`
+      );
+    });
+    return `${borrowerName ? `Borrower: ${borrowerName}.\n` : ''}${lines.join('\n')}`;
+  };
+
+  const askAi = async (q?: string) => {
+    const question = (q ?? aiQuestion).trim();
+    if (!question || aiBusy) return;
+    if (q) setAiQuestion(q);
+    setAiBusy(true);
+    setAiError('');
+    setAiAnswer('');
+    try {
+      const { answer } = await api.aiCompare(question, buildAiContext());
+      setAiAnswer(answer);
+    } catch (err) {
+      setAiError(err instanceof ApiError ? err.message : 'The assistant could not answer right now. Please try again.');
+    } finally {
+      setAiBusy(false);
     }
   };
 
@@ -591,6 +631,55 @@ export default function Compare() {
           </Card>
         </div>
       </div>
+
+      {/* AI assistant — sandboxed to the scenarios above */}
+      <Card className="mt-6 p-6">
+        <div className="mb-1 flex items-center gap-2">
+          <SectionLabel>ASK AI ABOUT THESE SCENARIOS</SectionLabel>
+          <Badge tone="teal">Beta</Badge>
+        </div>
+        <div className="mb-3.5 text-[12.5px] text-text-muted">
+          Ask which option is best, or anything about the loans above. The assistant only sees these scenarios — nothing else.
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <TextField
+            placeholder="e.g. Which scenario has the lowest total cost?"
+            value={aiQuestion}
+            onChange={(e) => setAiQuestion(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') askAi();
+            }}
+            aria-label="Ask the AI assistant about these scenarios"
+          />
+          <Button variant="primary" className="!px-6 sm:w-auto" disabled={aiBusy || !aiQuestion.trim()} onClick={() => askAi()}>
+            {aiBusy ? 'Thinking…' : 'Ask'}
+          </Button>
+        </div>
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {['Which option is cheapest overall?', 'Explain the APR differences', 'Which has the lowest cash to close?', 'Pros and cons of each'].map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => askAi(q)}
+              disabled={aiBusy}
+              className="cursor-pointer rounded-full border border-border-seg bg-input px-2.5 py-1 text-[11.5px] text-text-soft transition-colors hover:border-brand-teal hover:text-brand-teal disabled:opacity-50"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+        {aiError && (
+          <div className="mt-3.5 rounded-[10px] border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] px-3.5 py-2.5 text-[13px] text-danger">
+            {aiError}
+          </div>
+        )}
+        {aiAnswer && !aiError && (
+          <div className="mt-3.5 whitespace-pre-wrap rounded-[12px] border border-[rgba(45,212,191,0.22)] bg-[rgba(45,212,191,0.06)] px-4 py-3.5 text-[13.5px] leading-[1.6] text-text-softer">
+            {aiAnswer}
+          </div>
+        )}
+        <div className="mt-3 text-[11px] text-text-dim">AI-generated — estimates only, not financial advice. Verify important figures before quoting a borrower.</div>
+      </Card>
     </div>
   );
 }
