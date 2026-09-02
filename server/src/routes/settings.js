@@ -9,8 +9,8 @@ const router = Router();
 const ALLOWED = new Set([
   'name', 'company', 'phone', 'nmls', 'email', 'officerTitle', 'logoDataUrl', 'signatureDataUrl', 'headshotDataUrl',
   'lenderName', 'lenderNmls', 'website', 'lenderAddress', 'lenderPhone',
-  'agentName', 'brokerage', 'agentPhone',
-  'titleCompany', 'titleFeesPct', 'titleAgentName', 'feeDefaults', 'darkMode',
+  'agentName', 'brokerage', 'agentPhone', 'agents',
+  'feeDefaults', 'darkMode',
 ]);
 
 router.get('/', requireAuth, (req, res) => {

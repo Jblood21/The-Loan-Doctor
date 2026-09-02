@@ -20,9 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   agentName: '',
   brokerage: '',
   agentPhone: '',
-  titleCompany: '',
-  titleFeesPct: 0.5,
-  titleAgentName: '',
+  agents: [],
   feeDefaults: defaultClosingCosts(),
   darkMode: true,
 };

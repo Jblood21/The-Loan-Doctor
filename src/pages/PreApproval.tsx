@@ -119,6 +119,7 @@ export default function PreApproval() {
   const [webhookError, setWebhookError] = useState('');
   const [copied, setCopied] = useState(false);
   const [includeAgent, setIncludeAgent] = useState(true);
+  const [selectedAgentId, setSelectedAgentId] = useState('');
   const [imported, setImported] = useState<MismoResult | null>(null);
   const [importError, setImportError] = useState('');
   const [dragging, setDragging] = useState(false);
@@ -187,7 +188,15 @@ export default function PreApproval() {
     reader.readAsText(file);
   };
   const today = new Date();
-  const hasAgent = !!(settings.agentName && settings.agentName.trim());
+  // Saved agent contacts, and the one selected to co-brand this letter. Defaults to the
+  // first saved agent (or the legacy single agent) so existing behavior is preserved.
+  const agentContacts = settings.agents ?? [];
+  const legacyAgent = settings.agentName?.trim()
+    ? { id: '__legacy__', name: settings.agentName, brokerage: settings.brokerage, phone: settings.agentPhone }
+    : null;
+  const allAgents = agentContacts.length ? agentContacts : legacyAgent ? [legacyAgent] : [];
+  const selectedAgent = allAgents.find((a) => a.id === selectedAgentId) || allAgents[0] || null;
+  const hasAgent = !!selectedAgent;
 
   // Program template + editable body.
   const [templateId, setTemplateId] = useState('auto');
@@ -271,6 +280,7 @@ export default function PreApproval() {
     borrowerName: pa.borrowerName,
     propertyAddress: pa.propertyAddress,
     includeAgent,
+    agent: selectedAgent ? { name: selectedAgent.name, brokerage: selectedAgent.brokerage, phone: selectedAgent.phone } : null,
     now: today,
     templateId,
     pronoun,
@@ -1041,31 +1051,45 @@ export default function PreApproval() {
               label="Show signature"
               hint={signature ? 'Handwritten signature above your name' : 'Add one in the Signature section above'}
             />
-            <div className="flex items-center justify-between rounded-[10px] border border-border-input bg-input px-3.5 py-2.5">
-              <div className="pr-3">
-                <div className="text-[13px] font-semibold text-text-label">Dual branding (real-estate agent)</div>
-                <div className="text-[11.5px] text-text-muted">
-                  {hasAgent ? (
-                    <>Co-brand with {settings.agentName}</>
-                  ) : (
-                    <>
-                      No agent saved.{' '}
-                      <button onClick={openSettings} className="cursor-pointer border-none bg-transparent p-0 text-brand-blue-light underline">
-                        Add one in Settings
-                      </button>
-                    </>
-                  )}
+            <div className="rounded-[10px] border border-border-input bg-input px-3.5 py-2.5">
+              <div className="flex items-center justify-between">
+                <div className="pr-3">
+                  <div className="text-[13px] font-semibold text-text-label">Dual branding (real-estate agent)</div>
+                  <div className="text-[11.5px] text-text-muted">
+                    {hasAgent ? (
+                      <>Co-brand the letter with a saved agent</>
+                    ) : (
+                      <>
+                        No agents saved.{' '}
+                        <button onClick={openSettings} className="cursor-pointer border-none bg-transparent p-0 text-brand-blue-light underline">
+                          Add one in Settings
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
+                <button
+                  role="switch"
+                  aria-checked={includeAgent && hasAgent}
+                  disabled={!hasAgent}
+                  onClick={() => setIncludeAgent((v) => !v)}
+                  className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors disabled:opacity-40 ${includeAgent && hasAgent ? 'bg-brand-blue' : 'bg-border-input'}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${includeAgent && hasAgent ? 'left-[22px]' : 'left-0.5'}`} />
+                </button>
               </div>
-              <button
-                role="switch"
-                aria-checked={includeAgent && hasAgent}
-                disabled={!hasAgent}
-                onClick={() => setIncludeAgent((v) => !v)}
-                className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors disabled:opacity-40 ${includeAgent && hasAgent ? 'bg-brand-blue' : 'bg-border-input'}`}
-              >
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${includeAgent && hasAgent ? 'left-[22px]' : 'left-0.5'}`} />
-              </button>
+              {hasAgent && includeAgent && allAgents.length > 0 && (
+                <div className="mt-2.5">
+                  <Select
+                    value={selectedAgent ? selectedAgent.id : ''}
+                    onChange={(e) => setSelectedAgentId(e.target.value)}
+                    options={allAgents.map((a) => ({
+                      value: a.id,
+                      label: [a.name, a.brokerage].filter(Boolean).join(' · ') || a.name,
+                    }))}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
