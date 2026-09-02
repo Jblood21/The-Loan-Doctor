@@ -21,6 +21,7 @@ const RULE = '#e3e8ee';
 const LABEL = '#5b6b7b';
 const VALUE = '#1f2d3d';
 const MUTED = '#8b98a6';
+const GO = '#0f9d58'; // bright "go" green — highlights rate, payment, and cash-to-close
 
 const PAGE_W = 612;
 const LEFT = 40;
@@ -129,8 +130,8 @@ router.post('/pdf', requireAuth, (req, res) => {
   doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(2).strokeColor(NAVY).stroke();
   y += 12;
 
-  const heading = (text) => {
-    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(12.5).text(text.toUpperCase(), LEFT, y, { width: RIGHT - LEFT, align: 'center' });
+  const heading = (text, color = NAVY) => {
+    doc.fillColor(color).font('Helvetica-Bold').fontSize(12.5).text(text.toUpperCase(), LEFT, y, { width: RIGHT - LEFT, align: 'center' });
     y += 22;
   };
 
@@ -175,7 +176,7 @@ router.post('/pdf', requireAuth, (req, res) => {
   const rows = [
     { label: 'Down Payment', key: 'downPayment' },
     { label: 'Loan Amount', key: 'loanAmount' },
-    { label: 'Interest Rate', key: 'rate', boldLabel: true },
+    { label: 'Interest Rate', key: 'rate', go: true },
     { label: 'APR (Estimated)', key: 'apr', boldLabel: true },
     { label: 'Principal & Interest', key: 'pi' },
     { label: 'Mortgage Insurance', key: 'mi' },
@@ -189,23 +190,28 @@ router.post('/pdf', requireAuth, (req, res) => {
       doc.rect(LEFT, y, RIGHT - LEFT, rowH).fill(STRIPE);
       doc.restore();
     }
-    doc.fillColor(row.boldLabel ? NAVY : '#33414f').font(row.boldLabel ? 'Helvetica-Bold' : 'Helvetica').fontSize(9.5).text(row.label, LEFT + 10, y + 6, { width: labelW - 12, lineBreak: false });
-    columns.forEach((c, i) => centerCol(c[row.key] || '—', i, y + 6, { size: 9.5 }));
+    const emphasize = row.go || row.boldLabel;
+    const labelColor = row.go ? GO : row.boldLabel ? NAVY : '#33414f';
+    doc.fillColor(labelColor).font(emphasize ? 'Helvetica-Bold' : 'Helvetica').fontSize(9.5).text(row.label, LEFT + 10, y + 6, { width: labelW - 12, lineBreak: false });
+    columns.forEach((c, i) =>
+      centerCol(c[row.key] || '—', i, y + 6, { size: 9.5, color: row.go ? GO : VALUE, font: row.go ? 'Helvetica-Bold' : 'Helvetica' }),
+    );
     doc.moveTo(LEFT, y + rowH).lineTo(RIGHT, y + rowH).lineWidth(0.5).strokeColor(RULE).stroke();
     y += rowH;
   });
 
-  // Estimated monthly payment (highlight)
+  // Estimated monthly payment (highlight) — label centered under the "LOAN DETAILS"
+  // column, value + label in "go" green.
   const emH = 28;
   doc.save();
   doc.rect(LEFT, y, RIGHT - LEFT, emH).fill(HILITE);
   doc.restore();
-  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(dense ? 8 : 9).text('ESTIMATED MONTHLY PAYMENT', LEFT + 10, y + 10, { width: labelW - 8, lineBreak: false });
-  columns.forEach((c, i) => centerCol(c.totalMonthly, i, y + 7, { font: 'Helvetica-Bold', size: 13, color: NAVY }));
+  doc.fillColor(GO).font('Helvetica-Bold').fontSize(dense ? 7 : 8).text('ESTIMATED MONTHLY PAYMENT', LEFT, y + 11, { width: labelW, align: 'center', lineBreak: false });
+  columns.forEach((c, i) => centerCol(c.totalMonthly, i, y + 7, { font: 'Helvetica-Bold', size: 13, color: GO }));
   y += emH + 18;
 
   // --- ESTIMATED CASH TO CLOSE ---
-  heading('Estimated Cash to Close');
+  heading('Estimated Cash to Close', GO);
   const cardH = 42;
   const cardGap = 8;
   const cardW = (RIGHT - LEFT - cardGap * (cols - 1)) / cols;
@@ -216,7 +222,7 @@ router.post('/pdf', requireAuth, (req, res) => {
     doc.roundedRect(cx, y, cardW, cardH, 6).lineWidth(1).strokeColor(CARD_BORDER).stroke();
     doc.restore();
     doc.fillColor(LABEL).font('Helvetica-Bold').fontSize(7 * F).text(c.cardLabel, cx + 4, y + 8, { width: cardW - 8, align: 'center', lineBreak: false });
-    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(14 * F).text(c.cashToClose, cx + 4, y + 20, { width: cardW - 8, align: 'center', lineBreak: false });
+    doc.fillColor(GO).font('Helvetica-Bold').fontSize(14 * F).text(c.cashToClose, cx + 4, y + 20, { width: cardW - 8, align: 'center', lineBreak: false });
   });
   y += cardH + 12;
 
