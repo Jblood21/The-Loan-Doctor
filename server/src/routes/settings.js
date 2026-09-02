@@ -7,7 +7,7 @@ const router = Router();
 // Only these keys can be written — anything else in the body is ignored, so the
 // settings blob can't be used to smuggle arbitrary data into the store.
 const ALLOWED = new Set([
-  'name', 'company', 'phone', 'nmls', 'email', 'officerTitle', 'logoDataUrl', 'signatureDataUrl',
+  'name', 'company', 'phone', 'nmls', 'email', 'officerTitle', 'logoDataUrl', 'signatureDataUrl', 'headshotDataUrl',
   'lenderName', 'lenderNmls', 'website', 'lenderAddress', 'lenderPhone',
   'agentName', 'brokerage', 'agentPhone',
   'titleCompany', 'titleFeesPct', 'titleAgentName', 'feeDefaults', 'darkMode',
