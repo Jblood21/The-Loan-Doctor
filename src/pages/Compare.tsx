@@ -146,7 +146,7 @@ export default function Compare() {
         mi: c.mi.applies ? fmt2(c.mi.monthly) : '—',
         taxes: fmt2(c.taxes),
         insurance: fmt2(c.insurance),
-        hoa: fmt2(c.hoa),
+        hoa: c.hoa > 0 ? fmt2(c.hoa) : 'NA',
         totalMonthly: fmt2(c.totalMonthly),
         closing: fmt2(c.closingCosts),
         credits: c.creditsApplied > 0 ? `–${fmt2(c.creditsApplied)}` : fmt2(0),
@@ -161,7 +161,7 @@ export default function Compare() {
       downPayment: sameDown ? `${downPctOf(current)}%` : 'Varies',
       insurance: sameIns ? `${fmt2(r.insurance)} / mo` : 'Varies',
       taxes: sameTax ? `${fmt2(r.taxes)} / mo` : 'Varies',
-      hoa: sameHoa ? (r.hoa > 0 ? `${fmt2(r.hoa)} / mo` : '—') : 'Varies',
+      hoa: sameHoa ? (r.hoa > 0 ? `${fmt2(r.hoa)} / mo` : 'NA') : 'Varies',
     };
     // Header program + rate collapse to a single value only when every scenario shares it.
     const programLabel = sameType
