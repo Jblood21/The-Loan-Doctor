@@ -84,6 +84,8 @@ export interface Settings {
   logoDataUrl?: string;
   /** Saved signature (transparent PNG data URL) auto-filled into pre-approval letters. */
   signatureDataUrl?: string;
+  /** Loan-officer photo (data URL) shown in the pre-approval footer (overrides the default). */
+  headshotDataUrl?: string;
   // Lender Information
   lenderName: string;
   lenderNmls: string;
@@ -109,6 +111,7 @@ export interface User {
   email: string;
   name: string;
   company: string;
+  phone?: string;
   nmls: string;
   role: 'user' | 'admin';
   status?: 'Active' | 'Trial' | 'Inactive';

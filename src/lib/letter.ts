@@ -206,7 +206,7 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
     terms: opts.showTerms ? buildTerms(scenario) : null,
     validity: opts.showValidity ? validity : '',
     closing: (opts.closing || '').trim() || 'Best regards,',
-    officerName: settings.name || 'Alan Blood',
+    officerName: settings.name || 'Your Loan Officer',
     officerTitle: settings.officerTitle || 'Mortgage Specialist',
     partnerLine,
     agent,

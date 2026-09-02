@@ -43,7 +43,9 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json({ limit: '1mb' }));
+// 6mb so branding uploads (logo, signature, officer photo, all sent as data URLs in
+// JSON) fit; endpoints are rate-limited, so this isn't a meaningful DoS widening.
+app.use(express.json({ limit: '6mb' }));
 
 // Throttle auth endpoints against brute-force, and the public webhook against abuse.
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true, legacyHeaders: false });

@@ -6,7 +6,7 @@ import type { Settings } from '@/types';
 import { useAuth } from './AuthContext';
 
 export const DEFAULT_SETTINGS: Settings = {
-  name: 'Alan Blood',
+  name: '',
   company: 'Summit Home Loans',
   phone: '801-855-8535',
   nmls: '103895',
@@ -26,6 +26,20 @@ export const DEFAULT_SETTINGS: Settings = {
   feeDefaults: defaultClosingCosts(),
   darkMode: true,
 };
+
+/** Seed the officer identity from the signed-in account so the letter reflects whoever
+ *  is logged in (not a hardcoded default). Only non-empty account fields override the
+ *  defaults; the user's explicitly-saved settings still win over these. */
+function accountSeed(user: { name?: string; company?: string; phone?: string; nmls?: string; email?: string } | null): Partial<Settings> {
+  if (!user) return {};
+  const seed: Partial<Settings> = {};
+  if (user.name) seed.name = user.name;
+  if (user.company) seed.company = user.company;
+  if (user.phone) seed.phone = user.phone;
+  if (user.nmls) seed.nmls = user.nmls;
+  if (user.email) seed.email = user.email;
+  return seed;
+}
 
 interface SettingsContextValue {
   settings: Settings;
@@ -51,16 +65,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
     if (didLoad.current === user.id) return;
     didLoad.current = user.id;
+    // Seed the officer identity from the account immediately, so the letter shows the
+    // signed-in user even before saved settings load (or if they never customized any).
+    setSettings({ ...DEFAULT_SETTINGS, ...accountSeed(user) });
     let cancelled = false;
     (async () => {
       try {
         const { settings: s } = await api.getSettings();
-        if (!cancelled && s) setSettings({ ...DEFAULT_SETTINGS, ...s });
+        if (!cancelled) setSettings({ ...DEFAULT_SETTINGS, ...accountSeed(user), ...(s || {}) });
       } catch {
         const cached = cacheKey ? localStorage.getItem(cacheKey) : null;
         if (cached && !cancelled) {
           try {
-            setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(cached) });
+            setSettings({ ...DEFAULT_SETTINGS, ...accountSeed(user), ...JSON.parse(cached) });
           } catch {
             /* ignore */
           }
@@ -84,7 +101,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSaving(true);
     try {
       const { settings: saved } = await api.saveSettings(next);
-      if (saved) setSettings({ ...DEFAULT_SETTINGS, ...saved });
+      if (saved) setSettings({ ...DEFAULT_SETTINGS, ...accountSeed(user), ...saved });
     } catch {
       /* offline — local cache already holds the change */
     } finally {
