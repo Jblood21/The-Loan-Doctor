@@ -58,7 +58,7 @@ export function SettingsDrawer() {
   const { user } = useAuth();
 
   const [agentForm, setAgentForm] = useState({ name: '', brokerage: '', phone: '', email: '' });
-  const { canInstall, installed, promptInstall } = useInstallPrompt();
+  const { installed, promptInstall } = useInstallPrompt();
   const [installMsg, setInstallMsg] = useState('');
 
   if (!settingsOpen) return null;
@@ -314,23 +314,24 @@ export function SettingsDrawer() {
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {canInstall ? (
-                  <Button
-                    variant="primary"
-                    size="md"
-                    className="self-start"
-                    onClick={async () => {
-                      const outcome = await promptInstall();
-                      setInstallMsg(outcome === 'dismissed' ? 'Install canceled — you can do it any time from here.' : '');
-                    }}
-                  >
-                    Download / Install Desktop App
-                  </Button>
-                ) : (
-                  <div className="text-[12.5px] text-text-muted">
-                    Your browser doesn’t offer a one-click install — use the quick steps below.
-                  </div>
-                )}
+                {/* Always shown + clickable. Uses the browser's native install prompt when
+                    available, otherwise points to the manual steps just below. */}
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="self-start"
+                  onClick={async () => {
+                    const outcome = await promptInstall();
+                    if (outcome === 'accepted') setInstallMsg('');
+                    else if (outcome === 'dismissed') setInstallMsg('Install canceled — you can do it any time from here.');
+                    else setInstallMsg('Your browser didn’t show a one-click prompt — use the quick steps below to install.');
+                  }}
+                >
+                  Download / Install Desktop App
+                </Button>
+                <div className="text-[11.5px] text-text-dim">
+                  The website keeps working exactly as-is — installing the app is optional.
+                </div>
                 {installMsg && <div className="text-[12px] text-text-muted">{installMsg}</div>}
                 <div className="rounded-[10px] border border-border-input bg-input px-3.5 py-2.5 text-[12px] leading-[1.6] text-text-soft">
                   <div className="mb-1 font-semibold text-text-primary">Install manually</div>
