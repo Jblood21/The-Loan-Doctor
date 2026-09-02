@@ -6,6 +6,7 @@ import { Button } from './ui/Button';
 import { TextField, Label } from './ui/TextField';
 import { ClosingCostsEditor, cloneFees } from './ClosingCostsEditor';
 import { defaultClosingCosts } from '@/lib/finance';
+import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { initials } from '@/lib/format';
 import type { ChangeEvent } from 'react';
 import type { Settings } from '@/types';
@@ -57,6 +58,8 @@ export function SettingsDrawer() {
   const { user } = useAuth();
 
   const [agentForm, setAgentForm] = useState({ name: '', brokerage: '', phone: '', email: '' });
+  const { canInstall, installed, promptInstall } = useInstallPrompt();
+  const [installMsg, setInstallMsg] = useState('');
 
   if (!settingsOpen) return null;
 
@@ -297,6 +300,52 @@ export function SettingsDrawer() {
             <Button variant="primary" size="md" className="mt-[14px]" disabled={saving} onClick={() => save()}>
               {saving ? 'Saving…' : 'Save Default Fees'}
             </Button>
+          </div>
+
+          {/* Desktop app (installable PWA) */}
+          <div className="mb-4">
+            <div className="mb-1 text-[14px] font-bold text-text-primary">Desktop App</div>
+            <div className="mb-[14px] text-[12.5px] text-text-muted">
+              Install LoanDr. as a desktop app — it opens in its own window with a taskbar/dock icon, no browser tabs.
+            </div>
+            {installed ? (
+              <div className="rounded-[10px] border border-[rgba(52,211,153,0.28)] bg-[rgba(52,211,153,0.1)] px-3.5 py-2.5 text-[13px] font-semibold text-good">
+                ✓ You’re using the installed desktop app.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {canInstall ? (
+                  <Button
+                    variant="primary"
+                    size="md"
+                    className="self-start"
+                    onClick={async () => {
+                      const outcome = await promptInstall();
+                      setInstallMsg(outcome === 'dismissed' ? 'Install canceled — you can do it any time from here.' : '');
+                    }}
+                  >
+                    Download / Install Desktop App
+                  </Button>
+                ) : (
+                  <div className="text-[12.5px] text-text-muted">
+                    Your browser doesn’t offer a one-click install — use the quick steps below.
+                  </div>
+                )}
+                {installMsg && <div className="text-[12px] text-text-muted">{installMsg}</div>}
+                <div className="rounded-[10px] border border-border-input bg-input px-3.5 py-2.5 text-[12px] leading-[1.6] text-text-soft">
+                  <div className="mb-1 font-semibold text-text-primary">Install manually</div>
+                  <div>
+                    <strong>Chrome / Edge:</strong> click the install icon (a monitor with a ↓) at the right of the address bar, or the ⋮ menu → “Install LoanDr…”.
+                  </div>
+                  <div className="mt-1">
+                    <strong>Safari (Mac):</strong> File → “Add to Dock”.
+                  </div>
+                  <div className="mt-1">
+                    <strong>iPhone / iPad:</strong> Share → “Add to Home Screen”.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
