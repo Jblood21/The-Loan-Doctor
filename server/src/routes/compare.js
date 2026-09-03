@@ -248,7 +248,26 @@ export function addFooters(doc, lender) {
     doc.fillColor(NAVY_DK).font('Helvetica-Bold').fontSize(8).text(officer, LEFT, FOOT_Y + 8, { width: RIGHT - LEFT - 210, lineBreak: false });
     doc.fillColor(NAVY_DK).font('Helvetica-Bold').fontSize(8).text(right, RIGHT - 260, FOOT_Y + 8, { width: 200, align: 'right', lineBreak: false });
     if (range.count > 1) doc.fillColor(MUTED).font('Helvetica').fontSize(7.5).text(`Page ${i + 1} of ${range.count}`, RIGHT - 60, FOOT_Y + 8, { width: 60, align: 'right', lineBreak: false });
+    // Equal Housing Opportunity mark, bottom-left.
+    drawEho(doc, LEFT, FOOT_Y + 19);
+    doc.fillColor(MUTED).font('Helvetica').fontSize(6).text('EQUAL HOUSING OPPORTUNITY', LEFT + 19, FOOT_Y + 24, { lineBreak: false });
   }
+}
+
+/** Draw the Equal Housing Opportunity mark (a house with an "=" sign) as vectors. */
+function drawEho(doc, x, top) {
+  const s = 14;
+  doc.save();
+  doc.fillColor(NAVY_DK);
+  // roof
+  doc.moveTo(x + s / 2, top).lineTo(x, top + s * 0.5).lineTo(x + s, top + s * 0.5).fill();
+  // walls
+  doc.rect(x + s * 0.16, top + s * 0.5, s * 0.68, s * 0.5).fill();
+  // equal sign (white knockout)
+  doc.fillColor('#ffffff');
+  doc.rect(x + s * 0.34, top + s * 0.6, s * 0.32, s * 0.1).fill();
+  doc.rect(x + s * 0.34, top + s * 0.78, s * 0.32, s * 0.1).fill();
+  doc.restore();
 }
 
 function coerceModel(body) {
