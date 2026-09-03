@@ -51,7 +51,29 @@ export default function Affordability({ open, onClose }: CalcProps) {
           <CalcField label="Insurance /yr" suffix="%" value={insRate} onChange={set(setInsRate)} />
           <CalcField label="HOA (monthly)" prefix="$" value={hoa} onChange={set(setHoa)} />
         </div>
-        <ResultPanel>
+        <ResultPanel
+          report={{
+            key: 'afford',
+            title: 'Affordability',
+            subtitle: `At ${dti}% DTI · ${rate}% · ${term} yr`,
+            headline: { label: 'Max Home Price', value: fmt(maxPrice), sub: `At ${dti}% DTI · ${rate}% · ${term} yr` },
+            inputs: [
+              { label: 'Annual Income', value: fmt(income) },
+              { label: 'Monthly Debts', value: fmt(debts) },
+              { label: 'Down Payment', value: fmt(down) },
+              { label: 'Interest Rate', value: `${rate}%` },
+              { label: 'Loan Term', value: `${term} yr` },
+              { label: 'Max DTI', value: `${dti}%` },
+            ],
+            rows: [
+              { label: 'Max Loan Amount', value: fmt(maxLoan) },
+              { label: 'Principal & Interest', value: fmt(pi) },
+              { label: 'Taxes + Insurance', value: fmt(escrow) },
+              { label: 'HOA', value: fmt(hoa) },
+              { label: 'Total Housing Payment', value: fmt(totalPayment) },
+            ],
+          }}
+        >
           <Headline label="Max Home Price" value={fmt(maxPrice)} sub={`At ${dti}% DTI · ${rate}% · ${term} yr`} />
           <Row label="Max Loan Amount" value={fmt(maxLoan)} color="text-text-primary" />
           <Row label="Principal & Interest" value={fmt(pi)} />

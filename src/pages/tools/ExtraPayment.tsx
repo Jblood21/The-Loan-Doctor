@@ -29,7 +29,30 @@ export default function ExtraPayment({ open, onClose }: CalcProps) {
           <CalcSelect label="Loan Term" value={term} onChange={setTerm} options={TERM_OPTIONS} />
           <CalcField label="Extra Monthly Principal" prefix="$" value={extra} onChange={set(setExtra)} />
         </div>
-        <ResultPanel>
+        <ResultPanel
+          report={{
+            key: 'extra',
+            title: 'Extra Payment',
+            headline: {
+              label: 'Interest Saved',
+              value: fmt(Math.max(0, baseInterest - extraInterest)),
+              sub: `Pay off ${Math.floor(monthsSaved / 12)} yr ${monthsSaved % 12} mo sooner`,
+            },
+            inputs: [
+              { label: 'Loan Amount', value: fmt(loan) },
+              { label: 'Interest Rate', value: `${rate}%` },
+              { label: 'Loan Term', value: `${years} yr` },
+              { label: 'Extra Monthly Principal', value: fmt(extra) },
+            ],
+            rows: [
+              { label: 'Base Monthly P&I', value: fmt2(pi) },
+              { label: 'With Extra Payment', value: fmt2(pi + extra) },
+              { label: 'New Payoff', value: `${Math.floor(withExtra.length / 12)} yr ${withExtra.length % 12} mo` },
+              { label: 'Total Interest (base)', value: fmt(baseInterest) },
+              { label: 'Total Interest (with extra)', value: fmt(extraInterest) },
+            ],
+          }}
+        >
           <Headline
             label="Interest Saved"
             value={fmt(Math.max(0, baseInterest - extraInterest))}

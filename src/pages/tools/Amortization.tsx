@@ -43,7 +43,24 @@ export default function Amortization({ open, onClose }: CalcProps) {
             <CalcSelect label="Loan Term" value={term} onChange={setTerm} options={TERM_OPTIONS} />
           </div>
           <div className="mt-5">
-            <ResultPanel>
+            <ResultPanel
+              report={{
+                key: 'amort',
+                title: 'Amortization',
+                subtitle: `${rate}% · ${years} yr`,
+                headline: { label: 'Monthly Principal & Interest', value: fmt2(pi), sub: `${rate}% · ${years} yr` },
+                inputs: [
+                  { label: 'Loan Amount', value: fmt(loan) },
+                  { label: 'Interest Rate', value: `${rate}%` },
+                  { label: 'Loan Term', value: `${years} yr` },
+                ],
+                rows: [
+                  { label: 'Total Interest', value: fmt(totalInterest) },
+                  { label: 'Total Paid', value: fmt(totalPaid) },
+                  { label: 'Payoff', value: `${Math.floor(schedule.length / 12)} yr ${schedule.length % 12} mo` },
+                ],
+              }}
+            >
               <Headline label="Monthly Principal & Interest" value={fmt2(pi)} sub={`${rate}% · ${years} yr`} />
               <Row label="Total Interest" value={fmt(totalInterest)} color="text-warn-text" />
               <Row label="Total Paid" value={fmt(totalPaid)} />

@@ -69,7 +69,34 @@ export default function VaEntitlement({ open, onClose }: CalcProps) {
           />
         </div>
 
-        <ResultPanel>
+        <ResultPanel
+          report={{
+            key: 'va',
+            title: 'VA Bonus Entitlement',
+            headline: {
+              label: 'Down Payment Required',
+              value: fmt(res.requiredDownPayment),
+              sub: full
+                ? 'Full entitlement — no county limit, no money down.'
+                : res.zeroDownEligible
+                  ? 'Eligible for $0 down at this price.'
+                  : `Price exceeds the $0-down max of ${fmt(res.maxZeroDownLoan)}.`,
+            },
+            inputs: [
+              { label: 'Purchase Price', value: fmt(price) },
+              { label: 'County Loan Limit', value: fmt(countyLimit) },
+              { label: 'Entitlement Status', value: full ? 'Full / restored' : 'Partial' },
+              { label: 'Down Payment', value: fmt(down) },
+            ],
+            rows: [
+              { label: 'Max guaranty (25% of county limit)', value: fmt(res.maxGuaranty) },
+              { label: 'Available entitlement', value: fmt(res.availableEntitlement) },
+              { label: 'Max loan with $0 down', value: full ? 'No limit' : fmt(res.maxZeroDownLoan) },
+              { label: 'VA funding fee', value: `${pct(res.fundingFeePct, 2)} · ${fmt(res.fundingFee)}` },
+              { label: 'Loan amount', value: fmt(Math.max(0, price - down)) },
+            ],
+          }}
+        >
           <Headline
             label="Down Payment Required"
             value={fmt(res.requiredDownPayment)}
