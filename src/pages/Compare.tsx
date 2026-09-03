@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionLabel, Divider } from '@/components/ui/Card';
@@ -13,6 +13,8 @@ import { useScenarios, MAX_SCENARIOS } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useUI } from '@/context/UIContext';
 import { computeScenario, defaultClosingCosts } from '@/lib/finance';
+import { buildComparisonModel } from '@/lib/comparisonModel';
+import { RATES_AS_OF } from '@/lib/loanProgramRules';
 import { DonutChart, PAYMENT_COLORS } from '@/components/charts/DonutChart';
 import { api, ApiError } from '@/lib/api';
 import { fmt, fmt2, pct } from '@/lib/format';
@@ -60,6 +62,13 @@ export default function Compare() {
   const { openSettings } = useUI();
   const [savedDefault, setSavedDefault] = useState(false);
   const [borrowerName, setBorrowerName] = useState('');
+  // Property address has three states: a real address, "TBD", or omitted entirely.
+  const [addressMode, setAddressMode] = useState<'available' | 'tbd' | 'none'>('none');
+  const [propertyAddress, setPropertyAddress] = useState('');
+  const resolvedAddress = addressMode === 'available' ? propertyAddress.trim() : addressMode === 'tbd' ? 'TBD' : '';
+
+  // Dynamic comparison model: which rows/notes are relevant to the actual scenarios.
+  const comparisonModel = useMemo(() => buildComparisonModel(scenarios), [scenarios]);
 
   const r = computeScenario(current);
   const priceLabel = current.transaction === 'refinance' ? 'Home Value' : 'Purchase Price';
@@ -204,6 +213,11 @@ export default function Compare() {
       assumptions,
       columns,
       insights: { paymentDiff, keyTakeaway },
+      // Property & Borrower info + the dynamic comparison model (rows/notes chosen
+      // by the actual scenarios). Additive — the current PDF ignores these; the
+      // dynamic renderer (a later phase) consumes them.
+      propertyAddress: resolvedAddress,
+      model: comparisonModel,
     };
   };
 
@@ -361,7 +375,7 @@ export default function Compare() {
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.35fr_1fr]">
         {/* LEFT — form */}
         <Card className="p-6">
-          {/* Borrower — prints as "Prepared for …" on the comparison PDF */}
+          {/* Property & Borrower Information — prints on the comparison PDF */}
           <div className="mb-[22px]">
             <Label>Prepared For (Borrower)</Label>
             <TextField
@@ -369,6 +383,31 @@ export default function Compare() {
               value={borrowerName}
               onChange={(e) => setBorrowerName(e.target.value)}
             />
+            <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+              <span className="text-[13px] font-medium text-text-muted">Property Address</span>
+              <SegmentedControl
+                size="sm"
+                options={[
+                  { value: 'available', label: 'Address' },
+                  { value: 'tbd', label: 'TBD' },
+                  { value: 'none', label: 'None' },
+                ]}
+                value={addressMode}
+                onChange={(v) => setAddressMode(v as 'available' | 'tbd' | 'none')}
+              />
+            </div>
+            {addressMode === 'available' && (
+              <div className="mt-2.5">
+                <TextField
+                  placeholder="123 Main St, City, ST 00000"
+                  value={propertyAddress}
+                  onChange={(e) => setPropertyAddress(e.target.value)}
+                />
+              </div>
+            )}
+            {addressMode === 'tbd' && (
+              <div className="mt-2 text-[11.5px] text-text-dim">The report will show “TBD” for the property address.</div>
+            )}
           </div>
 
           {/* transaction + borrowers */}
@@ -668,6 +707,35 @@ export default function Compare() {
           </Card>
         </div>
       </div>
+
+      {/* Dynamic program notes — generated from the loan programs actually compared */}
+      {comparisonModel.notes.length > 0 && (
+        <Card className="mt-6 p-6">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <SectionLabel>COMPARISON NOTES</SectionLabel>
+            <span className="text-[12px] text-text-dim">
+              {comparisonModel.programLabels.join(' · ')}
+            </span>
+          </div>
+          <div className="mb-3.5 text-[12.5px] text-text-muted">
+            These notes appear automatically based on the programs you’re comparing — they’ll print on the report.
+          </div>
+          <ul className="flex flex-col gap-2">
+            {comparisonModel.notes.map((note, i) => (
+              <li key={i} className="flex gap-2 text-[13px] leading-[1.55] text-text-soft">
+                <span className="mt-[2px] text-brand-teal">•</span>
+                <span>{note}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3.5">
+            <StubNote>
+              Estimates only — not a Loan Estimate or commitment to lend. Program figures ({RATES_AS_OF}) can change;
+              confirm exact factors and fees before quoting a borrower.
+            </StubNote>
+          </div>
+        </Card>
+      )}
 
       {/* AI assistant — sandboxed to the scenarios above */}
       <Card className="mt-6 p-6">
