@@ -19,6 +19,10 @@ export interface ComparisonColumn {
   name: string;
   loanType: LoanType;
   typeLabel: string;
+  /** Representative credit score for the scenario, e.g. "700". */
+  credit: string;
+  /** Down-payment percent (rounded), for the column subheader. */
+  downPct: number;
   /** Formatted cell values keyed by row key. */
   cells: Record<string, string>;
 }
@@ -102,15 +106,15 @@ export function buildComparisonModel(scenarios: Scenario[]): ComparisonModel {
     { key: 'pi', label: 'Principal & Interest' },
   ];
   if (anyFha) {
-    rows.push({ key: 'fhaUfmip', label: 'FHA Upfront MIP (financed)' });
+    rows.push({ key: 'fhaUfmip', label: 'FHA Upfront MIP' });
     rows.push({ key: 'fhaMip', label: 'FHA Monthly MIP' });
   }
-  if (anyVa) rows.push({ key: 'vaFundingFee', label: 'VA Funding Fee (financed)' });
+  if (anyVa) rows.push({ key: 'vaFundingFee', label: 'VA Funding Fee' });
   if (anyUsda) {
-    rows.push({ key: 'usdaUpfront', label: 'USDA Guarantee Fee (financed)' });
+    rows.push({ key: 'usdaUpfront', label: 'USDA Upfront Fee' });
     rows.push({ key: 'usdaAnnual', label: 'USDA Monthly Fee' });
   }
-  if (anyConvPmi) rows.push({ key: 'pmi', label: 'Monthly Mortgage Insurance (PMI)' });
+  if (anyConvPmi) rows.push({ key: 'pmi', label: 'Mortgage Insurance (PMI)' });
   rows.push({ key: 'taxes', label: 'Property Taxes' });
   rows.push({ key: 'insurance', label: 'Homeowners Insurance' });
   if (anyHoa) rows.push({ key: 'hoa', label: 'HOA Dues' });
@@ -120,7 +124,8 @@ export function buildComparisonModel(scenarios: Scenario[]): ComparisonModel {
   const columns: ComparisonColumn[] = results.map(({ s, c }) => {
     const cells: Record<string, string> = {};
     for (const row of rows) cells[row.key] = cellValue(row.key, s, c);
-    return { name: s.name, loanType: s.loanType, typeLabel: c.typeLabel, cells };
+    const downPct = Math.round(s.homePrice > 0 ? ((s.downPayment || 0) / s.homePrice) * 100 : s.downPct || 0);
+    return { name: s.name, loanType: s.loanType, typeLabel: c.typeLabel, credit: String(s.credit || ''), downPct, cells };
   });
 
   // Program notes — only for the programs actually present.
