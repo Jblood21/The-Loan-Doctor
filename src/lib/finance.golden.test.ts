@@ -149,6 +149,56 @@ describe('computeScenario — golden output per program', () => {
     `);
   });
 
+  it('VA, 0% down, EXEMPT (no funding fee, financed loan = base)', () => {
+    const s: Scenario = { ...base, loanType: 'va', credit: '700', homePrice: 300000, downPayment: 0, downPct: 0, vaFundingFeeExempt: true };
+    expect(summarize(s)).toMatchInlineSnapshot(`
+      {
+        "aprPct": 6.587,
+        "baseLoan": 300000,
+        "cashToClose": 9000,
+        "closingCosts": 9000,
+        "financedLoan": 300000,
+        "hoa": 0,
+        "insurance": 87.5,
+        "ltvPct": 100,
+        "miAnnualPct": 0,
+        "miApplies": false,
+        "miLabel": "VA Funding Fee (exempt)",
+        "miMonthly": 0,
+        "principalAndInterest": 1896.2,
+        "taxes": 312.5,
+        "totalMonthly": 2296.2,
+        "typeLabel": "VA",
+        "upfrontFinanced": 0,
+      }
+    `);
+  });
+
+  it('VA, 0% down, SUBSEQUENT use (3.3% funding fee)', () => {
+    const s: Scenario = { ...base, loanType: 'va', credit: '700', homePrice: 300000, downPayment: 0, downPct: 0, vaSubsequentUse: true };
+    expect(summarize(s)).toMatchInlineSnapshot(`
+      {
+        "aprPct": 6.904,
+        "baseLoan": 300000,
+        "cashToClose": 9000,
+        "closingCosts": 9000,
+        "financedLoan": 309900,
+        "hoa": 0,
+        "insurance": 87.5,
+        "ltvPct": 100,
+        "miAnnualPct": 0,
+        "miApplies": false,
+        "miLabel": "VA Funding Fee (financed)",
+        "miMonthly": 0,
+        "principalAndInterest": 1958.78,
+        "taxes": 312.5,
+        "totalMonthly": 2358.78,
+        "typeLabel": "VA",
+        "upfrontFinanced": 9900,
+      }
+    `);
+  });
+
   it('USDA, 0% down, 700 FICO (upfront + annual guarantee fee)', () => {
     const s: Scenario = { ...base, loanType: 'usda', credit: '700', homePrice: 250000, downPayment: 0, downPct: 0 };
     expect(summarize(s)).toMatchInlineSnapshot(`

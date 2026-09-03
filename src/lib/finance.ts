@@ -146,6 +146,13 @@ export interface MortgageInsurance {
  * Mortgage insurance / guarantee fees by program.
  * baseLoan = homePrice - downPayment (the financed principal before upfront fees).
  */
+export interface VaOptions {
+  /** Subsequent use of the VA benefit (affects the <5%-down funding fee). */
+  subsequentUse?: boolean;
+  /** Funding fee waived (exempt borrower — e.g. VA disability compensation). */
+  exempt?: boolean;
+}
+
 export function mortgageInsurance(
   loanType: LoanType,
   baseLoan: number,
@@ -153,6 +160,7 @@ export function mortgageInsurance(
   downPct: number,
   creditScore: number,
   termYears: number,
+  vaOpts: VaOptions = {},
 ): MortgageInsurance {
   const ltv = ltvPct(baseLoan, homeValue);
   if (loanType === 'fha') {
@@ -179,7 +187,11 @@ export function mortgageInsurance(
     };
   }
   if (loanType === 'va') {
-    const feePct = vaFundingFeePct(downPct);
+    // Exempt borrowers (e.g. VA disability compensation) pay no funding fee.
+    if (vaOpts.exempt) {
+      return { monthly: 0, upfrontFinanced: 0, annualPct: 0, label: 'VA Funding Fee (exempt)', applies: false };
+    }
+    const feePct = vaFundingFeePct(downPct, vaOpts.subsequentUse);
     return {
       monthly: 0, // VA has no monthly MI
       upfrontFinanced: baseLoan * (feePct / 100),
@@ -342,7 +354,10 @@ export function computeScenario(s: Scenario): ScenarioResult {
   // Derive the down-payment % from the dollars that actually built baseLoan, so the VA
   // funding-fee tier can't disagree with a separately-stored downPct field.
   const downPct = homeValue > 0 ? ((s.downPayment || 0) / homeValue) * 100 : s.downPct || 0;
-  const mi = mortgageInsurance(s.loanType, baseLoan, homeValue, downPct, creditScore, termYears);
+  const mi = mortgageInsurance(s.loanType, baseLoan, homeValue, downPct, creditScore, termYears, {
+    subsequentUse: !!s.vaSubsequentUse,
+    exempt: !!s.vaFundingFeeExempt,
+  });
   const financedLoan = baseLoan + mi.upfrontFinanced;
 
   const pi = monthlyPayment(financedLoan, s.rate || 0, termYears);

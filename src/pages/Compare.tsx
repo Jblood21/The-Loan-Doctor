@@ -403,12 +403,49 @@ export default function Compare() {
             onChange={(v) => patch({ loanType: v })}
           />
           <PillGroup
-            className="mb-6"
+            className={current.loanType === 'va' ? 'mb-3' : 'mb-6'}
             variant="blue"
             options={PROGRAMS}
             value={current.program}
             onChange={(v) => patch({ program: v })}
           />
+
+          {current.loanType === 'va' && (
+            <div className="mb-6 rounded-[12px] border border-[rgba(129,140,248,0.28)] bg-[rgba(129,140,248,0.06)] p-4">
+              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.5px] text-[#818cf8]">VA Options</div>
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[13px] font-medium text-text-muted">Funding Fee</span>
+                  <SegmentedControl
+                    size="sm"
+                    options={[
+                      { value: 'no', label: 'Standard' },
+                      { value: 'yes', label: 'Exempt' },
+                    ]}
+                    value={current.vaFundingFeeExempt ? 'yes' : 'no'}
+                    onChange={(v) => patch({ vaFundingFeeExempt: v === 'yes' })}
+                  />
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[13px] font-medium text-text-muted">VA Use</span>
+                  <SegmentedControl
+                    size="sm"
+                    options={[
+                      { value: 'first', label: 'First' },
+                      { value: 'subsequent', label: 'Subsequent' },
+                    ]}
+                    value={current.vaSubsequentUse ? 'subsequent' : 'first'}
+                    onChange={(v) => patch({ vaSubsequentUse: v === 'subsequent' })}
+                  />
+                </div>
+              </div>
+              <div className="mt-3 text-[11.5px] leading-[1.5] text-text-dim">
+                {current.vaFundingFeeExempt
+                  ? 'Funding fee waived — exempt borrowers (e.g. VA disability compensation) pay no funding fee.'
+                  : 'Funding fee applies. Exempt for veterans with VA disability compensation, Purple Heart recipients on active duty, and qualifying surviving spouses.'}
+              </div>
+            </div>
+          )}
 
           <Divider className="mb-[22px]" />
           <SectionLabel className="mb-4">LOAN DETAILS</SectionLabel>
