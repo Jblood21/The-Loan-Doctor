@@ -103,42 +103,22 @@ export function renderComparisonPdf(doc, d) {
     }
   };
 
-  // ---- Loan Assumptions strip ----
-  const aItems = [
-    ['PURCHASE OPTIONS', str(assumptions.purchaseOptions, '—')],
-    ['DOWN PAYMENT', str(assumptions.downPayment, '—')],
-    ['HOMEOWNERS INS.', str(assumptions.insurance, '—')],
-    ['PROPERTY TAXES', str(assumptions.taxes, '—')],
-    ['HOA', str(assumptions.hoa, '—')],
-  ];
-  ensureFlow(22 + 40 + 16);
-  heading('Loan Assumptions');
-  const stripH = 40;
-  doc.save();
-  doc.roundedRect(LEFT, y, RIGHT - LEFT, stripH, 6).fill(STRIP);
-  doc.restore();
-  const aW = (RIGHT - LEFT) / aItems.length;
-  aItems.forEach(([k, v], i) => {
-    const ax = LEFT + i * aW;
-    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(7.5).text(k, ax + 4, y + 9, { width: aW - 8, align: 'center', lineBreak: false });
-    doc.fillColor(VALUE).font('Helvetica').fontSize(9).text(v, ax + 4, y + 22, { width: aW - 8, align: 'center', lineBreak: false });
-    if (i > 0) doc.moveTo(ax, y + 8).lineTo(ax, y + stripH - 8).lineWidth(0.5).strokeColor('#dbe2ea').stroke();
-  });
-  y += stripH + 12;
-
   // ---- Monthly Payment Comparison (dynamic rows) ----
   ensureFlow(22 + 30);
   heading('Monthly Payment Comparison');
   const headH = 30;
+  let activeHeaderLabel = 'LOAN DETAILS';
   function drawTableHeader() {
     doc.save();
     doc.roundedRect(LEFT, y, RIGHT - LEFT, headH, 4).fill(NAVY);
     doc.restore();
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9.5).text('LOAN DETAILS', LEFT + 10, y + 11, { width: labelW - 12, lineBreak: false });
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9.5).text(activeHeaderLabel, LEFT + 10, y + 11, { width: labelW - 12, lineBreak: false });
     columns.forEach((c, i) => {
       const lc = legacy.columns[i] || {};
       doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(11 * F).text(str(lc.head1) || c.typeLabel, colX(i) + 2, y + 5, { width: colW - 4, align: 'center', lineBreak: false });
-      doc.fillColor('#c7d4e6').font('Helvetica-Bold').fontSize(7 * F).text(str(lc.head2) || `${c.downPct}% DOWN`, colX(i) + 2, y + 19, { width: colW - 4, align: 'center', lineBreak: false });
+      // Show the borrower's credit alongside the down-payment in the column subheader.
+      const sub = `${str(lc.head2) || `${c.downPct}% DOWN`}${c.credit ? ` · FICO ${c.credit}` : ''}`;
+      doc.fillColor('#c7d4e6').font('Helvetica-Bold').fontSize(7 * F).text(sub, colX(i) + 2, y + 19, { width: colW - 4, align: 'center', lineBreak: false });
     });
     y += headH;
   }
@@ -179,31 +159,17 @@ export function renderComparisonPdf(doc, d) {
   doc.restore();
   doc.fillColor(GO).font('Helvetica-Bold').fontSize(dense ? 7 : 8).text('ESTIMATED MONTHLY PAYMENT', LEFT, y + 11, { width: labelW, align: 'center', lineBreak: false });
   columns.forEach((c, i) => centerCol(c.cells.totalMonthly, i, y + 7, { font: 'Helvetica-Bold', size: 13, color: GO }));
-  y += emH + 12;
+  y += emH + 14;
 
-  // ---- Estimated Cash to Close ----
-  ensureFlow(22 + 42 + 12);
-  heading('Estimated Cash to Close', GO);
-  const cardH = 42;
-  const cardGap = 8;
-  const cardW = (RIGHT - LEFT - cardGap * (cols - 1)) / cols;
-  columns.forEach((c, i) => {
-    const lc = legacy.columns[i] || {};
-    const cx = LEFT + i * (cardW + cardGap);
-    doc.save();
-    doc.roundedRect(cx, y, cardW, cardH, 6).fill(CARD_BG);
-    doc.roundedRect(cx, y, cardW, cardH, 6).lineWidth(1).strokeColor(CARD_BORDER).stroke();
-    doc.restore();
-    doc.fillColor(LABEL).font('Helvetica-Bold').fontSize(7 * F).text(str(lc.cardLabel) || c.typeLabel, cx + 4, y + 8, { width: cardW - 8, align: 'center', lineBreak: false });
-    doc.fillColor(GO).font('Helvetica-Bold').fontSize(14 * F).text(c.cells.cashToClose, cx + 4, y + 20, { width: cardW - 8, align: 'center', lineBreak: false });
-  });
-  y += cardH + 10;
-
-  // Cash-to-close breakdown
+  // ---- Closing Costs (same table format as the monthly comparison) ----
+  ensureFlow(22 + headH + rowH);
+  heading('Closing Costs & Cash to Close');
+  activeHeaderLabel = 'CLOSING COSTS';
+  drawTableHeader();
   const cRows = [
+    { label: 'Down Payment', get: (i) => columns[i].cells.downPayment },
     { label: 'Base Closing Costs (Est.)', get: (i) => str((legacy.columns[i] || {}).closing, '—') },
-    { label: 'Credits Applied', get: (i) => str((legacy.columns[i] || {}).credits, '$0') },
-    { label: 'Net Closing Costs', get: (i) => str((legacy.columns[i] || {}).netClosing, '—'), bold: true },
+    { label: 'Credits Applied', get: (i) => str((legacy.columns[i] || {}).credits, '$0'), green: true },
   ];
   let z2 = 0;
   cRows.forEach((row) => {
@@ -214,38 +180,22 @@ export function renderComparisonPdf(doc, d) {
       doc.restore();
     }
     z2 += 1;
-    doc.fillColor(row.bold ? NAVY : '#33414f').font(row.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9.5).text(row.label, LEFT + 10, y + 6, { width: labelW - 12, lineBreak: false });
-    columns.forEach((c, i) => centerCol(row.get(i), i, y + 6, { size: 9.5, font: row.bold ? 'Helvetica-Bold' : 'Helvetica', color: row.bold ? NAVY : VALUE }));
+    const lblColor = row.green ? GO : '#33414f';
+    doc.fillColor(lblColor).font(row.green ? 'Helvetica-Bold' : 'Helvetica').fontSize(9.5).text(row.label, LEFT + 10, y + 6, { width: labelW - 12, lineBreak: false });
+    columns.forEach((c, i) => centerCol(row.get(i), i, y + 6, { size: 9.5, color: row.green ? GO : VALUE, font: row.green ? 'Helvetica-Bold' : 'Helvetica' }));
     doc.moveTo(LEFT, y + rowH).lineTo(RIGHT, y + rowH).lineWidth(0.5).strokeColor(RULE).stroke();
     y += rowH;
   });
-  y += 12;
 
-  // ---- Payment Difference + Key Takeaway ----
-  const diffs = arr(insights.paymentDiff).slice(0, 4).map((s) => str(s));
-  const takeaway = str(insights.keyTakeaway);
-  if (diffs.length || takeaway) {
-    const halfW = (RIGHT - LEFT - 16) / 2;
-    const boxH2 = 50;
-    ensureFlow(boxH2 + 12);
-    const boxTop = y;
-    if (diffs.length) {
-      doc.save();
-      doc.roundedRect(LEFT, boxTop, halfW, boxH2, 6).fill(STRIP);
-      doc.restore();
-      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(8.5).text('PAYMENT DIFFERENCE', LEFT + 12, boxTop + 9, { lineBreak: false });
-      doc.fillColor('#44515f').font('Helvetica').fontSize(8.5).text(diffs.join('\n'), LEFT + 12, boxTop + 22, { width: halfW - 24, lineGap: 1.5 });
-    }
-    if (takeaway) {
-      const rx = LEFT + halfW + 16;
-      doc.save();
-      doc.roundedRect(rx, boxTop, halfW, boxH2, 6).fill(STRIP);
-      doc.restore();
-      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(8.5).text('KEY TAKEAWAY', rx + 12, boxTop + 9, { lineBreak: false });
-      doc.fillColor('#44515f').font('Helvetica').fontSize(8.5).text(takeaway, rx + 12, boxTop + 22, { width: halfW - 24, lineGap: 1.5 });
-    }
-    y = boxTop + boxH2 + 12;
-  }
+  // Estimated cash to close (green highlight) — sits UNDERNEATH the closing costs.
+  const ecH = 28;
+  ensureTable(ecH);
+  doc.save();
+  doc.rect(LEFT, y, RIGHT - LEFT, ecH).fill(HILITE);
+  doc.restore();
+  doc.fillColor(GO).font('Helvetica-Bold').fontSize(dense ? 7 : 8).text('ESTIMATED CASH TO CLOSE', LEFT, y + 11, { width: labelW, align: 'center', lineBreak: false });
+  columns.forEach((c, i) => centerCol(c.cells.cashToClose, i, y + 7, { font: 'Helvetica-Bold', size: 13, color: GO }));
+  y += ecH + 14;
 
   // ---- Program notes (dynamic) ----
   const notes = model.notes;
