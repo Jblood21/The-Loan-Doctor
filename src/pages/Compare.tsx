@@ -62,10 +62,10 @@ export default function Compare() {
   const { openSettings } = useUI();
   const [savedDefault, setSavedDefault] = useState(false);
   const [borrowerName, setBorrowerName] = useState('');
-  // Property address has three states: a real address, "TBD", or omitted entirely.
-  const [addressMode, setAddressMode] = useState<'available' | 'tbd' | 'none'>('none');
+  // Property address: enter an address, or mark it TBD. (An empty address is simply omitted.)
+  const [addressMode, setAddressMode] = useState<'available' | 'tbd'>('available');
   const [propertyAddress, setPropertyAddress] = useState('');
-  const resolvedAddress = addressMode === 'available' ? propertyAddress.trim() : addressMode === 'tbd' ? 'TBD' : '';
+  const resolvedAddress = addressMode === 'tbd' ? 'TBD' : propertyAddress.trim();
 
   // Dynamic comparison model: which rows/notes are relevant to the actual scenarios.
   const comparisonModel = useMemo(() => buildComparisonModel(scenarios), [scenarios]);
@@ -390,22 +390,20 @@ export default function Compare() {
                 options={[
                   { value: 'available', label: 'Address' },
                   { value: 'tbd', label: 'TBD' },
-                  { value: 'none', label: 'None' },
                 ]}
                 value={addressMode}
-                onChange={(v) => setAddressMode(v as 'available' | 'tbd' | 'none')}
+                onChange={(v) => setAddressMode(v as 'available' | 'tbd')}
               />
             </div>
-            {addressMode === 'available' && (
+            {addressMode === 'available' ? (
               <div className="mt-2.5">
                 <TextField
-                  placeholder="123 Main St, City, ST 00000"
+                  placeholder="123 Main St, City, ST 00000 (leave blank to omit)"
                   value={propertyAddress}
                   onChange={(e) => setPropertyAddress(e.target.value)}
                 />
               </div>
-            )}
-            {addressMode === 'tbd' && (
+            ) : (
               <div className="mt-2 text-[11.5px] text-text-dim">The report will show “TBD” for the property address.</div>
             )}
           </div>
@@ -452,29 +450,29 @@ export default function Compare() {
           {current.loanType === 'va' && (
             <div className="mb-6 rounded-[12px] border border-[rgba(129,140,248,0.28)] bg-[rgba(129,140,248,0.06)] p-4">
               <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.5px] text-[#818cf8]">VA Options</div>
-              <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[13px] font-medium text-text-muted">Funding Fee</span>
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[13px] font-medium text-text-soft">Funding fee exempt?</span>
                   <SegmentedControl
                     size="sm"
                     options={[
-                      { value: 'no', label: 'Standard' },
-                      { value: 'yes', label: 'Exempt' },
+                      { value: 'no', label: 'No' },
+                      { value: 'yes', label: 'Yes' },
                     ]}
                     value={current.vaFundingFeeExempt ? 'yes' : 'no'}
                     onChange={(v) => patch({ vaFundingFeeExempt: v === 'yes' })}
                   />
                 </div>
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[13px] font-medium text-text-muted">VA Use</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[13px] font-medium text-text-soft">Subsequent VA use?</span>
                   <SegmentedControl
                     size="sm"
                     options={[
-                      { value: 'first', label: 'First' },
-                      { value: 'subsequent', label: 'Subsequent' },
+                      { value: 'no', label: 'No' },
+                      { value: 'yes', label: 'Yes' },
                     ]}
-                    value={current.vaSubsequentUse ? 'subsequent' : 'first'}
-                    onChange={(v) => patch({ vaSubsequentUse: v === 'subsequent' })}
+                    value={current.vaSubsequentUse ? 'yes' : 'no'}
+                    onChange={(v) => patch({ vaSubsequentUse: v === 'yes' })}
                   />
                 </div>
               </div>
