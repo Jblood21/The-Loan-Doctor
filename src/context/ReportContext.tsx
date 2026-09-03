@@ -6,6 +6,13 @@ export interface ReportLine {
   value: string;
 }
 
+/** An optional multi-column comparison table for a section (e.g. Rate Buydown's
+ *  No Buydown / Temporary / Permanent columns). */
+export interface ReportTable {
+  columns: string[];
+  rows: { label: string; cells: string[] }[];
+}
+
 export interface ReportSection {
   /** Stable id (the tool key) — one section per tool in a report. */
   key: string;
@@ -14,6 +21,8 @@ export interface ReportSection {
   headline?: { label: string; value: string; sub?: string };
   inputs?: ReportLine[];
   rows: ReportLine[];
+  /** Optional multi-column table rendered in place of the flat rows. */
+  table?: ReportTable;
 }
 
 interface ReportContextValue {
