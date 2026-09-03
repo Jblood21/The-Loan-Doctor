@@ -85,7 +85,7 @@ export function renderComparisonPdf(doc, d) {
   if (subLine) doc.fillColor(LABEL).font('Helvetica').fontSize(9).text(subLine, HX + 14, boxY + 23, { width: RIGHT - HX - 120, lineBreak: false });
   if (rate) {
     doc.fillColor(MUTED).font('Helvetica-Bold').fontSize(8).text('RATE', RIGHT - 96, boxY + 8, { width: 82, align: 'right', lineBreak: false });
-    doc.fillColor(GO).font('Helvetica-Bold').fontSize(15).text(rate, RIGHT - 96, boxY + 18, { width: 82, align: 'right', lineBreak: false });
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(15).text(rate, RIGHT - 96, boxY + 18, { width: 82, align: 'right', lineBreak: false });
   }
 
   let y = Math.max(boxY + boxH, logoBottom + 12) + 8;
@@ -258,7 +258,7 @@ export function renderComparisonPdf(doc, d) {
       doc.font('Helvetica').fontSize(8.5);
       const nh = doc.heightOfString(note, { width: noteW, lineGap: 1 });
       ensureFlow(nh + 5);
-      doc.fillColor(GO).font('Helvetica-Bold').fontSize(8.5).text('•', LEFT, y, { lineBreak: false });
+      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(8.5).text('•', LEFT, y, { lineBreak: false });
       doc.fillColor('#44515f').font('Helvetica').fontSize(8.5).text(note, LEFT + 14, y, { width: noteW, lineGap: 1 });
       y += nh + 5;
     });
