@@ -81,7 +81,32 @@ export default function RentVsBuy({ open, onClose }: CalcProps) {
           <CalcField label="Home Appreciation /yr" suffix="%" value={appreciation} onChange={set(setAppreciation)} />
           <CalcField label="Investment Return /yr" suffix="%" value={invReturn} onChange={set(setInvReturn)} />
         </div>
-        <ResultPanel>
+        <ResultPanel
+          report={{
+            key: 'rentbuy',
+            title: 'Rent vs. Buy',
+            subtitle: `Over ${years} years`,
+            headline: {
+              label: `Over ${years} years`,
+              value: buyWins ? 'Buying wins' : 'Renting wins',
+              sub: breakEven ? `Buying breaks even in year ${breakEven}` : 'No break-even within 40 years',
+            },
+            inputs: [
+              { label: 'Monthly Rent', value: fmt(rent) },
+              { label: 'Home Price', value: fmt(price) },
+              { label: 'Down Payment', value: `${downPct}%` },
+              { label: 'Interest Rate', value: `${rate}%` },
+              { label: 'Years to Stay', value: String(years) },
+            ],
+            rows: [
+              { label: 'Net cost of renting', value: fmt(rentNetCost) },
+              { label: 'Net cost of buying', value: fmt(ownNetCost) },
+              { label: 'Monthly P&I (buying)', value: fmt(pi) },
+              { label: 'Projected home value', value: fmt(futureValue) },
+              { label: 'Equity at sale', value: fmt(equity) },
+            ],
+          }}
+        >
           <Headline
             label={`Over ${years} years`}
             value={buyWins ? 'Buying wins' : 'Renting wins'}

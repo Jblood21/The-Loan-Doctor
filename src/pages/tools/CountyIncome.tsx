@@ -91,7 +91,26 @@ export default function CountyIncome({ open, onClose }: CalcProps) {
           </div>
         </div>
 
-        <ResultPanel>
+        <ResultPanel
+          report={
+            result && result.medianIncome != null
+              ? {
+                  key: 'countyincome',
+                  title: 'County Median Income',
+                  subtitle: `${result.name} · ${result.year} ACS 5-Year`,
+                  headline: {
+                    label: 'Median Household Income',
+                    value: fmt(result.medianIncome),
+                    sub: `${result.name} · ${result.year} ACS 5-Year`,
+                  },
+                  rows: [
+                    { label: '100% of median income', value: fmt(result.medianIncome) },
+                    { label: '80% of median income', value: fmt(Math.round(result.medianIncome * 0.8)) },
+                  ],
+                }
+              : undefined
+          }
+        >
           {loading ? (
             <div className="py-6 text-center text-[13.5px] text-text-muted">Looking it up…</div>
           ) : error ? (
