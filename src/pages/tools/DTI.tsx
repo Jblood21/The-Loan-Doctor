@@ -35,7 +35,24 @@ export default function DTI({ open, onClose }: CalcProps) {
           <CalcField label="Student Loans" prefix="$" value={student} onChange={set(setStudent)} />
           <CalcField label="Other Debts" prefix="$" value={other} onChange={set(setOther)} />
         </div>
-        <ResultPanel>
+        <ResultPanel
+          report={{
+            key: 'dti',
+            title: 'DTI Calculator',
+            subtitle: `Rating: ${r.label}`,
+            headline: { label: 'Back-End DTI', value: pct(backEnd, 1), sub: `Rating: ${r.label}` },
+            inputs: [
+              { label: 'Gross Monthly Income', value: fmt(income) },
+              { label: 'Proposed Housing (PITI)', value: fmt(housing) },
+              { label: 'Non-housing debts', value: fmt(debts) },
+            ],
+            rows: [
+              { label: 'Front-End DTI (housing)', value: pct(frontEnd, 1) },
+              { label: 'Total Monthly Debts', value: fmt(housing + debts) },
+              { label: 'Non-housing debts', value: fmt(debts) },
+            ],
+          }}
+        >
           <Headline label="Back-End DTI" value={pct(backEnd, 1)} sub={`Rating: ${r.label}`} />
           <Row label="Front-End DTI (housing)" value={pct(frontEnd, 1)} />
           <Row label="Total Monthly Debts" value={fmt(housing + debts)} />

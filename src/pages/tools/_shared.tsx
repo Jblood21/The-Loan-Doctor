@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { NumberField } from '@/components/ui/NumberField';
 import { Select } from '@/components/ui/Select';
 import { Label } from '@/components/ui/TextField';
+import { useReport, type ReportSection } from '@/context/ReportContext';
 
 export interface CalcProps {
   open: boolean;
@@ -49,9 +51,38 @@ export function CalcSelect({
   );
 }
 
-/** Result panel — gradient card holding the headline outcome + breakdown rows. */
-export function ResultPanel({ children }: { children: ReactNode }) {
-  return <div className="rounded-2xl border border-[rgba(45,212,191,0.22)] bg-result-card p-5">{children}</div>;
+/** Result panel — gradient card holding the headline outcome + breakdown rows.
+ *  Pass `report` to show an "Add to report" toggle that collects this tool's
+ *  current result into the Tools-tab report builder. */
+export function ResultPanel({ children, report }: { children: ReactNode; report?: ReportSection }) {
+  const { has, add, remove, sync } = useReport();
+  const included = report ? has(report.key) : false;
+
+  // Keep the stored snapshot current while the tool stays in the report.
+  useEffect(() => {
+    if (report) sync(report);
+  });
+
+  return (
+    <div className="rounded-2xl border border-[rgba(45,212,191,0.22)] bg-result-card p-5">
+      {report && (
+        <div className="mb-3 flex justify-end">
+          <button
+            type="button"
+            onClick={() => (included ? remove(report.key) : add(report))}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors ${
+              included
+                ? 'border-[rgba(52,211,153,0.4)] bg-[rgba(52,211,153,0.12)] text-good'
+                : 'border-border-seg bg-transparent text-text-soft hover:border-brand-teal hover:text-brand-teal'
+            }`}
+          >
+            {included ? '✓ Added to report' : '+ Add to report'}
+          </button>
+        </div>
+      )}
+      {children}
+    </div>
+  );
 }
 
 export function Headline({ label, value, sub }: { label: string; value: string; sub?: string }) {

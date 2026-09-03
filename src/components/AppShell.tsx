@@ -6,6 +6,7 @@ import { Logo } from './Logo';
 import { UIProvider, useUI } from '@/context/UIContext';
 import { SettingsProvider } from '@/context/SettingsContext';
 import { ScenariosProvider } from '@/context/ScenariosContext';
+import { ReportProvider } from '@/context/ReportContext';
 
 /** Top bar shown only on phones/tablets — carries the hamburger that opens the nav drawer. */
 function MobileTopBar() {
@@ -30,6 +31,7 @@ export function AppShell() {
     <UIProvider>
       <SettingsProvider>
         <ScenariosProvider>
+          <ReportProvider>
           <div className="flex min-h-screen">
             <Sidebar />
             <main className="max-h-screen min-w-0 flex-1 overflow-y-auto">
@@ -40,6 +42,7 @@ export function AppShell() {
             </main>
             <SettingsDrawer />
           </div>
+          </ReportProvider>
         </ScenariosProvider>
       </SettingsProvider>
     </UIProvider>

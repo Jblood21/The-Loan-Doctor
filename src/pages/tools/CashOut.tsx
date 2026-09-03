@@ -41,7 +41,31 @@ export default function CashOut({ open, onClose }: CalcProps) {
           <CalcField label="New Rate" suffix="%" value={newRate} onChange={set(setNewRate)} />
           <CalcField label="New Term (yrs)" value={newTerm} onChange={set(setNewTerm)} />
         </div>
-        <ResultPanel>
+        <ResultPanel
+          report={{
+            key: 'cashout',
+            title: 'Cash-Out / Debt Consolidation',
+            headline: {
+              label: r.monthlySavings >= 0 ? 'Lower Monthly Outflow' : 'Higher Monthly Outflow',
+              value: fmt2(Math.abs(r.monthlySavings)),
+              sub: r.monthlySavings >= 0 ? 'saved vs. paying everything separately' : 'more per month than today',
+            },
+            inputs: [
+              { label: 'Home Value', value: fmt(homeValue) },
+              { label: 'Current Balance', value: fmt(curBalance) },
+              { label: 'Other Debt Balance', value: fmt(debtBalance) },
+              { label: 'New Rate', value: `${newRate}%` },
+              { label: 'New Term', value: `${newTerm} yr` },
+            ],
+            rows: [
+              { label: 'New Loan Amount', value: fmt(r.newLoanAmount) },
+              { label: 'New LTV', value: `${r.ltv.toFixed(1)}%` },
+              { label: 'New Mortgage Payment', value: fmt2(r.newPayment) },
+              { label: 'Today: Mortgage + Debts', value: fmt2(r.currentTotalMonthly) },
+              { label: 'Monthly Difference', value: `${r.monthlySavings >= 0 ? '−' : '+'} ${fmt2(Math.abs(r.monthlySavings))}` },
+            ],
+          }}
+        >
           <Headline
             label={r.monthlySavings >= 0 ? 'Lower Monthly Outflow' : 'Higher Monthly Outflow'}
             value={fmt2(Math.abs(r.monthlySavings))}

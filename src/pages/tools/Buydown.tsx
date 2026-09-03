@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { permanentBuydown, temporaryBuydown, TEMP_BUYDOWN_STRUCTURES } from '@/lib/finance';
 import { fmt, fmt2, pct } from '@/lib/format';
 import { CalcField, CalcSelect, TERM_OPTIONS, type CalcProps } from './_shared';
+import { useReport } from '@/context/ReportContext';
 
 const STRUCTURE_OPTIONS = Object.entries(TEMP_BUYDOWN_STRUCTURES).map(([value, s]) => ({
   value,
@@ -86,6 +87,33 @@ export default function Buydown({ open, onClose }: CalcProps) {
     { label: 'Lifetime interest saved', none: fmt(0), temp: fmt(0), perm: fmt(perm.lifetimeInterestSaved) },
   ];
 
+  const { has, add, remove, sync } = useReport();
+  const inReport = has('buydown');
+  const report = {
+    key: 'buydown',
+    title: 'Rate Buydown',
+    subtitle: `Recommendation: ${rec.pick}`,
+    headline: { label: 'Recommendation', value: rec.pick },
+    inputs: [
+      { label: 'Loan Amount', value: fmt(loan) },
+      { label: 'Note Rate', value: pct(noteRate) },
+      { label: 'Rate After Points', value: pct(boughtRate) },
+      { label: 'Points', value: `${points} pts` },
+      { label: 'Temporary Structure', value: TEMP_BUYDOWN_STRUCTURES[structure].label },
+      { label: "Years You'll Keep the Loan", value: String(holdYears) },
+    ],
+    rows: [
+      { label: 'Year-1 P&I (None / Temp / Perm)', value: `${rows[1].none} / ${rows[1].temp} / ${rows[1].perm}` },
+      { label: 'Upfront cost (Temp / Perm)', value: `${rows[3].temp} / ${rows[3].perm}` },
+      { label: 'Permanent break-even', value: Number.isFinite(breakEvenYears) ? `${breakEvenYears.toFixed(1)} yrs` : '—' },
+      { label: 'Lifetime interest saved (Permanent)', value: fmt(perm.lifetimeInterestSaved) },
+    ],
+  };
+  // Keep the stored snapshot current while this tool stays in the report.
+  useEffect(() => {
+    sync(report);
+  });
+
   return (
     <Modal open={open} onClose={onClose} title="Rate Buydown" subtitle="Compare a permanent (points) vs. a temporary buydown — and see which is worth it." width={900}>
       <div className="grid grid-cols-1 gap-5 md:grid-cols-[0.85fr_1.4fr]">
@@ -153,7 +181,20 @@ export default function Buydown({ open, onClose }: CalcProps) {
 
           {/* recommendation */}
           <div className={`rounded-xl border p-4 ${recTone}`}>
-            <div className="mb-1 text-[12px] font-bold uppercase tracking-[0.5px] opacity-80">Recommendation</div>
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="text-[12px] font-bold uppercase tracking-[0.5px] opacity-80">Recommendation</div>
+              <button
+                type="button"
+                onClick={() => (inReport ? remove('buydown') : add(report))}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors ${
+                  inReport
+                    ? 'border-[rgba(52,211,153,0.4)] bg-[rgba(52,211,153,0.12)] text-good'
+                    : 'border-border-seg bg-transparent text-text-soft hover:border-brand-teal hover:text-brand-teal'
+                }`}
+              >
+                {inReport ? '✓ Added to report' : '+ Add to report'}
+              </button>
+            </div>
             <div className="text-[16px] font-bold">{rec.pick}</div>
             <div className="mt-1.5 text-[13px] leading-[1.55] text-text-soft">{rec.reason}</div>
           </div>

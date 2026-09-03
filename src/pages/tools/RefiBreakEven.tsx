@@ -33,7 +33,32 @@ export default function RefiBreakEven({ open, onClose }: CalcProps) {
           <CalcField label="New Term (yrs)" value={newTerm} onChange={set(setNewTerm)} />
           <CalcField label="Closing Costs" prefix="$" value={costs} onChange={set(setCosts)} />
         </div>
-        <ResultPanel>
+        <ResultPanel
+          report={{
+            key: 'refi',
+            title: 'Refi Break-Even',
+            headline: {
+              label: 'Break-Even',
+              value: Number.isFinite(breakEvenMonths) ? `${Math.ceil(breakEvenMonths)} mo` : '—',
+              sub: Number.isFinite(breakEvenMonths)
+                ? `≈ ${(breakEvenMonths / 12).toFixed(1)} years to recoup costs`
+                : 'No monthly savings at these terms',
+            },
+            inputs: [
+              { label: 'Current Balance', value: fmt(balance) },
+              { label: 'Current Rate', value: `${curRate}%` },
+              { label: 'New Rate', value: `${newRate}%` },
+              { label: 'Closing Costs', value: fmt(costs) },
+            ],
+            rows: [
+              { label: 'Current Payment', value: fmt2(curPayment) },
+              { label: 'New Payment', value: fmt2(newPayment) },
+              { label: 'Monthly Savings', value: fmt2(Math.max(0, savings)) },
+              { label: 'Lifetime Interest (current)', value: fmt(curInterest) },
+              { label: 'Lifetime Interest (new)', value: fmt(newInterest) },
+            ],
+          }}
+        >
           <Headline
             label="Break-Even"
             value={Number.isFinite(breakEvenMonths) ? `${Math.ceil(breakEvenMonths)} mo` : '—'}

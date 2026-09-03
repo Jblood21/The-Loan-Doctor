@@ -120,6 +120,9 @@ export const api = {
       `/census/income?state=${encodeURIComponent(state)}&county=${encodeURIComponent(county)}`,
     ),
 
+  // tools report PDF (selected calculators compiled into one branded report)
+  reportPdf: (payload: unknown) => request<Blob>('POST', '/report/pdf', payload),
+
   // comparison PDF + shareable quote links
   comparePdf: (payload: unknown) => request<Blob>('POST', '/compare/pdf', payload),
   createShare: (payload: unknown) => request<{ id: string; url: string }>('POST', '/share', payload),

@@ -34,7 +34,31 @@ export default function SellerNet({ open, onClose }: CalcProps) {
           <CalcField label="Buyer Concessions" prefix="$" value={concessions} onChange={set(setConcessions)} />
           <CalcField label="Other Liens / Repairs" prefix="$" value={otherLiens} onChange={set(setOtherLiens)} />
         </div>
-        <ResultPanel>
+        <ResultPanel
+          report={{
+            key: 'sellernet',
+            title: 'Seller Net Sheet',
+            subtitle: `${r.netPct.toFixed(1)}% of the sale price`,
+            headline: {
+              label: 'Estimated Net Proceeds',
+              value: fmt(r.netProceeds),
+              sub: `${r.netPct.toFixed(1)}% of the sale price`,
+            },
+            inputs: [
+              { label: 'Sale Price', value: fmt(salePrice) },
+              { label: 'Mortgage Payoff', value: fmt(payoff) },
+              { label: 'Commission', value: `${commissionPct}%` },
+              { label: 'Seller Closing Costs', value: fmt(costs) },
+            ],
+            rows: [
+              { label: 'Sale Price', value: fmt(r.salePrice) },
+              { label: 'Agent Commission', value: `− ${fmt(r.commission)}` },
+              { label: 'Mortgage Payoff', value: `− ${fmt(payoff)}` },
+              { label: 'Closing Costs', value: `− ${fmt(costs)}` },
+              { label: 'Net to Seller', value: fmt(r.netProceeds) },
+            ],
+          }}
+        >
           <Headline
             label="Estimated Net Proceeds"
             value={fmt(r.netProceeds)}

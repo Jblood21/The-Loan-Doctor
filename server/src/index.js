@@ -21,6 +21,7 @@ import compareRoutes from './routes/compare.js';
 import shareRoutes from './routes/share.js';
 import aiRoutes from './routes/ai.js';
 import censusRoutes from './routes/census.js';
+import reportRoutes from './routes/report.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -65,6 +66,7 @@ app.use('/api/los/webhook', webhookLimiter);
 app.use('/api/los', losRoutes);
 app.use('/api/preapproval', preApprovalRoutes);
 app.use('/api/compare', compareRoutes);
+app.use('/api/report', reportRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/ai', aiLimiter, aiRoutes);
 app.use('/api/census', censusLimiter, censusRoutes);
