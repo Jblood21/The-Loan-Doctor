@@ -13,7 +13,7 @@
 import type { LoanType, Scenario } from '@/types';
 import { computeScenario, type ScenarioResult } from './finance';
 import { FHA, VA, USDA } from './loanProgramRules';
-import { fmt, fmt2 } from './format';
+import { fmt, fmt2, pct } from './format';
 
 export interface ComparisonColumn {
   name: string;
@@ -53,6 +53,8 @@ function cellValue(key: string, s: Scenario, c: ScenarioResult): string {
       return fmt(Math.round(c.baseLoan));
     case 'rate':
       return `${s.rate || 0}%`;
+    case 'apr':
+      return pct(c.apr, 3);
     case 'pi':
       return fmt2(c.pi);
     case 'fhaUfmip':
@@ -103,6 +105,7 @@ export function buildComparisonModel(scenarios: Scenario[]): ComparisonModel {
     { key: 'downPayment', label: 'Down Payment' },
     { key: 'loanAmount', label: 'Loan Amount' },
     { key: 'rate', label: 'Interest Rate' },
+    { key: 'apr', label: 'APR (Estimated)' },
     { key: 'pi', label: 'Principal & Interest' },
   ];
   if (anyFha) {
