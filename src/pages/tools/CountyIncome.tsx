@@ -86,8 +86,8 @@ export default function CountyIncome({ open, onClose }: CalcProps) {
           />
           <CalcSelect label="County" value={county} onChange={setCounty} options={countyOptions} />
           <div className="text-[11.5px] leading-[1.5] text-text-dim">
-            Data comes live from the U.S. Census Bureau’s American Community Survey (ACS) 5-year estimates. Median
-            household income is a real, citable figure — not an AI guess.
+            Median household income by county from the U.S. Census Bureau’s American Community Survey (ACS) 5-year
+            estimates — a real, citable figure, not an AI guess. Built-in snapshot, refreshed periodically.
           </div>
         </div>
 
