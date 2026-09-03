@@ -102,12 +102,12 @@ export default function Buydown({ open, onClose }: CalcProps) {
       { label: 'Temporary Structure', value: TEMP_BUYDOWN_STRUCTURES[structure].label },
       { label: "Years You'll Keep the Loan", value: String(holdYears) },
     ],
-    rows: [
-      { label: 'Year-1 P&I (None / Temp / Perm)', value: `${rows[1].none} / ${rows[1].temp} / ${rows[1].perm}` },
-      { label: 'Upfront cost (Temp / Perm)', value: `${rows[3].temp} / ${rows[3].perm}` },
-      { label: 'Permanent break-even', value: Number.isFinite(breakEvenYears) ? `${breakEvenYears.toFixed(1)} yrs` : '—' },
-      { label: 'Lifetime interest saved (Permanent)', value: fmt(perm.lifetimeInterestSaved) },
-    ],
+    rows: [],
+    // Full 3-column comparison — No Buydown / Temporary / Permanent — like the tool.
+    table: {
+      columns: cols.map((c) => c.label),
+      rows: rows.map((r) => ({ label: r.label, cells: [r.none, r.temp, r.perm] })),
+    },
   };
   // Keep the stored snapshot current while this tool stays in the report.
   useEffect(() => {

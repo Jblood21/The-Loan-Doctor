@@ -51,6 +51,16 @@ router.post('/pdf', requireAuth, (req, res) => {
     .map((s) => {
       const sec = obj(s);
       const h = obj(sec.headline);
+      const t = obj(sec.table);
+      const tableCols = arr(t.columns).slice(0, 4).map((c) => str(c));
+      const table = tableCols.length
+        ? {
+            columns: tableCols,
+            rows: arr(t.rows)
+              .slice(0, 40)
+              .map((r) => ({ label: str(obj(r).label), cells: arr(obj(r).cells).slice(0, tableCols.length).map((c) => str(c)) })),
+          }
+        : null;
       return {
         title: str(sec.title, 'Result'),
         subtitle: str(sec.subtitle),
@@ -61,6 +71,7 @@ router.post('/pdf', requireAuth, (req, res) => {
         rows: arr(sec.rows)
           .slice(0, 40)
           .map((l) => ({ label: str(obj(l).label), value: str(obj(l).value) })),
+        table,
       };
     });
 
@@ -96,6 +107,12 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
     headline: sec.headline ? { label: C(sec.headline.label), value: C(sec.headline.value), sub: C(sec.headline.sub) } : null,
     inputs: (sec.inputs || []).map((i) => ({ label: C(i.label), value: C(i.value) })),
     rows: (sec.rows || []).map((r) => ({ label: C(r.label), value: C(r.value) })),
+    table: sec.table
+      ? {
+          columns: (sec.table.columns || []).map((c) => C(c)),
+          rows: (sec.table.rows || []).map((r) => ({ label: C(r.label), cells: (r.cells || []).map((c) => C(c)) })),
+        }
+      : null,
   }));
 
   const phoneEmail = [lender.phone, lender.email].filter(Boolean).join('   ·   ');
@@ -230,17 +247,39 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
       y = bTop + boxH + 12;
     }
 
-    // --- Result rows ---
-    sec.rows.forEach((row, i) => {
+    // --- Multi-column comparison table (e.g. Rate Buydown) ---
+    if (sec.table) {
+      const tcols = sec.table.columns;
+      const nC = Math.max(1, tcols.length);
+      const labelColW = contentW * 0.34;
+      const cW = (contentW - labelColW) / nC;
+      const cX = (i) => LEFT + labelColW + i * cW;
       ensure(20);
-      const rowY = y;
-      doc.fillColor('#33414f').font('Helvetica').fontSize(10.5).text(row.label, LEFT, rowY + 4, { width: contentW * 0.62, lineBreak: false });
-      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10.5).text(row.value, LEFT, rowY + 4, { width: contentW, align: 'right', lineBreak: false });
-      y = rowY + 20;
-      if (i < sec.rows.length - 1) {
+      tcols.forEach((c, i) => doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(8.5).text(c, cX(i) + 2, y + 3, { width: cW - 4, align: 'center', lineBreak: false }));
+      y += 17;
+      doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(0.8).strokeColor('#c9d4e2').stroke();
+      y += 2;
+      sec.table.rows.forEach((r) => {
+        ensure(17);
+        const rowY = y;
+        doc.fillColor('#33414f').font('Helvetica').fontSize(9).text(r.label, LEFT, rowY + 4, { width: labelColW - 6, lineBreak: false });
+        r.cells.forEach((cell, i) => doc.fillColor(INK).font('Helvetica-Bold').fontSize(9).text(cell, cX(i) + 2, rowY + 4, { width: cW - 4, align: 'center', lineBreak: false }));
+        y = rowY + 17;
         doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(0.5).strokeColor('#eaeef3').stroke();
-      }
-    });
+      });
+    } else {
+      // --- Result rows ---
+      sec.rows.forEach((row, i) => {
+        ensure(20);
+        const rowY = y;
+        doc.fillColor('#33414f').font('Helvetica').fontSize(10.5).text(row.label, LEFT, rowY + 4, { width: contentW * 0.62, lineBreak: false });
+        doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10.5).text(row.value, LEFT, rowY + 4, { width: contentW, align: 'right', lineBreak: false });
+        y = rowY + 20;
+        if (i < sec.rows.length - 1) {
+          doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(0.5).strokeColor('#eaeef3').stroke();
+        }
+      });
+    }
 
     y += 18;
   });
