@@ -14,6 +14,7 @@
 
 import type { ClosingCostItem, LoanType, Scenario, TransactionType } from '@/types';
 import { buildTitleScheduleFees, titleBasisAmount } from './titleFees';
+import { CONVENTIONAL, FHA, USDA, VA } from './loanProgramRules';
 
 export const DEFAULT_TAX_RATE = 1.25; // %/yr of home value
 export const DEFAULT_INSURANCE_RATE = 0.35; // %/yr of home value
@@ -84,23 +85,16 @@ export function ltvPct(loan: number, homeValue: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Conventional PMI — borrower-paid monthly, 30-yr fixed, by LTV band & credit.
-// Annual premium as a % of the loan amount. Values approximate national MI rate
-// cards (e.g. MGIC/Radian) and are intentionally centralized for easy override.
+// Program-specific rate lookups. The FIGURES live in loanProgramRules.ts (the
+// central config); the functions below apply them. Keeping the functions here
+// preserves the existing API while the numbers become configuration.
 // ---------------------------------------------------------------------------
-// Ordered ASCENDING by maxLtv so the tightest applicable band wins, e.g. LTV 90
-// maps to the 85.01–90 band, not 95.01–97. Each byCredit entry: [minScore, annualPct].
-const PMI_TABLE: { maxLtv: number; byCredit: [number, number][] }[] = [
-  { maxLtv: 85, byCredit: [[760, 0.14], [740, 0.16], [720, 0.19], [700, 0.21], [680, 0.27], [660, 0.34], [640, 0.38], [0, 0.46]] },
-  { maxLtv: 90, byCredit: [[760, 0.19], [740, 0.23], [720, 0.3], [700, 0.38], [680, 0.52], [660, 0.66], [640, 0.78], [0, 0.94]] },
-  { maxLtv: 95, byCredit: [[760, 0.3], [740, 0.38], [720, 0.54], [700, 0.7], [680, 0.9], [660, 1.1], [640, 1.32], [0, 1.55]] },
-  { maxLtv: 97, byCredit: [[760, 0.41], [740, 0.55], [720, 0.7], [700, 0.87], [680, 1.1], [660, 1.36], [640, 1.6], [0, 1.84]] },
-];
 
 /** Conventional PMI annual rate (%) — 0 when LTV ≤ 80. */
 export function pmiAnnualPct(ltv: number, creditScore: number): number {
   if (ltv <= 80) return 0;
-  const band = PMI_TABLE.find((b) => ltv <= b.maxLtv) ?? PMI_TABLE[PMI_TABLE.length - 1];
+  const table = CONVENTIONAL.pmiTable;
+  const band = table.find((b) => ltv <= b.maxLtv) ?? table[table.length - 1];
   for (const [minScore, pctVal] of band.byCredit) {
     if (creditScore >= minScore) return pctVal;
   }
@@ -108,30 +102,31 @@ export function pmiAnnualPct(ltv: number, creditScore: number): number {
 }
 
 /** FHA base-loan threshold above which the higher "high-balance" MIP applies. */
-export const FHA_HIGH_BALANCE = 726200;
+export const FHA_HIGH_BALANCE = FHA.highBalanceThreshold;
 
 /** FHA annual MIP (%) — by term, LTV, and whether the base loan is high-balance.
  *  Reflects the schedule effective March 2023 (the 30-yr break is at 95% LTV). */
 export function fhaAnnualMipPct(ltv: number, termYears: number, baseLoan = 0): number {
-  const highBalance = baseLoan > FHA_HIGH_BALANCE;
+  const highBalance = baseLoan > FHA.highBalanceThreshold;
+  const g = FHA.annualMip;
   if (termYears > 15) {
-    if (highBalance) return ltv > 95 ? 0.75 : 0.7;
-    return ltv > 95 ? 0.55 : 0.5;
+    return highBalance ? (ltv > 95 ? g.longTerm.highBalance.gt95 : g.longTerm.highBalance.le95) : ltv > 95 ? g.longTerm.standard.gt95 : g.longTerm.standard.le95;
   }
   // 15-year (and shorter) terms
-  if (highBalance) return ltv > 90 ? 0.65 : ltv > 78 ? 0.4 : 0.15;
-  return ltv > 90 ? 0.4 : 0.15;
+  if (highBalance) return ltv > 90 ? g.shortTerm.highBalance.gt90 : ltv > 78 ? g.shortTerm.highBalance.gt78 : g.shortTerm.highBalance.le78;
+  return ltv > 90 ? g.shortTerm.standard.gt90 : g.shortTerm.standard.le90;
 }
-export const FHA_UPFRONT_MIP = 1.75; // % of base loan, financed
-export const USDA_UPFRONT_FEE = 1.0; // % of loan, financed
-export const USDA_ANNUAL_FEE = 0.35; // % of balance, ~constant approximation
+export const FHA_UPFRONT_MIP = FHA.upfrontMipPct; // % of base loan, financed
+export const USDA_UPFRONT_FEE = USDA.upfrontFeePct; // % of loan, financed
+export const USDA_ANNUAL_FEE = USDA.annualFeePct; // % of balance, ~constant approximation
 
 /** VA funding fee (%), tiered by down payment. Only the <5%-down tier differs for
  *  subsequent use (3.3% vs 2.15%); the 5%+ and 10%+ tiers are the same either way. */
 export function vaFundingFeePct(downPct: number, subsequentUse = false): number {
-  if (downPct >= 10) return 1.25;
-  if (downPct >= 5) return 1.5;
-  return subsequentUse ? 3.3 : 2.15;
+  const f = VA.fundingFee_purchase;
+  if (downPct >= 10) return f.down10;
+  if (downPct >= 5) return f.down5;
+  return subsequentUse ? f.subsequentUseLow : f.firstUseLow;
 }
 
 export interface MortgageInsurance {
@@ -258,11 +253,11 @@ function miAprMonths(
   homeValue: number,
 ): number {
   const n = schedule.length;
-  if (loanType === 'fha') return ltv > 90 ? n : Math.min(132, n);
+  if (loanType === 'fha') return ltv > FHA.mipLifeOfLoanLtv ? n : Math.min(FHA.mipCancellableMonths, n);
   if (loanType === 'usda') return n;
   if (loanType === 'conventional' || loanType === 'arm') {
     if (homeValue <= 0) return n;
-    const threshold = 0.78 * homeValue;
+    const threshold = CONVENTIONAL.pmiCancelLtvRatio * homeValue;
     const idx = schedule.findIndex((row) => row.balance <= threshold);
     return idx === -1 ? n : idx + 1;
   }
