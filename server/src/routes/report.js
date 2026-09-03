@@ -16,7 +16,15 @@ const PAGE_H = 792;
 const BOTTOM = 726; // content stops here; footer sits below
 const CONT_TOP = 60; // top of continuation pages
 
-const str = (v, f = '') => (v == null ? f : String(v));
+// PDFKit's built-in fonts use WinAnsi encoding, which lacks a few symbols the
+// calculators emit (the minus sign − and the approx sign ≈). Map those to ASCII
+// so they don't render as garbage.
+const clean = (s) =>
+  String(s)
+    .replace(/−/g, '-') // minus sign → hyphen
+    .replace(/≈/g, '~') // ≈ → ~
+    .replace(/→/g, '->'); // → → ->
+const str = (v, f = '') => (v == null ? clean(f) : clean(String(v)));
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const arr = (v) => (Array.isArray(v) ? v : []);
 
@@ -67,9 +75,28 @@ router.post('/pdf', requireAuth, (req, res) => {
 
 // Draw the whole report onto an existing PDFDocument (shared with render tests).
 export function renderReport(doc, { preparedFor, officer, lender, logoBuf, sections }) {
+  // Sanitize every string for the PDF's WinAnsi fonts (drop unsupported symbols),
+  // so the function is safe to call directly, not only through the route.
+  const C = (s) => clean(String(s ?? ''));
+  preparedFor = C(preparedFor);
   officer = officer || {};
-  lender = lender || {};
-  sections = sections || [];
+  officer = { name: C(officer.name), title: C(officer.title) };
+  const L = lender || {};
+  lender = {
+    name: C(L.name),
+    phone: C(L.phone),
+    email: C(L.email),
+    nmls: C(L.nmls),
+    website: C(L.website),
+    address: C(L.address),
+  };
+  sections = (sections || []).map((sec) => ({
+    title: C(sec.title),
+    subtitle: C(sec.subtitle),
+    headline: sec.headline ? { label: C(sec.headline.label), value: C(sec.headline.value), sub: C(sec.headline.sub) } : null,
+    inputs: (sec.inputs || []).map((i) => ({ label: C(i.label), value: C(i.value) })),
+    rows: (sec.rows || []).map((r) => ({ label: C(r.label), value: C(r.value) })),
+  }));
 
   const phoneEmail = [lender.phone, lender.email].filter(Boolean).join('   ·   ');
   const nmlsLine = [lender.nmls ? `NMLS# ${lender.nmls}` : '', lender.website || '', lender.address || '']
@@ -96,26 +123,37 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
     doc.y = savedY;
   }
 
+  const contentW = RIGHT - LEFT;
+
   // ---- Page-1 header ----
-  let y = 44;
+  let y = 46;
   try {
-    if (logoBuf) {
-      doc.image(logoBuf, LEFT, y, { height: 40 });
-    }
+    if (logoBuf) doc.image(logoBuf, LEFT, y, { height: 36 });
   } catch {
     /* logo optional */
   }
-  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(21).text('Loan Analysis Report', LEFT, y + (logoBuf ? 52 : 4), {
-    width: RIGHT - LEFT,
-  });
-  y = doc.y + 4;
   const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  // Date sits top-right, aligned with the logo.
+  doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(dateStr, LEFT, y + 2, { width: contentW, align: 'right', lineBreak: false });
+
+  const titleY = y + (logoBuf ? 50 : 6);
+  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(20).text('Loan Analysis Report', LEFT, titleY, { lineBreak: false });
+  y = titleY + 26;
+
   const by = [officer.name, officer.title].filter(Boolean).join(', ');
-  const meta = [preparedFor ? `Prepared for ${preparedFor}` : '', by ? `By ${by}` : '', dateStr].filter(Boolean).join('   ·   ');
-  doc.fillColor(MUTED).font('Helvetica').fontSize(10).text(meta, LEFT, y, { width: RIGHT - LEFT });
-  y = doc.y + 10;
-  doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(2).strokeColor(STEEL).stroke();
-  y += 18;
+  const primary = preparedFor ? `Prepared for ${preparedFor}` : by || lender.name || '';
+  const secondary = preparedFor ? [by, lender.name].filter(Boolean).join('  ·  ') : lender.name || '';
+  if (primary) {
+    doc.fillColor(INK).font('Helvetica-Bold').fontSize(11).text(primary, LEFT, y, { width: contentW, lineBreak: false });
+    y += 15;
+  }
+  if (secondary) {
+    doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(secondary, LEFT, y, { width: contentW, lineBreak: false });
+    y += 15;
+  }
+  y += 4;
+  doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(1.5).strokeColor(NAVY).stroke();
+  y += 22;
 
   drawFooter();
   doc.on('pageAdded', () => {
@@ -127,57 +165,84 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
     if (y + h > BOTTOM) doc.addPage();
   };
 
-  sections.forEach((sec) => {
-    // Section header bar
-    ensure(30 + (sec.headline ? 46 : 0));
+  sections.forEach((sec, idx) => {
+    if (idx > 0) y += 6;
+    // --- Section header: light navy-tint band with navy title ---
+    ensure(28 + (sec.headline ? 48 : 0));
     doc.save();
-    doc.roundedRect(LEFT, y, RIGHT - LEFT, 26, 5).fill(NAVY);
+    doc.roundedRect(LEFT, y, contentW, 25, 4).fill('#eef2f8');
+    doc.rect(LEFT, y, 3.5, 25).fill(NAVY); // left accent
     doc.restore();
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(12.5).text(sec.title, LEFT + 12, y + 7, { lineBreak: false });
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(12).text(sec.title, LEFT + 14, y + 7.5, { lineBreak: false });
     if (sec.subtitle) {
-      doc.fillColor('#c9d6e8').font('Helvetica').fontSize(9).text(sec.subtitle, LEFT + 12, y + 8.5, {
-        width: RIGHT - LEFT - 24,
+      doc.fillColor(STEEL).font('Helvetica').fontSize(8.5).text(sec.subtitle, LEFT + 14, y + 9, {
+        width: contentW - 28,
         align: 'right',
         lineBreak: false,
       });
     }
-    y += 26 + 12;
+    y += 25 + 14;
 
-    // Headline
+    // --- Headline stat ---
     if (sec.headline && (sec.headline.value || sec.headline.label)) {
-      ensure(46);
-      doc.fillColor(MUTED).font('Helvetica-Bold').fontSize(9).text((sec.headline.label || '').toUpperCase(), LEFT, y, { characterSpacing: 0.3 });
-      y = doc.y + 1;
-      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(19).text(sec.headline.value, LEFT, y);
-      y = doc.y + 1;
+      ensure(48);
+      if (sec.headline.label) {
+        doc.fillColor('#8a99ab').font('Helvetica-Bold').fontSize(8).text(sec.headline.label.toUpperCase(), LEFT, y, { characterSpacing: 0.6, lineBreak: false });
+        y += 12;
+      }
+      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(20).text(sec.headline.value, LEFT, y, { lineBreak: false });
+      y += 24;
       if (sec.headline.sub) {
-        doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(sec.headline.sub, LEFT, y);
-        y = doc.y;
+        doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(sec.headline.sub, LEFT, y, { width: contentW, lineBreak: false });
+        y += 13;
       }
       y += 8;
     }
 
-    // Inputs (compact wrapped line)
+    // --- Assumptions panel (two-column key/value grid) ---
     if (sec.inputs.length) {
-      const inputsText = sec.inputs.map((i) => `${i.label}: ${i.value}`).join('    ·    ');
-      ensure(22);
-      doc.fillColor('#8a99ab').font('Helvetica-Bold').fontSize(8).text('ASSUMPTIONS', LEFT, y, { characterSpacing: 0.5 });
-      y = doc.y + 2;
-      doc.fillColor(MUTED).font('Helvetica').fontSize(9).text(inputsText, LEFT, y, { width: RIGHT - LEFT, lineGap: 2 });
-      y = doc.y + 8;
+      const gap = 18;
+      const colW = (contentW - gap) / 2;
+      const nRows = Math.ceil(sec.inputs.length / 2);
+      const cellH = 15;
+      const padTop = 10;
+      const padBot = 10;
+      const labelY = y;
+      doc.fillColor('#9aa7b5').font('Helvetica-Bold').fontSize(7.5).text('ASSUMPTIONS', LEFT, labelY, { characterSpacing: 0.8, lineBreak: false });
+      y += 12;
+      const boxTop = y;
+      const boxH = padTop + nRows * cellH + padBot - 4;
+      ensure(boxH + 4);
+      // re-anchor if a page break happened
+      const bTop = y > boxTop ? y : boxTop;
+      doc.save();
+      doc.roundedRect(LEFT, bTop, contentW, boxH, 5).fill('#f6f8fb');
+      doc.restore();
+      sec.inputs.forEach((inp, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const cellLeft = LEFT + col * (colW + gap) + 12;
+        const cellRight = LEFT + col * (colW + gap) + colW - 12;
+        const cy = bTop + padTop + row * cellH;
+        doc.fillColor(MUTED).font('Helvetica').fontSize(8.8).text(inp.label, cellLeft, cy, { width: (cellRight - cellLeft) * 0.62, lineBreak: false });
+        doc.fillColor(INK).font('Helvetica-Bold').fontSize(8.8).text(inp.value, cellLeft, cy, { width: cellRight - cellLeft, align: 'right', lineBreak: false });
+      });
+      y = bTop + boxH + 12;
     }
 
-    // Result rows
-    sec.rows.forEach((row) => {
-      ensure(19);
+    // --- Result rows ---
+    sec.rows.forEach((row, i) => {
+      ensure(20);
       const rowY = y;
-      doc.fillColor(INK).font('Helvetica').fontSize(10.5).text(row.label, LEFT, rowY, { width: (RIGHT - LEFT) * 0.62, lineBreak: false });
-      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10.5).text(row.value, LEFT, rowY, { width: RIGHT - LEFT, align: 'right', lineBreak: false });
-      y = rowY + 17;
-      doc.moveTo(LEFT, y - 4).lineTo(RIGHT, y - 4).lineWidth(0.5).strokeColor('#e6eaf0').stroke();
+      doc.fillColor('#33414f').font('Helvetica').fontSize(10.5).text(row.label, LEFT, rowY + 4, { width: contentW * 0.62, lineBreak: false });
+      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10.5).text(row.value, LEFT, rowY + 4, { width: contentW, align: 'right', lineBreak: false });
+      y = rowY + 20;
+      if (i < sec.rows.length - 1) {
+        doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(0.5).strokeColor('#eaeef3').stroke();
+      }
     });
 
-    y += 16;
+    y += 18;
   });
 
   if (!sections.length) {
