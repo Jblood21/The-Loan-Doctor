@@ -57,6 +57,11 @@ export interface Scenario {
   insuranceMonthly?: number;
   /** Monthly HOA dues ($/mo). 0/undefined = none. */
   hoaMonthly?: number;
+  /** VA only: funding fee is waived for an exempt borrower. Absent/false = not exempt. */
+  vaFundingFeeExempt?: boolean;
+  /** VA only: subsequent use of the VA benefit (raises the <5%-down funding fee).
+   *  Absent/false = first use. */
+  vaSubsequentUse?: boolean;
 }
 
 export interface HecmInputs {

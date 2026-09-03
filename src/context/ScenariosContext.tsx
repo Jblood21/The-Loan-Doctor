@@ -9,6 +9,37 @@ import { useSettings } from './SettingsContext';
 
 export const MAX_SCENARIOS = 6;
 
+// Backfill the required fields on scenarios loaded from the server or the local
+// cache, so an older/partial saved scenario (one missing a field added in a later
+// version) can never crash the comparison engine or the UI. Present values are kept
+// as-is; optional fields (tax*/hoa/VA toggles/closingCosts) are left untouched
+// because their absence is meaningful.
+export function normalizeScenario(input: unknown): Scenario {
+  const o = (input && typeof input === 'object' ? input : {}) as Partial<Scenario>;
+  const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+  return {
+    ...o,
+    name: o.name ?? 'Scenario',
+    transaction: o.transaction ?? 'purchase',
+    borrowers: o.borrowers ?? '1',
+    loanType: o.loanType ?? 'conventional',
+    program: o.program ?? 'standard',
+    homePrice: num(o.homePrice, 300000),
+    downPayment: num(o.downPayment, 0),
+    downPct: num(o.downPct, 0),
+    rate: num(o.rate, 0),
+    term: o.term ?? '30',
+    credit: o.credit ?? '700',
+    lenderCredit: num(o.lenderCredit, 0),
+    sellerCredit: num(o.sellerCredit, 0),
+    otherCredits: num(o.otherCredits, 0),
+  } as Scenario;
+}
+
+function normalizeList(list: unknown): Scenario[] {
+  return Array.isArray(list) ? list.map(normalizeScenario) : [];
+}
+
 export function blankScenario(name: string, fees?: ClosingCostItem[]): Scenario {
   return {
     name,
@@ -81,7 +112,8 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
       try {
         const { scenarios: s } = await api.listScenarios();
         if (cancelled) return;
-        const list = s && s.length ? s : [seededBlank('Scenario 1')];
+        const normalized = normalizeList(s);
+        const list = normalized.length ? normalized : [seededBlank('Scenario 1')];
         setScenarios(list);
         setActive(0);
         setLoaded(true);
@@ -91,7 +123,8 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
         const cached = cacheKey ? localStorage.getItem(cacheKey) : null;
         if (cached && !cancelled) {
           try {
-            setScenarios(JSON.parse(cached));
+            const normalized = normalizeList(JSON.parse(cached));
+            if (normalized.length) setScenarios(normalized);
           } catch {
             /* ignore */
           }
