@@ -73,7 +73,7 @@ export default function CountyIncome({ open, onClose }: CalcProps) {
       open={open}
       onClose={onClose}
       title="County Median Income"
-      subtitle="Median household income by county — official U.S. Census Bureau data."
+      subtitle="Median household income by county, with 80% & 100% for Home Possible eligibility."
       width={720}
     >
       <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_1fr]">
@@ -103,8 +103,30 @@ export default function CountyIncome({ open, onClose }: CalcProps) {
                 value={result.medianIncome != null ? fmt(result.medianIncome) : '—'}
                 sub={`${result.name} · ${result.year} ACS 5-Year`}
               />
-              {result.moe != null && result.medianIncome != null && (
-                <Row label="Margin of error" value={`± ${fmt(result.moe)}`} />
+              {result.medianIncome != null && (
+                <>
+                  <Row label="100% of median income" value={fmt(result.medianIncome)} />
+                  <Row
+                    label="80% of median income"
+                    value={fmt(Math.round(result.medianIncome * 0.8))}
+                    color="text-good"
+                  />
+                  {result.moe != null && <Row label="Margin of error" value={`± ${fmt(result.moe)}`} />}
+                  <div className="mt-3 rounded-[10px] border border-[rgba(52,211,153,0.22)] bg-[rgba(52,211,153,0.07)] px-3.5 py-2.5 text-[11.5px] leading-[1.55] text-text-soft">
+                    Freddie Mac <span className="font-semibold text-good">Home Possible</span> caps qualifying income at{' '}
+                    <span className="font-semibold text-good">80% of area median income (AMI)</span>. AMI is set at the
+                    census-tract level and can differ from this county figure — confirm exact eligibility on{' '}
+                    <a
+                      href="https://sf.freddiemac.com/working-with-us/affordable-lending/home-possible-eligibility-map"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-brand-teal underline"
+                    >
+                      Freddie Mac’s Home Possible map
+                    </a>
+                    .
+                  </div>
+                </>
               )}
               {result.medianIncome == null && (
                 <div className="text-[12.5px] text-text-muted">The Census Bureau doesn’t publish an estimate for this county.</div>

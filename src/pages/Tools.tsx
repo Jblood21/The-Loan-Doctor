@@ -36,7 +36,7 @@ const TOOLS: Tool[] = [
   { key: 'va', title: 'VA Bonus Entitlement', desc: 'Second-tier entitlement, max $0-down loan, and required down payment.', bg: 'rgba(129,140,248,.14)', fg: '#818cf8', icon: ShieldCheck, Component: VaEntitlement },
   { key: 'sellernet', title: 'Seller Net Sheet', desc: 'Estimated proceeds a seller nets after payoff, commission, and costs.', bg: 'rgba(96,165,250,.14)', fg: '#60a5fa', icon: Receipt, Component: SellerNet },
   { key: 'cashout', title: 'Cash-Out / Consolidation', desc: 'Roll high-rate debt into the mortgage and compare monthly outflow.', bg: 'rgba(251,146,60,.14)', fg: '#fb923c', icon: Coins, Component: CashOut },
-  { key: 'countyincome', title: 'County Median Income', desc: 'Median household income by county — real U.S. Census data. Pick a state and county.', bg: 'rgba(45,212,191,.14)', fg: '#2dd4bf', icon: Landmark, Component: CountyIncome },
+  { key: 'countyincome', title: 'County Median Income', desc: 'Median household income by county with 80% & 100% for Home Possible — real U.S. Census data.', bg: 'rgba(45,212,191,.14)', fg: '#2dd4bf', icon: Landmark, Component: CountyIncome },
 ];
 
 export default function Tools() {
