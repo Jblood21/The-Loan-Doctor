@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getLos, setLos, getLosBorrowers, upsertLosBorrowers, clearLosBorrowers, findUserByWebhookToken, sharedWebhookToken, SHARED_LOS_KEY, addWebhookLog, getWebhookLog } from '../store.js';
+import { getLos, setLos, getLosBorrowers, upsertLosBorrowers, clearLosBorrowers, findUserByWebhookToken, sharedWebhookToken, SHARED_LOS_KEY, addWebhookLog, getWebhookLog, timingSafeEqualStr } from '../store.js';
 import { requireAuth } from '../auth.js';
 import { ariveConfigured, ariveSearch } from '../los/arive.js';
 
@@ -102,7 +102,7 @@ function mapInbound(rec = {}) {
 // record, an array, or { borrowers: [...] } / { loans: [...] }. The shared token
 // routes to one pool everyone sees; a legacy per-user token still routes to that user.
 function resolveWebhookTarget(token) {
-  if (token === sharedWebhookToken()) return SHARED_LOS_KEY;
+  if (timingSafeEqualStr(token, sharedWebhookToken())) return SHARED_LOS_KEY;
   const user = findUserByWebhookToken(token);
   return user ? user.id : null;
 }

@@ -6,12 +6,13 @@ import { requireAuth, signToken } from '../auth.js';
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Registration gate. Three states:
-//   • SIGNUP_CODE set        → anyone with the matching access code may register (invite-only).
-//   • ALLOW_SIGNUP !== 'false' → open registration (default; fine for dev).
-//   • otherwise               → registration closed entirely.
+// Registration gate. Closed by default so a public deployment can't be self-registered
+// into (which would expose the shared borrower pool to strangers). Three states:
+//   • SIGNUP_CODE set       → anyone with the matching access code may register (invite-only).
+//   • ALLOW_SIGNUP === 'true' → open registration (opt-in; convenient for local dev).
+//   • otherwise              → registration closed entirely (default).
 const SIGNUP_CODE = process.env.SIGNUP_CODE || '';
-const SIGNUPS_OPEN = process.env.ALLOW_SIGNUP !== 'false';
+const SIGNUPS_OPEN = process.env.ALLOW_SIGNUP === 'true';
 
 router.post('/register', (req, res) => {
   const { password, name = '', company = '', code = '' } = req.body || {};
@@ -38,6 +39,10 @@ router.post('/login', (req, res) => {
   const user = findUserByEmail(email);
   if (!user || !bcrypt.compareSync(password || '', user.passwordHash)) {
     return res.status(401).json({ error: 'Incorrect email or password' });
+  }
+  // A deactivated account must not be able to authenticate.
+  if (user.status && user.status !== 'Active') {
+    return res.status(403).json({ error: 'This account is inactive. Contact your administrator.' });
   }
   res.json({ token: signToken(user), user: publicUser(user) });
 });
