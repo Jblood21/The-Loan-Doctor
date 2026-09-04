@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { addUser, findUserByEmail, findUserById, publicUser, updateUser, normalizeEmail } from '../store.js';
+import { addUser, findUserByEmail, findUserById, publicUser, updateUser, normalizeEmail, bumpSessionEpoch } from '../store.js';
 import { requireAuth, signToken } from '../auth.js';
 
 const router = Router();
@@ -75,6 +75,15 @@ router.put('/password', requireAuth, (req, res) => {
   }
   if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
   updateUser(user.id, { passwordHash: bcrypt.hashSync(newPassword, 12) });
+  // Invalidate every previously-issued token, then hand back a fresh one so the
+  // current session stays signed in with the new epoch.
+  bumpSessionEpoch(user.id);
+  res.json({ ok: true, token: signToken(findUserById(user.id)) });
+});
+
+// Server-side logout — invalidates this user's outstanding tokens everywhere.
+router.post('/logout', requireAuth, (req, res) => {
+  bumpSessionEpoch(req.user.id);
   res.json({ ok: true });
 });
 

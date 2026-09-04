@@ -157,11 +157,22 @@ export function addUser({ id, email, password, passwordHash, name = '', company 
     role,
     status,
     scenarioCount,
+    // Bumped to invalidate this user's outstanding JWTs (logout / password change).
+    sessionEpoch: 0,
     createdAt: new Date().toISOString(),
   };
   db.users.push(user);
   persist();
   return user;
+}
+
+/** Invalidate all of a user's currently-issued tokens by advancing their session epoch. */
+export function bumpSessionEpoch(id) {
+  const u = findUserById(id);
+  if (!u) return null;
+  u.sessionEpoch = (u.sessionEpoch || 0) + 1;
+  persist();
+  return u.sessionEpoch;
 }
 export function updateUser(id, patch) {
   const u = findUserById(id);

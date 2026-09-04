@@ -42,7 +42,6 @@ router.post('/compare', requireAuth, async (req, res) => {
     const msg = await getClient().messages.create({
       model: MODEL,
       max_tokens: 1500,
-      output_config: { effort: 'low' },
       system: SYSTEM,
       messages: [
         {

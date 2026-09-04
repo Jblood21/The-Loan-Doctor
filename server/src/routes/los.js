@@ -8,6 +8,15 @@ const router = Router();
 // No demo/sample borrowers anywhere — the list only ever contains real loans
 // pushed in from Zapier, so nothing fake can appear in any environment.
 
+/** "John Michael Smith" → "John S." — enough to recognize a record in the diagnostics
+ *  log without persisting a full borrower name. */
+function maskName(n) {
+  const parts = String(n || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  const lastInitial = parts.length > 1 ? ` ${parts[parts.length - 1][0].toUpperCase()}.` : '';
+  return `${parts[0]}${lastInitial}`;
+}
+
 function filterByQuery(list, q) {
   const query = String(q || '').trim().toLowerCase();
   if (!query) return list;
@@ -132,15 +141,15 @@ router.post('/webhook/:token', (req, res) => {
     .filter((b) => b.name && b.name !== 'Borrower')
     .map((b, i) => ({ id: `${now}-${i}`, receivedAt: now, ...b }));
 
-  // Log the raw payload so the pipeline is inspectable — you can see the exact field
-  // names Zapier sent, how many records arrived, and how many were understood.
+  // Log enough to inspect the pipeline — the field NAMES Zapier sent, counts, and
+  // masked borrower names — WITHOUT persisting raw borrower PII (no raw payload
+  // values), since this diagnostics log is readable by signed-in users.
   addWebhookLog({
     at: new Date(now).toISOString(),
     recordsReceived: records.length,
     borrowersStored: mapped.length,
     fieldNames: Object.keys(flattenFields(records[0] || {})).slice(0, 40),
-    extractedNames: mappedAll.map((b) => b.name).slice(0, 20),
-    sample: JSON.stringify(records[0] || {}).slice(0, 1500),
+    extractedNames: mappedAll.map((b) => maskName(b.name)).filter(Boolean).slice(0, 20),
   });
 
   // A test POST with no recognizable fields still succeeds (200) with a hint, so a
