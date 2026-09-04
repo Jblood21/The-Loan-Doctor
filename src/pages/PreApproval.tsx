@@ -16,13 +16,15 @@ import { computeScenario } from '@/lib/finance';
 import {
   buildPreApprovalLetter,
   LETTER_TEMPLATES,
+  LETTER_KINDS,
   LETTERHEAD_STYLES,
   PRONOUN_OPTIONS,
+  letterKindNoun,
   resolveTemplate,
   SALUTATION_PRESETS,
   CLOSING_PRESETS,
 } from '@/lib/letter';
-import type { PronounChoice } from '@/lib/letter';
+import type { LetterKind, PronounChoice } from '@/lib/letter';
 import { fmt, longDateWeekday } from '@/lib/format';
 import { rankBorrowers } from '@/lib/borrowerSearch';
 import { parseMismo } from '@/lib/mismo';
@@ -200,6 +202,8 @@ export default function PreApproval() {
 
   // Program template + editable body.
   const [templateId, setTemplateId] = useState('auto');
+  // Approval level — sets the letter's core verbiage (Pre-Approval / Pre-Underwritten / Pre-Qualified).
+  const [letterKind, setLetterKind] = useState<LetterKind>('preapproval');
   const [bodyText, setBodyText] = useState('');
   const [customized, setCustomized] = useState(false);
   const [pronoun, setPronoun] = useState<PronounChoice>('they');
@@ -261,8 +265,8 @@ export default function PreApproval() {
   const resetHeadshot = () => saveSettings({ headshotDataUrl: '' });
 
   const tpl = useMemo(
-    () => resolveTemplate(templateId, srcScenario, { borrowerName: pa.borrowerName, propertyAddress: pa.propertyAddress, pronoun }),
-    [templateId, srcScenario, pa.borrowerName, pa.propertyAddress, pronoun],
+    () => resolveTemplate(templateId, srcScenario, { borrowerName: pa.borrowerName, propertyAddress: pa.propertyAddress, pronoun, kind: letterKind }),
+    [templateId, srcScenario, pa.borrowerName, pa.propertyAddress, pronoun, letterKind],
   );
   useEffect(() => {
     if (customized) return;
@@ -283,6 +287,7 @@ export default function PreApproval() {
     agent: selectedAgent ? { name: selectedAgent.name, brokerage: selectedAgent.brokerage, phone: selectedAgent.phone } : null,
     now: today,
     templateId,
+    kind: letterKind,
     pronoun,
     paragraphs: parsedParagraphs.length ? parsedParagraphs : undefined,
     reLine,
@@ -299,6 +304,10 @@ export default function PreApproval() {
   const onTemplateChange = (id: string) => {
     setCustomized(false);
     setTemplateId(id);
+  };
+  const onKindChange = (k: LetterKind) => {
+    setCustomized(false);
+    setLetterKind(k);
   };
   const resetTemplate = () => setCustomized(false);
   const isClassic = styleId === 'classic';
@@ -887,6 +896,19 @@ export default function PreApproval() {
             </div>
           </div>
 
+          {/* Approval level — sets the letter's verbiage */}
+          <div className="mb-5">
+            <SectionLabel className="mb-2">APPROVAL LEVEL</SectionLabel>
+            <Select
+              value={letterKind}
+              onChange={(e) => onKindChange(e.target.value as LetterKind)}
+              options={LETTER_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+            />
+            <div className="mt-1.5 text-[12px] text-text-muted">
+              Changes the wording between Pre-Approval, Pre-Underwritten, and Pre-Qualified throughout the letter.
+            </div>
+          </div>
+
           {/* Program template + editable body */}
           <div className="mb-5">
             <div className="mb-2 flex items-center justify-between">
@@ -924,7 +946,7 @@ export default function PreApproval() {
             </div>
             <div className="col-span-2">
               <Label>RE line</Label>
-              <TextField placeholder={`Pre-Approval for ${pa.borrowerName || 'Borrower'}`} value={reLine} onChange={(e) => setReLine(e.target.value)} />
+              <TextField placeholder={`${letterKindNoun(letterKind)} for ${pa.borrowerName || 'Borrower'}`} value={reLine} onChange={(e) => setReLine(e.target.value)} />
             </div>
             <div className="col-span-2">
               <Label>Salutation</Label>
