@@ -670,22 +670,21 @@ export default function PreApproval() {
 
               {pa.losProvider === 'arive' && (
                 <div className="mb-3.5 rounded-[10px] border border-border-input bg-input p-3.5">
-                  <div className="text-[12.5px] font-semibold text-text-label">Shared team pipeline · one Zap for everyone</div>
+                  <div className="text-[12.5px] font-semibold text-text-label">Your private loan pipeline</div>
                   <div className="mt-1 text-[11.5px] leading-[1.5] text-text-muted">
-                    This is a <strong>shared</strong> feed: one Zap sends loans in, and everyone on your team sees them here — so
-                    teammates don’t set up anything, they just search below. <strong>Set it up once:</strong> in Zapier,{' '}
-                    <strong>Trigger</strong> = Arive (new/updated loan) → <strong>Action</strong> = “Webhooks by Zapier” (POST) to
-                    the shared URL below. Map borrower name, property address, loan #, and amount. (The URL is the same for every
-                    account.)
+                    This webhook URL is <strong>yours</strong> — loans sent to it are private to your account and only you see
+                    them here. <strong>Set it up once:</strong> in Zapier, <strong>Trigger</strong> = Arive (new/updated loan) →{' '}
+                    <strong>Action</strong> = “Webhooks by Zapier” (POST) to <strong>your</strong> URL below. Map borrower name,
+                    property address, loan #, and amount. (Each officer has their own URL — don’t share yours.)
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     <input
                       readOnly
                       value={webhookUrl}
-                      placeholder={webhookLoading ? 'Loading the shared webhook URL…' : 'Click Refresh to load the shared webhook URL'}
+                      placeholder={webhookLoading ? 'Loading your webhook URL…' : 'Click Refresh to load your webhook URL'}
                       onFocus={(e) => e.currentTarget.select()}
                       className="num h-9 flex-1 rounded-[8px] border border-border-input bg-app px-2.5 text-[11.5px] text-text-soft outline-none placeholder:text-text-dim"
-                      aria-label="Shared team webhook URL"
+                      aria-label="Your private webhook URL"
                     />
                     <Button variant="secondary" size="sm" onClick={copyWebhook} disabled={!webhookUrl}>
                       {copied ? 'Copied ✓' : 'Copy'}
@@ -699,7 +698,7 @@ export default function PreApproval() {
                   ) : (
                     <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-text-dim">
                       <span>
-                        {webhookCount} borrower{webhookCount === 1 ? '' : 's'} in the shared pipeline · same feed for your whole team.
+                        {webhookCount} borrower{webhookCount === 1 ? '' : 's'} in your pipeline · private to your account.
                       </span>
                       <button
                         type="button"
@@ -862,7 +861,7 @@ export default function PreApproval() {
                   <div className="mt-2 text-[11.5px] text-text-dim">
                     {losMode === 'demo'
                       ? 'Waiting for your first loan — send one from your Zap (or hit “Test” in Zapier) and it appears here instantly.'
-                      : `${losResults.length} borrower${losResults.length === 1 ? '' : 's'} in your team’s shared pipeline.`}
+                      : `${losResults.length} borrower${losResults.length === 1 ? '' : 's'} in your private pipeline.`}
                   </div>
 
                   {/* Disclose which loan terms drive the letter after a borrower is picked. */}

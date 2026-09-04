@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getLos, setLos, getLosBorrowers, upsertLosBorrowers, clearLosBorrowers, findUserByWebhookToken, sharedWebhookToken, SHARED_LOS_KEY, addWebhookLog, getWebhookLog, timingSafeEqualStr } from '../store.js';
+import { getLos, setLos, getLosBorrowers, upsertLosBorrowers, clearLosBorrowers, findUserByWebhookToken, ensureWebhookToken, regenerateWebhookToken, sharedWebhookToken, primaryOwnerId, addWebhookLog, getWebhookLog, timingSafeEqualStr } from '../store.js';
 import { requireAuth } from '../auth.js';
 import { ariveConfigured, ariveSearch } from '../los/arive.js';
 
@@ -111,9 +111,12 @@ function mapInbound(rec = {}) {
 // record, an array, or { borrowers: [...] } / { loans: [...] }. The shared token
 // routes to one pool everyone sees; a legacy per-user token still routes to that user.
 function resolveWebhookTarget(token) {
-  if (timingSafeEqualStr(token, sharedWebhookToken())) return SHARED_LOS_KEY;
   const user = findUserByWebhookToken(token);
-  return user ? user.id : null;
+  if (user) return user.id;
+  // Back-compat: a Zap still pointing at the pre-isolation shared URL now feeds the
+  // owner's private list, so an existing integration doesn't silently break.
+  if (timingSafeEqualStr(token, sharedWebhookToken())) return primaryOwnerId();
+  return null;
 }
 
 // GET is a liveness/verification probe: opening the webhook URL in a browser (or a
@@ -144,7 +147,7 @@ router.post('/webhook/:token', (req, res) => {
   // Log enough to inspect the pipeline — the field NAMES Zapier sent, counts, and
   // masked borrower names — WITHOUT persisting raw borrower PII (no raw payload
   // values), since this diagnostics log is readable by signed-in users.
-  addWebhookLog({
+  addWebhookLog(target, {
     at: new Date(now).toISOString(),
     recordsReceived: records.length,
     borrowersStored: mapped.length,
@@ -166,28 +169,28 @@ router.post('/webhook/:token', (req, res) => {
 });
 
 // ---- webhook setup info (auth) -----------------------------------------
-// One shared webhook URL is returned for everyone.
+// Each officer gets their OWN webhook URL; loans posted to it are private to them.
 function webhookUrl(req, token) {
   const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
   return `${base.replace(/\/$/, '')}/api/los/webhook/${token}`;
 }
 router.get('/webhook-info', requireAuth, (req, res) => {
-  const token = sharedWebhookToken();
-  res.json({ token, url: webhookUrl(req, token), count: getLosBorrowers(SHARED_LOS_KEY).length });
+  const token = ensureWebhookToken(req.user.id);
+  res.json({ token, url: webhookUrl(req, token), count: getLosBorrowers(req.user.id).length });
 });
 router.post('/webhook-info/regenerate', requireAuth, (req, res) => {
-  // The shared URL is derived from the server secret and can't be rotated per user;
-  // re-confirm it so the button still returns the current, permanent URL.
-  const token = sharedWebhookToken();
+  // The URL is derived from the server secret + user id (stable), so this re-confirms
+  // this officer's permanent webhook URL rather than issuing a throwaway one.
+  const token = regenerateWebhookToken(req.user.id);
   res.json({ token, url: webhookUrl(req, token) });
 });
 router.post('/webhook-info/clear', requireAuth, (req, res) => {
-  clearLosBorrowers(SHARED_LOS_KEY);
+  clearLosBorrowers(req.user.id);
   res.json({ ok: true });
 });
-// Recent raw webhook activity — lets you see exactly what Zapier has been sending.
+// Recent webhook activity for THIS officer's URL (field names + counts, names masked).
 router.get('/webhook-info/log', requireAuth, (req, res) => {
-  res.json({ log: getWebhookLog(), count: getLosBorrowers(SHARED_LOS_KEY).length });
+  res.json({ log: getWebhookLog(req.user.id), count: getLosBorrowers(req.user.id).length });
 });
 
 // ---- connect / search ---------------------------------------------------
@@ -204,7 +207,7 @@ router.post('/connect', requireAuth, async (req, res) => {
     }
   }
   setLos(req.user.id, provider, true);
-  const mode = getLosBorrowers(SHARED_LOS_KEY).length ? 'zapier' : 'demo';
+  const mode = getLosBorrowers(req.user.id).length ? 'zapier' : 'demo';
   res.json({ connected: true, provider, mode });
 });
 
@@ -225,7 +228,7 @@ router.get('/borrowers', requireAuth, async (req, res) => {
       return res.status(502).json({ error: `${provider} API error: ${err.message}` });
     }
   }
-  const pushed = getLosBorrowers(SHARED_LOS_KEY);
+  const pushed = getLosBorrowers(req.user.id);
   if (pushed.length) return res.json({ results: filterByQuery(pushed, req.query.q), mode: 'zapier' });
   // No real loans pushed yet — honest empty state (never fake sample borrowers).
   res.json({ results: [], mode: 'demo' });

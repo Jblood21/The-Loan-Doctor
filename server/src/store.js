@@ -92,7 +92,7 @@ export function dataDirInfo() {
   return { dir: DATA_DIR, persistent, explicit, onKnownMount };
 }
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: [], shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
+const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -218,7 +218,19 @@ export function getLos(userId) {
   return db.los[userId] || {};
 }
 
-// ---- inbound LOS borrowers (pushed via Zapier webhook) -----------------
+// The account that owns pre-isolation shared data (and legacy shared-webhook posts):
+// the configured OWNER_EMAIL account, else the first admin, else the first user.
+export function primaryOwnerId() {
+  const ownerEmail = normalizeEmail(process.env.OWNER_EMAIL);
+  if (ownerEmail) {
+    const owner = findUserByEmail(ownerEmail);
+    if (owner) return owner.id;
+  }
+  const admin = db.users.find((u) => u.role === 'admin');
+  return admin ? admin.id : db.users[0]?.id || null;
+}
+
+// ---- inbound LOS borrowers (pushed via Zapier webhook, per user) --------
 export function getLosBorrowers(userId) {
   return db.losBorrowers[userId] || [];
 }
@@ -243,17 +255,24 @@ export function clearLosBorrowers(userId) {
   persist();
 }
 
-// ---- webhook activity log (diagnostics) --------------------------------
-// Keeps the most recent raw inbound payloads so you can SEE exactly what Zapier
-// sent (field names + values) and how many borrowers were extracted from each.
-export function addWebhookLog(entry) {
-  const list = db.losWebhookLog || [];
+// ---- webhook activity log (diagnostics, per user) ----------------------
+// Keeps the most recent inbound payloads for each user's own webhook so they can
+// SEE which field names Zapier sent and how many borrowers were extracted (values
+// are redacted at the call site — no raw borrower PII is stored here).
+function webhookLogStore() {
+  // Migrate the pre-isolation single global array to the per-user shape on first touch.
+  if (!db.losWebhookLog || Array.isArray(db.losWebhookLog)) db.losWebhookLog = {};
+  return db.losWebhookLog;
+}
+export function addWebhookLog(userId, entry) {
+  const all = webhookLogStore();
+  const list = all[userId] || [];
   list.unshift(entry);
-  db.losWebhookLog = list.slice(0, 25);
+  all[userId] = list.slice(0, 25);
   persist();
 }
-export function getWebhookLog() {
-  return db.losWebhookLog || [];
+export function getWebhookLog(userId) {
+  return webhookLogStore()[userId] || [];
 }
 
 // ---- per-user webhook token (identifies the Zap source) ----------------
@@ -444,6 +463,21 @@ export function seed() {
     for (const [name, email, company, count, status] of samples) {
       addUser({ email, password: randomUUID(), name, company, role: 'user', status, scenarioCount: count });
     }
+  }
+
+  // One-time migration to per-officer borrower isolation: fold any borrowers that
+  // landed in the old shared pool into the owner's private list, then drop the shared
+  // pool. Guarded so it runs at most once. Also normalizes the webhook log shape.
+  if (!db.sharedLosMigrated) {
+    const shared = db.losBorrowers[SHARED_LOS_KEY] || [];
+    const ownerId = primaryOwnerId();
+    if (shared.length && ownerId) {
+      upsertLosBorrowers(ownerId, shared);
+      console.log(`[seed] Migrated ${shared.length} shared borrower(s) into the owner's private list (per-officer isolation).`);
+    }
+    delete db.losBorrowers[SHARED_LOS_KEY];
+    if (Array.isArray(db.losWebhookLog)) db.losWebhookLog = {};
+    db.sharedLosMigrated = true;
   }
 
   persist();
