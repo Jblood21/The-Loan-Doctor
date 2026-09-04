@@ -154,11 +154,15 @@ export function renderComparisonPdf(doc, d) {
   heading('Closing Costs & Cash to Close');
   activeHeaderLabel = 'CLOSING COSTS';
   drawTableHeader();
+  const anyPoints = legacy.columns.some((lc) => lc && lc.points);
   const cRows = [
     { label: 'Down Payment', get: (i) => columns[i].cells.downPayment },
     { label: 'Base Closing Costs (Est.)', get: (i) => str((legacy.columns[i] || {}).closing, '—') },
-    { label: 'Credits Applied', get: (i) => str((legacy.columns[i] || {}).credits, '$0'), green: true },
   ];
+  if (anyPoints) {
+    cRows.push({ label: 'Lender Points', get: (i) => str((legacy.columns[i] || {}).points) || '—' });
+  }
+  cRows.push({ label: 'Credits Applied', get: (i) => str((legacy.columns[i] || {}).credits, '$0'), green: true });
   let z2 = 0;
   cRows.forEach((row) => {
     ensureTable(rowH);
@@ -282,6 +286,7 @@ function coerceLegacy(body) {
       head2: str(o.head2) || str(o.downLabel),
       cardLabel: str(o.cardLabel),
       closing: str(o.closing),
+      points: str(o.points),
       credits: str(o.credits),
       netClosing: str(o.netClosing) || str(o.closing),
     };

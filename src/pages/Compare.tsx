@@ -146,6 +146,13 @@ export default function Compare() {
     const columns = results.map(({ s, c }) => {
       const price = compactPrice(s.homePrice || 0);
       const dn = downPctOf(s);
+      // Split the lender points out of closing / credits so they can show on their own
+      // PDF line without double-counting (a cost is baked into closingCosts; a discount
+      // into creditsApplied). The signed points line then reconciles to cash-to-close.
+      const pointsCost = Math.max(0, c.lenderPointsAmount);
+      const pointsCredit = Math.max(0, -c.lenderPointsAmount);
+      const baseClosing = c.closingCosts - pointsCost;
+      const baseCredits = c.creditsApplied - pointsCredit;
       return {
         priceLabel: price,
         downLabel: `${dn}% DOWN`,
@@ -164,9 +171,14 @@ export default function Compare() {
         insurance: fmt2(c.insurance),
         hoa: c.hoa > 0 ? fmt2(c.hoa) : 'NA',
         totalMonthly: fmt2(c.totalMonthly),
-        closing: fmt2(c.closingCosts),
-        credits: c.creditsApplied > 0 ? `–${fmt2(c.creditsApplied)}` : fmt2(0),
-        netClosing: fmt2(Math.max(0, c.closingCosts - c.creditsApplied)),
+        closing: fmt2(baseClosing),
+        // Lender points as a signed dollar line (+ cost / – credit), with the point count.
+        points:
+          c.lenderPoints > 0
+            ? `${c.lenderPointsAmount < 0 ? '–' : ''}${fmt2(Math.abs(c.lenderPointsAmount))} (${c.lenderPoints} pt${c.lenderPoints === 1 ? '' : 's'})`
+            : '',
+        credits: baseCredits > 0 ? `–${fmt2(baseCredits)}` : fmt2(0),
+        netClosing: fmt2(Math.max(0, baseClosing - baseCredits)),
         cashToClose: fmt2(c.cashToClose),
       };
     });
