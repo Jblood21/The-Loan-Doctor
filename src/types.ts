@@ -45,6 +45,11 @@ export interface Scenario {
   lenderCredit: number;
   sellerCredit: number;
   otherCredits: number;
+  /** Lender/discount points on the loan, in points (% of loan amount). 0/undefined = none. */
+  lenderPoints?: number;
+  /** Whether the points are a cost the borrower pays (discount points) or a credit the
+   *  lender gives (rebate/negative points). Absent = 'cost'. */
+  lenderPointsMode?: 'cost' | 'credit';
   /** Itemized closing costs (base + custom fees). When empty, a 3% estimate is used. */
   closingCosts?: ClosingCostItem[];
   /** Optional per-scenario override for property tax rate (%/yr of home value). */
