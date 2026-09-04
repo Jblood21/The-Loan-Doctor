@@ -79,9 +79,14 @@ interface KindWording {
   basis: (pr: PronounSet, scores: string) => string;
   /** Third paragraph — readiness / remaining steps. */
   readiness: (name: string) => string;
+  /** Tail of the validity sentence ("… and is <validityTail>"), so each level's
+   *  remaining conditions match what has actually been done. */
+  validityTail: string;
 }
 
 const KIND_WORDING: Record<LetterKind, KindWording> = {
+  // Standard pre-approval: credit reviewed and income/assets documented, but the file
+  // has NOT yet been submitted to an underwriter — full underwriting is still ahead.
   preapproval: {
     noun: 'Pre-Approval',
     nounLower: 'pre-approval',
@@ -89,25 +94,34 @@ const KIND_WORDING: Record<LetterKind, KindWording> = {
     basis: (pr, scores) =>
       `This pre-approval is supported by ${pr.poss} strong credit history and ${scores}. ${pr.subjCap} ${pr.have} provided income and asset documentation verifying sufficient income and assets needed for this transaction.`,
     readiness: (name) =>
-      `Based on this, ${name} can close in a timely manner pending underwriter review of the file, including a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+      `Based on this, ${name} can close in a timely manner once the file is submitted to underwriting, including a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+    validityTail: 'subject to a satisfactory appraisal, clear title, and final underwriting approval.',
   },
+  // Pre-underwritten: the file HAS been reviewed and approved by a mortgage underwriter.
+  // What remains are the property-side items and the underwriter's stated conditions —
+  // not another underwriting pass, so the wording must not imply one.
   preunderwritten: {
     noun: 'Underwritten Pre-Approval',
     nounLower: 'underwritten pre-approval',
     verb: 'fully underwritten and conditionally approved',
     basis: (pr, scores) =>
-      `This approval reflects a full underwriting review of ${pr.poss} credit, income, and asset documentation by a mortgage underwriter, including ${pr.poss} ${scores}. ${pr.subjCap} ${pr.have} met the requirements for this financing, subject only to the conditions noted below.`,
+      `This approval reflects a complete underwriting review of ${pr.poss} credit, income, and asset documentation by a mortgage underwriter, who has verified ${pr.poss} ${scores} and ability to repay. ${pr.subjCap} ${pr.have} met the requirements for this financing, so the approval is subject only to the property-related items and standard closing conditions — not to a further review of income, assets, or credit.`,
     readiness: (name) =>
-      `Because the file has already been underwritten, ${name} is positioned to close quickly — the remaining items are a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+      `Because the file has already been underwritten, ${name} can close quickly — the remaining items are a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+    validityTail: 'subject to a satisfactory appraisal, clear title, and satisfaction of the remaining underwriting conditions.',
   },
+  // Pre-qualified: based on information the borrower stated but that has NOT been
+  // verified, and the file has not been underwritten. Everything is still ahead.
   prequalified: {
     noun: 'Pre-Qualification',
     nounLower: 'pre-qualification',
     verb: 'pre-qualified',
     basis: (pr, scores) =>
-      `This pre-qualification is based on ${pr.poss} stated income, assets, and ${scores}, which have not yet been verified with documentation.`,
+      `This pre-qualification is based on ${pr.poss} stated income, assets, and ${scores}, which have not yet been verified with documentation or reviewed by an underwriter.`,
     readiness: (name) =>
-      `Based on the information provided, ${name} appears well-qualified for this financing. Final approval is subject to verification of income and assets, a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+      `Based on the information provided, this financing looks like a strong fit for ${name}. Moving to a full pre-approval requires verification of income and assets and an underwriting review, followed by a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+    validityTail:
+      "subject to verification of the borrower's income, assets, and credit, a satisfactory appraisal, clear title, and full underwriting approval.",
   },
 };
 
@@ -254,7 +268,7 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
 
   const expDays = opts.expDays || 90;
   const exp = new Date(now.getTime() + expDays * 86_400_000);
-  const validity = `This ${w.nounLower} is valid through ${longDate(exp)} and is subject to property appraisal, title review, and final underwriting verification.`;
+  const validity = `This ${w.nounLower} is valid through ${longDate(exp)} and is ${w.validityTail}`;
 
   // The selected agent (from the saved contacts) wins; otherwise fall back to the legacy
   // single agent fields on settings.
