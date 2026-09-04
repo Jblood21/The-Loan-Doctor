@@ -34,29 +34,39 @@ describe('pre-approval letter kinds', () => {
     expect(l.paragraphs[0]).toContain('is pre-approved for the purchase');
   });
 
-  it('pre-approved: verified docs wording', () => {
+  it('pre-approved: docs reviewed, underwriting still ahead', () => {
     const l = letterFor('preapproval');
     expect(l.reLine).toBe('Pre-Approval for John Smith');
     expect(l.paragraphs[0]).toContain('is pre-approved for the purchase');
     expect(l.paragraphs[1]).toContain('provided income and asset documentation');
+    // Underwriting has not happened yet — the file is still to be submitted.
+    expect(l.paragraphs[2]).toContain('once the file is submitted to underwriting');
     expect(l.validity).toContain('This pre-approval is valid through');
+    expect(l.validity).toContain('final underwriting approval');
     expect(l.paragraphs[3]).toBe('Please contact me with any questions regarding this pre-approval.');
   });
 
-  it('pre-underwritten: underwriter-reviewed wording', () => {
+  it('pre-underwritten: underwriter already reviewed, no further income/asset review', () => {
     const l = letterFor('preunderwritten');
     expect(l.reLine).toBe('Underwritten Pre-Approval for John Smith');
     expect(l.paragraphs[0]).toContain('fully underwritten and conditionally approved');
-    expect(l.paragraphs[1]).toContain('full underwriting review');
-    expect(l.validity).toContain('This underwritten pre-approval is valid through');
+    expect(l.paragraphs[1]).toContain('complete underwriting review');
+    expect(l.paragraphs[1]).toContain('not to a further review of income, assets, or credit');
+    expect(l.paragraphs[2]).toContain('already been underwritten');
+    // Must NOT claim underwriting is still pending — it's done.
+    expect(l.validity).toContain('remaining underwriting conditions');
+    expect(l.validity).not.toContain('final underwriting approval');
   });
 
-  it('pre-qualified: stated (unverified) wording', () => {
+  it('pre-qualified: stated info, not verified or underwritten', () => {
     const l = letterFor('prequalified');
     expect(l.reLine).toBe('Pre-Qualification for John Smith');
     expect(l.paragraphs[0]).toContain('is pre-qualified for the purchase');
     expect(l.paragraphs[1]).toContain('have not yet been verified');
-    expect(l.validity).toContain('This pre-qualification is valid through');
+    expect(l.paragraphs[1]).toContain('reviewed by an underwriter');
+    // Everything is still ahead: verification AND underwriting.
+    expect(l.validity).toContain('verification of the borrower');
+    expect(l.validity).toContain('full underwriting approval');
   });
 
   it('a refinance keeps the selected kind verb', () => {
