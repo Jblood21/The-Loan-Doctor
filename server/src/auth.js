@@ -1,13 +1,13 @@
 // JWT helpers + auth middleware.
 
 import jwt from 'jsonwebtoken';
-import { findUserById } from './store.js';
+import { findUserById, serverSecret } from './store.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 export function signToken(user) {
-  return jwt.sign({ sub: user.id, email: user.email, role: user.role }, JWT_SECRET, {
+  return jwt.sign({ sub: user.id, email: user.email, role: user.role }, serverSecret(), {
+    algorithm: 'HS256',
     expiresIn: JWT_EXPIRES_IN,
   });
 }
@@ -22,7 +22,7 @@ export function requireAuth(req, res, next) {
   const token = readToken(req);
   if (!token) return res.status(401).json({ error: 'Authentication required' });
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, serverSecret(), { algorithms: ['HS256'] });
     const user = findUserById(payload.sub);
     if (!user) return res.status(401).json({ error: 'Account not found' });
     req.user = user;

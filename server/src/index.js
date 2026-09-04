@@ -38,11 +38,15 @@ app.set('trust proxy', 1); // behind Render/other TLS proxy — needed for corre
 // hardening headers (HSTS, X-Content-Type-Options, frameguard, referrer policy) apply.
 app.use(helmet({ contentSecurityPolicy: false }));
 
-// CORS — reflect any origin in dev; lock to CORS_ORIGIN list in production.
+// CORS — reflect any origin in dev; lock to the CORS_ORIGIN list in production. The API
+// and SPA ship as one service (same origin), so production needs cross-origin access
+// only when a separate frontend host is configured; otherwise deny it rather than
+// reflecting any origin with credentials.
+const isProduction = process.env.NODE_ENV === 'production';
 const allowed = (process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
 app.use(
   cors({
-    origin: allowed.length ? allowed : true,
+    origin: allowed.length ? allowed : (isProduction ? false : true),
     credentials: true,
   }),
 );
@@ -98,16 +102,16 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Warn loudly (but don't block boot) if JWT_SECRET wasn't set to a real value in
-// production. On the default, both the login tokens and the derived LOS webhook token
-// are signed with a public, committed value, which allows trivial admin-token forgery.
-// This is a non-fatal warning so a live service already running on the default is not
-// knocked offline by a deploy — set JWT_SECRET when you can rotate the webhook URL too.
+// The committed dev default is never used to sign anything — when JWT_SECRET is unset,
+// the store falls back to a strong random secret it persists (see store.serverSecret()).
+// That closes the forgery hole, but on an EPHEMERAL data dir the random secret is
+// regenerated on every redeploy, which silently logs everyone out and changes the LOS
+// webhook URL. Recommend (don't require) an explicit JWT_SECRET so both stay stable.
 const DEV_JWT_DEFAULT = 'dev-secret-change-me-in-production';
 if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEV_JWT_DEFAULT)) {
-  console.warn('\n  ⚠ SECURITY: JWT_SECRET is missing or set to the known default in production.');
-  console.warn('    Tokens (and the LOS webhook URL) are signed with a public value — anyone could forge an admin token.');
-  console.warn('    Set a long, random JWT_SECRET in your host environment (e.g. `openssl rand -hex 48`), then redeploy.\n');
+  console.warn('\n  ⚠ JWT_SECRET is not set in production — using a persisted random secret.');
+  console.warn('    Set a long, random JWT_SECRET (e.g. `openssl rand -hex 48`) so sessions and the');
+  console.warn('    LOS webhook URL stay stable across redeploys, especially on an ephemeral disk.\n');
 }
 
 seed();

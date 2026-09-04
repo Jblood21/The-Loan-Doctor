@@ -7,8 +7,36 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID, createHash, createHmac } from 'node:crypto';
+import { randomUUID, randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import bcrypt from 'bcryptjs';
+
+// The committed dev fallback — never used to sign anything (see serverSecret()).
+const DEV_SECRET_DEFAULT = 'dev-secret-change-me-in-production';
+
+/**
+ * The secret that signs JWTs and derives webhook tokens. Prefers an explicit
+ * JWT_SECRET env var; when it is missing (or still set to the committed dev
+ * default) a strong random secret is generated once and persisted, so the
+ * public committed value is never used. Stable across restarts as long as the
+ * data dir is persistent (a fresh random secret only re-issues logins once).
+ */
+export function serverSecret() {
+  const env = process.env.JWT_SECRET;
+  if (env && env !== DEV_SECRET_DEFAULT) return env;
+  if (!db.serverSecret) {
+    db.serverSecret = randomBytes(48).toString('hex');
+    persist();
+  }
+  return db.serverSecret;
+}
+
+/** Constant-time string comparison for secrets/tokens (length is not sensitive here). */
+export function timingSafeEqualStr(a, b) {
+  const ba = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
 
 /** Stable, deterministic id for a seeded account so it survives a data wipe with the
  *  same id — keeps a logged-in session valid across restarts (e.g. Render free tier). */
@@ -19,16 +47,14 @@ function stableSeedId(email) {
 /** Deterministic per-user webhook token derived from the server secret + user id.
  *  Unguessable (HMAC) yet stable across restarts, so the webhook URL never changes. */
 function webhookTokenFor(userId) {
-  const secret = process.env.JWT_SECRET || 'dev-secret-change-me-in-production';
-  return `whk_${createHmac('sha256', secret).update(`webhook:${userId}`).digest('hex').slice(0, 32)}`;
+  return `whk_${createHmac('sha256', serverSecret()).update(`webhook:${userId}`).digest('hex').slice(0, 32)}`;
 }
 
 /** One shared webhook for the whole deployment — the same URL for everyone. Loans
  *  posted here land in a single shared pool that every user sees. */
 export const SHARED_LOS_KEY = '__shared__';
 export function sharedWebhookToken() {
-  const secret = process.env.JWT_SECRET || 'dev-secret-change-me-in-production';
-  return `whk_${createHmac('sha256', secret).update('webhook:shared').digest('hex').slice(0, 32)}`;
+  return `whk_${createHmac('sha256', serverSecret()).update('webhook:shared').digest('hex').slice(0, 32)}`;
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -88,10 +114,19 @@ export function load() {
 
 export function persist() {
   ensureDir();
-  // Atomic write: fill a temp file then rename over the target, so a crash
-  // mid-write can never leave a truncated/corrupt db.json.
-  const tmp = `${DB_FILE}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+  // Atomic, durable write: fill a UNIQUE temp file, fsync it, then rename over the
+  // target. A unique name (pid + uuid) keeps two processes (e.g. an overlapping
+  // redeploy sharing the disk) from writing the same temp file and renaming a
+  // half-written db.json into place; the fsync makes the bytes durable before the
+  // rename, so a crash can't leave the rename pointing at unflushed data.
+  const tmp = `${DB_FILE}.${process.pid}.${randomUUID()}.tmp`;
+  const fd = fs.openSync(tmp, 'w');
+  try {
+    fs.writeFileSync(fd, JSON.stringify(db, null, 2));
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
   fs.renameSync(tmp, DB_FILE);
 }
 
@@ -217,7 +252,7 @@ export function getWebhookLog() {
 // so a POST works even before the token has been persisted after a fresh boot.
 export function findUserByWebhookToken(token) {
   if (!token) return undefined;
-  return db.users.find((u) => u.webhookToken === token || webhookTokenFor(u.id) === token);
+  return db.users.find((u) => timingSafeEqualStr(u.webhookToken, token) || timingSafeEqualStr(webhookTokenFor(u.id), token));
 }
 export function ensureWebhookToken(userId) {
   const u = findUserById(userId);
