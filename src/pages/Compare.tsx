@@ -62,6 +62,8 @@ export default function Compare() {
   const { openSettings } = useUI();
   const [savedDefault, setSavedDefault] = useState(false);
   const [borrowerName, setBorrowerName] = useState('');
+  // Borrower credit score — a free-text box that prints on the PDF like the name/address.
+  const [borrowerCredit, setBorrowerCredit] = useState('');
   // Property address: enter an address, or mark it TBD. (An empty address is simply omitted.)
   const [addressMode, setAddressMode] = useState<'available' | 'tbd'>('available');
   const [propertyAddress, setPropertyAddress] = useState('');
@@ -206,6 +208,8 @@ export default function Compare() {
       bestIndex,
       lender,
       borrowerName,
+      // Borrower-level credit score for the letterhead (blank ⇒ omitted).
+      borrowerCredit: borrowerCredit.trim(),
       programLabel,
       subLine,
       // Empty when rates differ → the PDF hides the single "RATE" box.
@@ -406,6 +410,15 @@ export default function Compare() {
             ) : (
               <div className="mt-2 text-[11.5px] text-text-dim">The report will show “TBD” for the property address.</div>
             )}
+            <div className="mt-3.5">
+              <Label>Credit Score</Label>
+              <TextField
+                placeholder="Borrower's credit score (appears on the PDF)"
+                value={borrowerCredit}
+                onChange={(e) => setBorrowerCredit(e.target.value)}
+                inputMode="numeric"
+              />
+            </div>
           </div>
 
           {/* transaction + borrowers */}
