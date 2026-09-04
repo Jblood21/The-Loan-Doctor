@@ -9,7 +9,8 @@ interface SegmentedControlProps<T extends string> {
   options: SegOption<T>[];
   value: T;
   onChange: (value: T) => void;
-  /** 'md' = label pills, 'sm' = compact 38px squares (e.g. borrower count) */
+  /** 'md' = label pills, 'sm' = compact pills that size to their label with a 38px
+   *  floor (single chars like the borrower count stay square; word labels expand). */
   size?: 'md' | 'sm';
   className?: string;
 }
@@ -29,7 +30,7 @@ export function SegmentedControl<T extends string>({
         const active = opt.value === value;
         const base =
           size === 'sm'
-            ? 'w-[38px] py-2 text-[13.5px] rounded-[7px]'
+            ? 'min-w-[38px] px-3 py-2 text-[13.5px] rounded-[7px] text-center'
             : 'px-[18px] py-[9px] text-[13.5px] rounded-lg';
         return (
           <button
