@@ -12,13 +12,9 @@ const LOGO = path.join(__dirname, '..', 'assets', 'letterhead-logo.jpg');
 // Summit Home Loans palette.
 const NAVY = '#13355f';
 const NAVY_DK = '#0b2547';
-const STRIP = '#f4f6f9';
 const STRIPE = '#f8fafc';
 const HILITE = '#e8f5ee'; // green-tinted highlight for the payment / cash-to-close rows
-const CARD_BG = '#f5f8fc';
-const CARD_BORDER = '#d9e2ee';
 const RULE = '#e3e8ee';
-const LABEL = '#5b6b7b';
 const VALUE = '#1f2d3d';
 const MUTED = '#8b98a6';
 const GO = '#0f9d58'; // bright "go" green — rate, monthly payment, cash to close
@@ -36,7 +32,7 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 
 /** Draw the whole comparison onto a bufferPages document. Content only. */
 export function renderComparisonPdf(doc, d) {
-  const { title, borrowerName, propertyAddress, date, logoSource, programLabel, subLine, rate, assumptions, insights, model, legacy } = d;
+  const { title, borrowerName, propertyAddress, borrowerCredit, date, logoSource, model, legacy } = d;
   const columns = model.columns;
   const cols = columns.length;
 
@@ -74,21 +70,13 @@ export function renderComparisonPdf(doc, d) {
     doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(`Property: ${propertyAddress}`, HX, hy, { width: RIGHT - HX, lineBreak: false });
     hy += 15;
   }
-
-  // Program + rate box
-  const boxY = Math.max(hy + 2, 92);
-  const boxH = 40;
-  doc.save();
-  doc.roundedRect(HX, boxY, RIGHT - HX, boxH, 6).fill(STRIP);
-  doc.restore();
-  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(11).text(programLabel || 'Loan Comparison', HX + 14, boxY + 8, { width: RIGHT - HX - 120, lineBreak: false });
-  if (subLine) doc.fillColor(LABEL).font('Helvetica').fontSize(9).text(subLine, HX + 14, boxY + 23, { width: RIGHT - HX - 120, lineBreak: false });
-  if (rate) {
-    doc.fillColor(MUTED).font('Helvetica-Bold').fontSize(8).text('RATE', RIGHT - 96, boxY + 8, { width: 82, align: 'right', lineBreak: false });
-    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(15).text(rate, RIGHT - 96, boxY + 18, { width: 82, align: 'right', lineBreak: false });
+  // Borrower credit score — shown just like the name/address, only when provided.
+  if (borrowerCredit) {
+    doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(`Credit Score: ${borrowerCredit}`, HX, hy, { width: RIGHT - HX, lineBreak: false });
+    hy += 15;
   }
 
-  let y = Math.max(boxY + boxH, logoBottom + 12) + 8;
+  let y = Math.max(hy + 6, logoBottom + 12) + 8;
   doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(2).strokeColor(NAVY).stroke();
   y += 12;
 
@@ -307,16 +295,12 @@ router.post('/pdf', requireAuth, (req, res) => {
   const title = str(body.title, 'Home Financing Comparison').slice(0, 120);
   const borrowerName = str(body.borrowerName).slice(0, 120);
   const propertyAddress = str(body.propertyAddress).slice(0, 160);
-  const programLabel = str(body.programLabel).slice(0, 90);
-  const subLine = str(body.subLine).slice(0, 120);
-  const rate = str(body.rate).slice(0, 24);
+  const borrowerCredit = str(body.borrowerCredit).slice(0, 24);
   const date =
     typeof body.date === 'string'
       ? body.date.slice(0, 60)
       : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const lender = obj(body.lender);
-  const assumptions = obj(body.assumptions);
-  const insights = obj(body.insights);
   const model = coerceModel(body);
   const legacy = coerceLegacy(body);
 
@@ -351,7 +335,7 @@ router.post('/pdf', requireAuth, (req, res) => {
   });
 
   try {
-    renderComparisonPdf(doc, { title, borrowerName, propertyAddress, date, logoSource, programLabel, subLine, rate, assumptions, insights, model, legacy });
+    renderComparisonPdf(doc, { title, borrowerName, propertyAddress, borrowerCredit, date, logoSource, model, legacy });
     addFooters(doc, lender);
     doc.end();
   } catch {
