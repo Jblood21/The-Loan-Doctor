@@ -592,6 +592,41 @@ export default function Compare() {
             <SectionLabel>RATE BUYDOWN &amp; CREDITS</SectionLabel>
             <Badge tone="neutral">optional</Badge>
           </div>
+          {/* Lender / discount points — a cost the borrower pays, or a lender credit. */}
+          <div className="mt-4">
+            <label className="mb-[7px] block text-[12.5px] font-semibold text-text-soft">Lender Points</label>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="w-[112px]">
+                <NumberField
+                  size="sm"
+                  suffix="pts"
+                  value={current.lenderPoints ?? 0}
+                  onChange={(v) => setField('lenderPoints', v)}
+                  ariaLabel="Lender points"
+                />
+              </div>
+              <SegmentedControl
+                size="sm"
+                options={[
+                  { value: 'cost', label: 'Cost' },
+                  { value: 'credit', label: 'Discount' },
+                ]}
+                value={current.lenderPointsMode ?? 'cost'}
+                onChange={(v) => patch({ lenderPointsMode: v as 'cost' | 'credit' })}
+              />
+              {(current.lenderPoints ?? 0) > 0 && (
+                <span className="text-[12px] text-text-dim">
+                  {current.lenderPointsMode === 'credit'
+                    ? `–${fmt(Math.abs(r.lenderPointsAmount))} lender credit`
+                    : `${fmt(r.lenderPointsAmount)} added to closing`}
+                </span>
+              )}
+            </div>
+            <div className="mt-1.5 text-[11.5px] text-text-dim">
+              1 point = 1% of the loan. <span className="font-semibold">Cost</span> = discount points the borrower pays to buy the rate down;{' '}
+              <span className="font-semibold">Discount</span> = a lender credit toward closing.
+            </div>
+          </div>
           <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
             {([
               ['Lender Credit', 'lenderCredit'],

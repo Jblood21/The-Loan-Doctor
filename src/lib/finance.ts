@@ -328,6 +328,11 @@ export interface ScenarioResult {
   closingItemized: boolean;
   creditsApplied: number;
   cashToClose: number;
+  /** Lender/discount points, in points (% of loan). */
+  lenderPoints: number;
+  /** Dollar value of the points, signed: positive = a cost added to closing,
+   *  negative = a lender credit that offsets cash to close. */
+  lenderPointsAmount: number;
   subline: string;
 }
 
@@ -374,20 +379,31 @@ export function computeScenario(s: Scenario): ScenarioResult {
   const payoffMonths = schedule.length;
 
   const closingItemized = !!(s.closingCosts && s.closingCosts.length);
-  const closingCosts = closingItemized
+  const baseClosing = closingItemized
     ? totalClosingCosts(s.closingCosts as ClosingCostItem[], baseLoan, homeValue)
     : baseLoan * DEFAULT_CLOSING_RATE;
 
+  // Lender/discount points (points = % of loan). A "cost" is discount points the
+  // borrower pays to buy the rate down: it adds to closing costs and is a prepaid
+  // finance charge (so it raises the APR). A "credit" is a lender rebate/negative
+  // points: it offsets cash to close like any other credit.
+  const lenderPoints = Math.max(0, s.lenderPoints || 0);
+  const pointsValue = baseLoan * (lenderPoints / 100);
+  const pointsCost = s.lenderPointsMode === 'credit' ? 0 : pointsValue;
+  const pointsCredit = s.lenderPointsMode === 'credit' ? pointsValue : 0;
+  const closingCosts = baseClosing + pointsCost;
+
   // APR: prepaid finance charges = the lender/finance-charge portion of the itemized
-  // fees (origination, points, underwriting…) + financed upfront MI. Falls back to a
-  // rough estimate only when fees aren't itemized.
-  const prepaidFinanceCharges = closingItemized
-    ? financeCharges(s.closingCosts as ClosingCostItem[], baseLoan, homeValue) + mi.upfrontFinanced
-    : mi.upfrontFinanced + baseLoan * 0.005 + 1200;
+  // fees (origination, points, underwriting…) + financed upfront MI + any discount
+  // points entered here. Falls back to a rough estimate only when fees aren't itemized.
+  const prepaidFinanceCharges =
+    (closingItemized
+      ? financeCharges(s.closingCosts as ClosingCostItem[], baseLoan, homeValue) + mi.upfrontFinanced
+      : mi.upfrontFinanced + baseLoan * 0.005 + 1200) + pointsCost;
   // Recurring MI is a finance charge — include it in the APR stream for the months it applies.
   const miMonths = mi.monthly > 0 ? miAprMonths(s.loanType, ltv, schedule, homeValue) : 0;
   const apr = computeApr(financedLoan, pi, termYears, prepaidFinanceCharges, mi.monthly, miMonths);
-  const creditsApplied = (s.lenderCredit || 0) + (s.sellerCredit || 0) + (s.otherCredits || 0);
+  const creditsApplied = (s.lenderCredit || 0) + (s.sellerCredit || 0) + (s.otherCredits || 0) + pointsCredit;
   const cashToClose = Math.max(0, (s.downPayment || 0) + closingCosts - creditsApplied);
 
   return {
@@ -407,6 +423,8 @@ export function computeScenario(s: Scenario): ScenarioResult {
     closingCosts,
     creditsApplied,
     cashToClose,
+    lenderPoints,
+    lenderPointsAmount: pointsCost - pointsCredit,
     closingItemized,
     subline: `${Math.round(baseLoan).toLocaleString('en-US')} loan · ${s.rate || 0}% · ${s.term} yr · ${Math.round(ltv)}% LTV`,
   };
