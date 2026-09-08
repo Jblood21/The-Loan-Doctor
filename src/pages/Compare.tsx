@@ -9,9 +9,9 @@ import { NumberField } from '@/components/ui/NumberField';
 import { Select } from '@/components/ui/Select';
 import { Label, TextField } from '@/components/ui/TextField';
 import { ClosingCostsEditor, cloneFees } from '@/components/ClosingCostsEditor';
+import { SavedScenariosModal } from '@/components/SavedScenariosModal';
 import { useScenarios, MAX_SCENARIOS } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
-import { useUI } from '@/context/UIContext';
 import { computeScenario, defaultClosingCosts } from '@/lib/finance';
 import { buildComparisonModel } from '@/lib/comparisonModel';
 import { RATES_AS_OF } from '@/lib/loanProgramRules';
@@ -59,7 +59,6 @@ export default function Compare() {
   const { scenarios, active, current, select, patch, setField, addScenario, removeScenario, saveAll, saving, dirty } =
     useScenarios();
   const { settings, save } = useSettings();
-  const { openSettings } = useUI();
   const [savedDefault, setSavedDefault] = useState(false);
   const [borrowerName, setBorrowerName] = useState('');
   // Borrower credit score — a free-text box that prints on the PDF like the name/address.
@@ -84,6 +83,7 @@ export default function Compare() {
 
   const [busy, setBusy] = useState<'pdf' | 'share' | null>(null);
   const [shareMsg, setShareMsg] = useState('');
+  const [savedOpen, setSavedOpen] = useState(false);
   // AI assistant state.
   const [aiQuestion, setAiQuestion] = useState('');
   const [aiAnswer, setAiAnswer] = useState('');
@@ -327,8 +327,8 @@ export default function Compare() {
         subtitle="Model up to six scenarios and compare them side by side."
         actions={
           <>
-            <Button variant="secondary" onClick={openSettings}>
-              My Scenarios
+            <Button variant="secondary" onClick={() => setSavedOpen(true)}>
+              Saved Scenarios
             </Button>
             <Button variant="secondary" onClick={shareQuote} disabled={busy !== null}>
               {busy === 'share' ? 'Sharing…' : 'Share'}
@@ -843,6 +843,8 @@ export default function Compare() {
         )}
         <div className="mt-3 text-[11px] text-text-dim">AI-generated — estimates only, not financial advice. Verify important figures before quoting a borrower.</div>
       </Card>
+
+      <SavedScenariosModal open={savedOpen} onClose={() => setSavedOpen(false)} />
     </div>
   );
 }
