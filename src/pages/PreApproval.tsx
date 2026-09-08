@@ -8,7 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { TextField, Label } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
 import { SignaturePad } from '@/components/SignaturePad';
-import { useScenarios } from '@/context/ScenariosContext';
+import { useScenarios, blankScenario } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useUI } from '@/context/UIContext';
 import { api, ApiError } from '@/lib/api';
@@ -99,7 +99,8 @@ function PresetChips({ presets, onPick }: { presets: string[]; onPick: (v: strin
 }
 
 export default function PreApproval() {
-  const { scenarios } = useScenarios();
+  // Pre-Approval draws from the same saved bank of scenarios as Compare.
+  const { bank } = useScenarios();
   const { settings, save: saveSettings, saving: savingSettings } = useSettings();
   const { openSettings } = useUI();
   const [pa, setPa] = useState<PreApprovalState>({
@@ -158,6 +159,8 @@ export default function PreApproval() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
+  // The saved scenario chosen in the picker (falls back to a blank when the bank is empty).
+  const bankPick = bank.length ? bank[Math.min(pa.scenarioIdx, bank.length - 1)] : blankScenario('Scenario');
   // Letter loan terms come from: an imported MISMO file, else a selected LOS
   // borrower's feed data, else the chosen saved scenario.
   const srcScenario =
@@ -165,7 +168,7 @@ export default function PreApproval() {
       ? imported.scenario
       : pa.source === 'los' && losScenario
         ? losScenario
-        : scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
+        : bankPick;
 
   // Read a MISMO 3.4 XML file entirely in the browser (borrower PII never leaves the
   // device) and pull the borrower, property, and loan terms into the letter.
@@ -650,11 +653,17 @@ export default function PreApproval() {
           {pa.source === 'scenario' && (
             <div className="mb-[22px]">
               <Label>Choose a saved scenario</Label>
-              <Select
-                value={String(pa.scenarioIdx)}
-                onChange={(e) => set({ scenarioIdx: parseInt(e.target.value, 10) })}
-                options={scenarios.map((s, i) => ({ value: i, label: `${s.name || `Scenario ${i + 1}`} · ${computeScenario(s).typeLabel} · ${fmt(computeScenario(s).baseLoan)}` }))}
-              />
+              {bank.length ? (
+                <Select
+                  value={String(Math.min(pa.scenarioIdx, bank.length - 1))}
+                  onChange={(e) => set({ scenarioIdx: parseInt(e.target.value, 10) })}
+                  options={bank.map((s, i) => ({ value: i, label: `${s.name || `Scenario ${i + 1}`} · ${computeScenario(s).typeLabel} · ${fmt(computeScenario(s).baseLoan)}` }))}
+                />
+              ) : (
+                <div className="rounded-[10px] border border-border-input bg-input px-3.5 py-2.5 text-[12.5px] text-text-muted">
+                  You haven’t saved any scenarios yet. Build one on the Compare screen and hit <span className="font-semibold">Save</span> — it’ll appear here.
+                </div>
+              )}
             </div>
           )}
 
@@ -812,7 +821,7 @@ export default function PreApproval() {
                                   e.preventDefault();
                                   // Carry the feed's loan terms into the letter math (not just name/address),
                                   // using the currently-selected saved scenario for anything the feed omits.
-                                  const base = scenarios[Math.min(pa.scenarioIdx, scenarios.length - 1)] || scenarios[0];
+                                  const base = bankPick;
                                   const built = base ? losBorrowerToScenario(b, base) : null;
                                   setLosScenario(built?.scenario ?? null);
                                   setLosFeedFields(built?.fromFeed ?? []);

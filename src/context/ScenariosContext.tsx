@@ -61,7 +61,10 @@ export function blankScenario(name: string, fees?: ClosingCostItem[]): Scenario 
 }
 
 interface ScenariosContextValue {
+  /** The working comparison tabs (up to 6) currently shown on the Compare screen. */
   scenarios: Scenario[];
+  /** The full saved bank — every scenario the user has saved (shared with Pre-Approval). */
+  bank: Scenario[];
   active: number;
   current: Scenario;
   loaded: boolean;
@@ -71,9 +74,11 @@ interface ScenariosContextValue {
   patch: (obj: Partial<Scenario>) => void;
   setField: (field: keyof Scenario, raw: string) => void;
   addScenario: () => void;
-  /** Load a saved scenario into the working set as a new tab. Returns false when the
-   *  6-scenario limit is already reached. */
+  /** Open a saved scenario into the working tabs (keeps its id so re-saving updates the
+   *  same bank entry). Returns false when the 6-scenario comparison limit is reached. */
   addScenarioFrom: (scenario: Scenario) => boolean;
+  /** Delete a scenario from the saved bank. */
+  deleteFromBank: (id: string) => Promise<void>;
   removeScenario: (i: number) => void;
   saveAll: () => Promise<void>;
 }
@@ -91,6 +96,8 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
   const seededBlank = (name: string) => blankScenario(name, feeDefaultsRef.current);
 
   const [scenarios, setScenarios] = useState<Scenario[]>([blankScenario('Scenario 1')]);
+  // The full saved list. The comparison tabs above are a working view of this bank.
+  const [bank, setBank] = useState<Scenario[]>([]);
   const [active, setActive] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -102,6 +109,7 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) {
       setScenarios([blankScenario('Scenario 1')]);
+      setBank([]);
       setActive(0);
       setLoaded(false);
       setDirty(false);
@@ -116,8 +124,11 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
         const { scenarios: s } = await api.listScenarios();
         if (cancelled) return;
         const normalized = normalizeList(s);
-        const list = normalized.length ? normalized : [seededBlank('Scenario 1')];
-        setScenarios(list);
+        setBank(normalized);
+        // Open the first few saved scenarios into the comparison; the rest live in the
+        // Saved Scenarios popup. A brand-new user starts with one blank scenario.
+        const working = normalized.length ? normalized.slice(0, MAX_SCENARIOS) : [seededBlank('Scenario 1')];
+        setScenarios(working);
         setActive(0);
         setLoaded(true);
         setDirty(false);
@@ -184,16 +195,34 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
     });
 
   const addScenarioFrom = (scenario: Scenario): boolean => {
+    // Already open in a tab → just focus it (avoid duplicate tabs of one saved scenario).
+    if (scenario.id) {
+      const existing = scenarios.findIndex((s) => s.id === scenario.id);
+      if (existing >= 0) {
+        setActive(existing);
+        return true;
+      }
+    }
     if (scenarios.length >= MAX_SCENARIOS) return false;
-    // Drop any persisted id so it becomes a fresh tab, and normalize to backfill fields.
-    const copy = normalizeScenario({ ...scenario, id: undefined });
+    // Keep the id so saving this tab updates the same bank entry (not a duplicate).
+    const copy = normalizeScenario({ ...scenario });
     setScenarios((list) => {
       const next = [...list, copy];
       setActive(next.length - 1);
       return next;
     });
-    setDirty(true);
     return true;
+  };
+
+  const deleteFromBank = async (id: string) => {
+    setBank((b) => b.filter((s) => s.id !== id));
+    // If it's open as a tab, drop its id so a later Save won't resurrect the deleted entry.
+    setScenarios((list) => list.map((s) => (s.id === id ? { ...s, id: undefined } : s)));
+    try {
+      await api.deleteScenario(id);
+    } catch {
+      /* best effort — it reappears on the next load if the server delete failed */
+    }
   };
 
   const removeScenario = (i: number) =>
@@ -208,8 +237,10 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
   const saveAll = async () => {
     setSaving(true);
     try {
-      const { scenarios: saved } = await api.saveScenarios(scenarios);
-      if (saved && saved.length) setScenarios(saved);
+      // Merge the working tabs into the bank (add new / update existing by id).
+      const { scenarios: fullBank, saved } = await api.upsertScenarios(scenarios);
+      if (saved && saved.length) setScenarios(normalizeList(saved));
+      if (fullBank) setBank(normalizeList(fullBank));
       setDirty(false);
     } finally {
       setSaving(false);
@@ -220,6 +251,7 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ScenariosContextValue>(
     () => ({
       scenarios,
+      bank,
       active: safeActive,
       current: scenarios[safeActive],
       loaded,
@@ -230,11 +262,12 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
       setField,
       addScenario,
       addScenarioFrom,
+      deleteFromBank,
       removeScenario,
       saveAll,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scenarios, safeActive, loaded, saving, dirty],
+    [scenarios, bank, safeActive, loaded, saving, dirty],
   );
 
   return <ScenariosContext.Provider value={value}>{children}</ScenariosContext.Provider>;

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
-import { getScenarios, setScenarios, getSavedScenarios, addSavedScenario, deleteSavedScenario, SAVED_SCENARIO_LIMIT } from '../store.js';
+import { getScenarios, setScenarios, upsertScenarios } from '../store.js';
 import { requireAuth } from '../auth.js';
 
 const router = Router();
@@ -19,27 +19,13 @@ router.get('/', requireAuth, (req, res) => {
   res.json({ scenarios: getScenarios(req.user.id) });
 });
 
-// ---- saved-scenario library (find & reopen later) ----------------------
-// Registered before the '/:id' routes so these fixed paths win.
-router.get('/saved', requireAuth, (req, res) => {
-  res.json({ saved: getSavedScenarios(req.user.id) });
-});
-router.post('/saved', requireAuth, (req, res) => {
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const scenario = body.scenario;
-  if (!scenario || typeof scenario !== 'object' || Array.isArray(scenario)) {
-    return res.status(400).json({ error: 'Invalid scenario' });
-  }
-  if (getSavedScenarios(req.user.id).length >= SAVED_SCENARIO_LIMIT) {
-    return res.status(409).json({ error: `Saved-scenario limit reached (${SAVED_SCENARIO_LIMIT}). Delete a few to save more.` });
-  }
-  const name = String(body.name || scenario.name || 'Saved scenario').trim().slice(0, 80) || 'Saved scenario';
-  const item = addSavedScenario(req.user.id, name, withId(scenario));
-  res.status(201).json({ saved: item });
-});
-router.delete('/saved/:id', requireAuth, (req, res) => {
-  deleteSavedScenario(req.user.id, req.params.id);
-  res.status(204).end();
+// Merge the working scenarios into the bank by id (Compare's "Save"): existing ids are
+// updated in place, new ones get an id. Returns the full bank plus the saved items (now
+// with ids) so the client can reconcile. Registered before '/:id' so this path wins.
+router.post('/upsert', requireAuth, (req, res) => {
+  const saved = sanitizeList(req.body?.scenarios); // withId assigns ids to new ones
+  const scenarios = upsertScenarios(req.user.id, saved);
+  res.json({ scenarios, saved });
 });
 
 // Replace the whole set (the Compare screen's "Save").
