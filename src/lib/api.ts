@@ -3,7 +3,7 @@
 // In development the Vite dev server proxies /api to the Express backend, so
 // API_BASE can stay empty. In production set VITE_API_BASE to the API origin.
 
-import type { PreApprovalRecord, Scenario, Settings, User } from '@/types';
+import type { PreApprovalRecord, SavedScenario, Scenario, Settings, User } from '@/types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
 const TOKEN_KEY = 'loandr.token';
@@ -82,6 +82,12 @@ export const api = {
   createScenario: (scenario: Scenario) => request<{ scenario: Scenario }>('POST', '/scenarios', scenario),
   updateScenario: (id: string, scenario: Scenario) => request<{ scenario: Scenario }>('PUT', `/scenarios/${id}`, scenario),
   deleteScenario: (id: string) => request<void>('DELETE', `/scenarios/${id}`),
+
+  // saved-scenario library (reopen later)
+  listSavedScenarios: () => request<{ saved: SavedScenario[] }>('GET', '/scenarios/saved'),
+  saveScenarioToLibrary: (name: string, scenario: Scenario) =>
+    request<{ saved: SavedScenario }>('POST', '/scenarios/saved', { name, scenario }),
+  deleteSavedScenario: (id: string) => request<void>('DELETE', `/scenarios/saved/${id}`),
 
   // admin (JWT role=admin gated)
   adminStats: () => request<{ stats: { label: string; value: string; delta: string }[] }>('GET', '/admin/stats'),

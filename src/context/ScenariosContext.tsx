@@ -71,6 +71,9 @@ interface ScenariosContextValue {
   patch: (obj: Partial<Scenario>) => void;
   setField: (field: keyof Scenario, raw: string) => void;
   addScenario: () => void;
+  /** Load a saved scenario into the working set as a new tab. Returns false when the
+   *  6-scenario limit is already reached. */
+  addScenarioFrom: (scenario: Scenario) => boolean;
   removeScenario: (i: number) => void;
   saveAll: () => Promise<void>;
 }
@@ -180,6 +183,19 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
       return next;
     });
 
+  const addScenarioFrom = (scenario: Scenario): boolean => {
+    if (scenarios.length >= MAX_SCENARIOS) return false;
+    // Drop any persisted id so it becomes a fresh tab, and normalize to backfill fields.
+    const copy = normalizeScenario({ ...scenario, id: undefined });
+    setScenarios((list) => {
+      const next = [...list, copy];
+      setActive(next.length - 1);
+      return next;
+    });
+    setDirty(true);
+    return true;
+  };
+
   const removeScenario = (i: number) =>
     setScenarios((list) => {
       if (list.length <= 1) return list;
@@ -213,6 +229,7 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
       patch,
       setField,
       addScenario,
+      addScenarioFrom,
       removeScenario,
       saveAll,
     }),
