@@ -92,7 +92,7 @@ export function dataDirInfo() {
   return { dir: DATA_DIR, persistent, explicit, onKnownMount };
 }
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, savedScenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
+const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -208,24 +208,20 @@ export function scenarioCount(userId) {
   return u?.scenarioCount || 0;
 }
 
-// ---- saved-scenario library (kept separately from the 6-slot working set) ---
-const MAX_SAVED_SCENARIOS = 100;
-export function getSavedScenarios(userId) {
-  return (db.savedScenarios && db.savedScenarios[userId]) || [];
-}
-export function addSavedScenario(userId, name, scenario) {
-  if (!db.savedScenarios) db.savedScenarios = {};
-  const item = { id: randomUUID(), name, scenario, savedAt: new Date().toISOString() };
-  db.savedScenarios[userId] = [item, ...getSavedScenarios(userId)].slice(0, MAX_SAVED_SCENARIOS);
+// ---- scenario bank ------------------------------------------------------
+// One saved list per user (the "bank"). The Compare tabs are a working view of
+// it; Save upserts them by id (add new, update existing) rather than replacing,
+// so the bank can hold more than the 6 shown, and Pre-Approval reads the same list.
+const MAX_SCENARIO_BANK = 100;
+export const SCENARIO_BANK_LIMIT = MAX_SCENARIO_BANK;
+export function upsertScenarios(userId, incoming) {
+  const byId = new Map((db.scenarios[userId] || []).map((s) => [s.id, s]));
+  for (const s of Array.isArray(incoming) ? incoming : []) if (s && s.id) byId.set(s.id, s);
+  const merged = Array.from(byId.values()).slice(0, MAX_SCENARIO_BANK);
+  db.scenarios[userId] = merged;
   persist();
-  return item;
+  return merged;
 }
-export function deleteSavedScenario(userId, id) {
-  if (!db.savedScenarios || !db.savedScenarios[userId]) return;
-  db.savedScenarios[userId] = db.savedScenarios[userId].filter((s) => s.id !== id);
-  persist();
-}
-export const SAVED_SCENARIO_LIMIT = MAX_SAVED_SCENARIOS;
 
 // ---- LOS connections ---------------------------------------------------
 export function setLos(userId, provider, connected) {
@@ -497,6 +493,22 @@ export function seed() {
     delete db.losBorrowers[SHARED_LOS_KEY];
     if (Array.isArray(db.losWebhookLog)) db.losWebhookLog = {};
     db.sharedLosMigrated = true;
+  }
+
+  // One-time fold of the short-lived separate saved-scenario library into the single
+  // scenario bank, so those saved scenarios aren't lost when the library is removed.
+  if (!db.savedLibraryFolded) {
+    const lib = db.savedScenarios || {};
+    for (const [uid, items] of Object.entries(lib)) {
+      const scen = (Array.isArray(items) ? items : []).map((it) => ({
+        ...(it.scenario || {}),
+        id: (it.scenario && it.scenario.id) || it.id || randomUUID(),
+        name: it.name || (it.scenario && it.scenario.name) || 'Saved scenario',
+      }));
+      if (scen.length) upsertScenarios(uid, scen);
+    }
+    delete db.savedScenarios;
+    db.savedLibraryFolded = true;
   }
 
   persist();

@@ -69,15 +69,6 @@ export interface Scenario {
   vaSubsequentUse?: boolean;
 }
 
-/** A scenario saved to the user's library so it can be reopened later. */
-export interface SavedScenario {
-  id: string;
-  name: string;
-  /** ISO timestamp of when it was saved. */
-  savedAt: string;
-  scenario: Scenario;
-}
-
 export interface HecmInputs {
   /** Traditional reverse refinance vs. HECM for Purchase. */
   mode: 'refinance' | 'purchase';
