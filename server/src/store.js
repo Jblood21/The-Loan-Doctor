@@ -92,7 +92,7 @@ export function dataDirInfo() {
   return { dir: DATA_DIR, persistent, explicit, onKnownMount };
 }
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
+const EMPTY = { users: [], settings: {}, scenarios: {}, savedScenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -207,6 +207,25 @@ export function scenarioCount(userId) {
   const u = findUserById(userId);
   return u?.scenarioCount || 0;
 }
+
+// ---- saved-scenario library (kept separately from the 6-slot working set) ---
+const MAX_SAVED_SCENARIOS = 100;
+export function getSavedScenarios(userId) {
+  return (db.savedScenarios && db.savedScenarios[userId]) || [];
+}
+export function addSavedScenario(userId, name, scenario) {
+  if (!db.savedScenarios) db.savedScenarios = {};
+  const item = { id: randomUUID(), name, scenario, savedAt: new Date().toISOString() };
+  db.savedScenarios[userId] = [item, ...getSavedScenarios(userId)].slice(0, MAX_SAVED_SCENARIOS);
+  persist();
+  return item;
+}
+export function deleteSavedScenario(userId, id) {
+  if (!db.savedScenarios || !db.savedScenarios[userId]) return;
+  db.savedScenarios[userId] = db.savedScenarios[userId].filter((s) => s.id !== id);
+  persist();
+}
+export const SAVED_SCENARIO_LIMIT = MAX_SAVED_SCENARIOS;
 
 // ---- LOS connections ---------------------------------------------------
 export function setLos(userId, provider, connected) {
