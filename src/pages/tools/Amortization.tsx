@@ -31,7 +31,9 @@ export default function Amortization({ open, onClose }: CalcProps) {
     return { schedule: sched, byYear: agg, totalInterest: sched.length ? sched[sched.length - 1].cumulativeInterest : 0 };
   }, [loan, rate, years]);
 
-  const totalPaid = pi * schedule.length;
+  // Exact total paid = principal repaid + all interest (avoids the tiny overstatement
+  // from level-payment × months, since the final payment is a small partial payment).
+  const totalPaid = loan + totalInterest;
 
   return (
     <Modal open={open} onClose={onClose} title="Amortization" subtitle="Full payment schedule with principal and interest split." width={760}>
