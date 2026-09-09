@@ -70,10 +70,18 @@ export function renderComparisonPdf(doc, d) {
     doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(`Property: ${propertyAddress}`, HX, hy, { width: RIGHT - HX, lineBreak: false });
     hy += 15;
   }
-  // Borrower credit score — shown just like the name/address, only when provided.
+  // Borrower credit score — shown in a highlighted pill (only when provided) so it stands out.
   if (borrowerCredit) {
-    doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(`Credit Score: ${borrowerCredit}`, HX, hy, { width: RIGHT - HX, lineBreak: false });
-    hy += 15;
+    const label = `Credit Score: ${borrowerCredit}`;
+    doc.font('Helvetica-Bold').fontSize(9.5);
+    const padX = 8;
+    const boxH = 18;
+    const boxW = doc.widthOfString(label) + padX * 2;
+    doc.save();
+    doc.roundedRect(HX, hy, boxW, boxH, 4).fill(HILITE);
+    doc.restore();
+    doc.fillColor(GO).font('Helvetica-Bold').fontSize(9.5).text(label, HX + padX, hy + 5, { lineBreak: false });
+    hy += boxH + 5;
   }
 
   let y = Math.max(hy + 6, logoBottom + 12) + 8;
