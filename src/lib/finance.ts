@@ -378,16 +378,21 @@ export function computeScenario(s: Scenario): ScenarioResult {
   const totalInterest = schedule.length ? schedule[schedule.length - 1].cumulativeInterest : 0;
   const payoffMonths = schedule.length;
 
-  const closingItemized = !!(s.closingCosts && s.closingCosts.length);
-  const baseClosing = closingItemized
-    ? totalClosingCosts(s.closingCosts as ClosingCostItem[], baseLoan, homeValue)
-    : baseLoan * DEFAULT_CLOSING_RATE;
-
   // Lender/discount points (points = % of loan). A "cost" is discount points the
   // borrower pays to buy the rate down: it adds to closing costs and is a prepaid
   // finance charge (so it raises the APR). A "credit" is a lender rebate/negative
   // points: it offsets cash to close like any other credit.
   const lenderPoints = Math.max(0, s.lenderPoints || 0);
+  // When the simple Lender Points field is used, treat it as the single source for
+  // discount points: drop any itemized "discount points" fee line so the same points
+  // aren't counted twice (once via the field, once via the line) in closing OR APR.
+  const isPointsLine = (it: ClosingCostItem) => isFinanceCharge(it) && /discount|points/i.test(it.label || '');
+  const rawItems = (s.closingCosts as ClosingCostItem[]) || [];
+  const feeItems = lenderPoints > 0 ? rawItems.filter((it) => !isPointsLine(it)) : rawItems;
+
+  const closingItemized = !!(s.closingCosts && s.closingCosts.length);
+  const baseClosing = closingItemized ? totalClosingCosts(feeItems, baseLoan, homeValue) : baseLoan * DEFAULT_CLOSING_RATE;
+
   const pointsValue = baseLoan * (lenderPoints / 100);
   const pointsCost = s.lenderPointsMode === 'credit' ? 0 : pointsValue;
   const pointsCredit = s.lenderPointsMode === 'credit' ? pointsValue : 0;
@@ -398,7 +403,7 @@ export function computeScenario(s: Scenario): ScenarioResult {
   // points entered here. Falls back to a rough estimate only when fees aren't itemized.
   const prepaidFinanceCharges =
     (closingItemized
-      ? financeCharges(s.closingCosts as ClosingCostItem[], baseLoan, homeValue) + mi.upfrontFinanced
+      ? financeCharges(feeItems, baseLoan, homeValue) + mi.upfrontFinanced
       : mi.upfrontFinanced + baseLoan * 0.005 + 1200) + pointsCost;
   // Recurring MI is a finance charge — include it in the APR stream for the months it applies.
   const miMonths = mi.monthly > 0 ? miAprMonths(s.loanType, ltv, schedule, homeValue) : 0;
