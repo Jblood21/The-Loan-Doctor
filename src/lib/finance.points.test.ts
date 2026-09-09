@@ -51,4 +51,19 @@ describe('lender points', () => {
     expect(disc.creditsApplied).toBeCloseTo(none.creditsApplied + dollars, 2);
     expect(disc.cashToClose).toBeCloseTo(none.cashToClose - dollars, 2);
   });
+
+  it('the Lender Points field does not double-count an itemized "discount points" fee line', () => {
+    const withItemizedPoints = {
+      ...base,
+      closingCosts: [
+        { id: 'a', label: 'Origination', basis: 'flat', value: 1000 },
+        { id: 'b', label: 'Discount Points', basis: 'loan', value: 2 }, // 2% of loan itemized
+      ],
+    } as Scenario;
+    const itemizedOnly = computeScenario(withItemizedPoints); // points counted once (via the line)
+    const alsoField = computeScenario({ ...withItemizedPoints, lenderPoints: 2, lenderPointsMode: 'cost' } as Scenario);
+    // The field replaces the itemized points line — closing and APR must not double up.
+    expect(alsoField.closingCosts).toBeCloseTo(itemizedOnly.closingCosts, 2);
+    expect(alsoField.apr).toBeCloseTo(itemizedOnly.apr, 3);
+  });
 });
