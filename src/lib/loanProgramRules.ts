@@ -19,6 +19,11 @@
 /** Human-facing "rates as of" stamp. Bump when any figure below is re-verified. */
 export const RATES_AS_OF = 'March 2023 (FHA MIP) · 2025 program year';
 
+/** 2025 baseline conforming loan limit (one unit). The FHA high-balance MIP break
+ *  tracks this figure; it mirrors the VA baseline limit used in finance.ts. Update
+ *  annually with the FHFA limit. */
+export const CONFORMING_LOAN_LIMIT = 806500;
+
 export interface ProgramMeta {
   /** Short label for the program. */
   label: string;
@@ -90,8 +95,9 @@ export const FHA = {
   /** Upfront MIP as a % of the base loan (financed). */
   upfrontMipPct: 1.75,
 
-  /** Base-loan threshold above which the higher "high-balance" annual MIP applies. */
-  highBalanceThreshold: 726200,
+  /** Base-loan threshold above which the higher "high-balance" annual MIP applies —
+   *  the baseline conforming limit for the year (2025: $806,500). */
+  highBalanceThreshold: CONFORMING_LOAN_LIMIT,
 
   /** Annual MIP (%) grid, selected by term length, high-balance, and LTV break. */
   annualMip: {
@@ -123,7 +129,7 @@ export const FHA = {
 export const VA = {
   meta: {
     label: 'VA',
-    asOf: 'Effective Jan 1, 2020 (Blue Water Navy Vietnam Veterans Act) — 2025 schedule',
+    asOf: 'Effective April 7, 2023 (current VA funding-fee schedule)',
     sources: ['U.S. Department of Veterans Affairs', '38 U.S.C.'],
     notes: [
       'VA-backed loans have no monthly PMI; instead a one-time funding fee (typically financed).',
