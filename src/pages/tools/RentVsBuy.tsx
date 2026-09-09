@@ -15,6 +15,7 @@ export default function RentVsBuy({ open, onClose }: CalcProps) {
   const [carryPct, setCarryPct] = useState(1.8); // taxes + ins + maintenance %/yr
   const [appreciation, setAppreciation] = useState(3.5);
   const [invReturn, setInvReturn] = useState(5);
+  const [sellCostPct, setSellCostPct] = useState(7); // agent commission + closing at sale
 
   const set = (fn: (v: number) => void) => (v: string) => fn(v === '' ? 0 : parseFloat(v) || 0);
 
@@ -41,7 +42,11 @@ export default function RentVsBuy({ open, onClose }: CalcProps) {
   const n = (parseInt(term, 10) || 30) * 12;
   const paidMonths = years * 12;
   const remaining = r > 0 ? loan * (Math.pow(1 + r, n) - Math.pow(1 + r, paidMonths)) / (Math.pow(1 + r, n) - 1) : loan * (1 - paidMonths / n);
-  const equity = futureValue - remaining;
+  // Net the cost of selling (agent commission + closing) out of the sale price before
+  // counting equity — otherwise buying looks better than it really is.
+  const sellingCosts = futureValue * (sellCostPct / 100);
+  const netSale = futureValue - sellingCosts;
+  const equity = netSale - remaining;
   const ownNetCost = down + ownPI + carry - equity; // net of equity gained
 
   const buyWins = ownNetCost < rentNetCost;
@@ -57,7 +62,7 @@ export default function RentVsBuy({ open, onClose }: CalcProps) {
       const fv = price * Math.pow(1 + appreciation / 100, y);
       const pm = y * 12;
       const rem = r > 0 ? loan * (Math.pow(1 + r, n) - Math.pow(1 + r, pm)) / (Math.pow(1 + r, n) - 1) : loan * (1 - pm / n);
-      const eq = fv - rem;
+      const eq = fv * (1 - sellCostPct / 100) - rem;
       const oNet = down + pi * 12 * y + price * (carryPct / 100) * y - eq;
       if (oNet <= rNet) {
         breakEven = y;
@@ -80,6 +85,7 @@ export default function RentVsBuy({ open, onClose }: CalcProps) {
           <CalcField label="Carry Costs /yr" suffix="%" value={carryPct} onChange={set(setCarryPct)} />
           <CalcField label="Home Appreciation /yr" suffix="%" value={appreciation} onChange={set(setAppreciation)} />
           <CalcField label="Investment Return /yr" suffix="%" value={invReturn} onChange={set(setInvReturn)} />
+          <CalcField label="Selling Costs" suffix="%" value={sellCostPct} onChange={set(setSellCostPct)} />
         </div>
         <ResultPanel
           report={{
@@ -103,7 +109,8 @@ export default function RentVsBuy({ open, onClose }: CalcProps) {
               { label: 'Net cost of buying', value: fmt(ownNetCost) },
               { label: 'Monthly P&I (buying)', value: fmt(pi) },
               { label: 'Projected home value', value: fmt(futureValue) },
-              { label: 'Equity at sale', value: fmt(equity) },
+              { label: `Selling costs (${sellCostPct}%)`, value: `–${fmt(sellingCosts)}` },
+              { label: 'Net equity at sale', value: fmt(equity) },
             ],
           }}
         >
@@ -116,7 +123,8 @@ export default function RentVsBuy({ open, onClose }: CalcProps) {
           <Row label="Net cost of buying" value={fmt(ownNetCost)} color={buyWins ? 'text-brand-teal' : undefined} />
           <Row label="Monthly P&I (buying)" value={fmt(pi)} />
           <Row label="Projected home value" value={fmt(futureValue)} />
-          <Row label="Equity at sale" value={fmt(equity)} />
+          <Row label={`Selling costs (${sellCostPct}%)`} value={`–${fmt(sellingCosts)}`} />
+          <Row label="Net equity at sale" value={fmt(equity)} />
         </ResultPanel>
       </div>
     </Modal>
