@@ -56,7 +56,7 @@ const CREDIT_BANDS = [
 ];
 
 export default function Compare() {
-  const { scenarios, active, current, select, patch, setField, addScenario, removeScenario, saveAll, saving, dirty } =
+  const { scenarios, active, current, select, patch, setField, addScenario, resetScenarios, removeScenario, saveAll, saving, dirty } =
     useScenarios();
   const { settings, save } = useSettings();
   const [savedDefault, setSavedDefault] = useState(false);
@@ -89,6 +89,21 @@ export default function Compare() {
   const [aiAnswer, setAiAnswer] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState('');
+
+  // Reset the whole Compare tab back to the preset defaults: a fresh default scenario
+  // plus cleared borrower/AI/share fields. Saved scenarios (the bank) are untouched.
+  const resetAll = () => {
+    if (!window.confirm('Reset the comparison to defaults? This clears the current scenarios and borrower info. Your saved scenarios are kept.')) return;
+    resetScenarios();
+    setBorrowerName('');
+    setBorrowerCredit('');
+    setAddressMode('available');
+    setPropertyAddress('');
+    setAiQuestion('');
+    setAiAnswer('');
+    setAiError('');
+    setShareMsg('');
+  };
 
   // Build the side-by-side comparison from every scenario. Returns both the legacy
   // names/metrics matrix (used by the shareable quote) and a structured payload the
@@ -335,6 +350,9 @@ export default function Compare() {
             </Button>
             <Button variant="secondary" onClick={exportComparisonPdf} disabled={busy !== null}>
               {busy === 'pdf' ? 'Building…' : 'Export PDF'}
+            </Button>
+            <Button variant="secondary" onClick={resetAll} disabled={saving || busy !== null}>
+              Reset
             </Button>
             <Button variant="primary" onClick={() => saveAll()} disabled={saving}>
               {saving ? 'Saving…' : dirty ? 'Save *' : 'Save'}
