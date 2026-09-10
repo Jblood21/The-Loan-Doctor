@@ -74,6 +74,8 @@ interface ScenariosContextValue {
   patch: (obj: Partial<Scenario>) => void;
   setField: (field: keyof Scenario, raw: string) => void;
   addScenario: () => void;
+  /** Reset the working comparison to a single preset-default scenario (bank untouched). */
+  resetScenarios: () => void;
   /** Open a saved scenario into the working tabs (keeps its id so re-saving updates the
    *  same bank entry). Returns false when the 6-scenario comparison limit is reached. */
   addScenarioFrom: (scenario: Scenario) => boolean;
@@ -194,6 +196,14 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
       return next;
     });
 
+  // Reset the working comparison to a single preset-default scenario. The saved bank is
+  // left untouched — only the current (unsaved) comparison view is cleared.
+  const resetScenarios = () => {
+    setScenarios([seededBlank('Scenario 1')]);
+    setActive(0);
+    setDirty(false);
+  };
+
   const addScenarioFrom = (scenario: Scenario): boolean => {
     // Already open in a tab → just focus it (avoid duplicate tabs of one saved scenario).
     if (scenario.id) {
@@ -261,6 +271,7 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
       patch,
       setField,
       addScenario,
+      resetScenarios,
       addScenarioFrom,
       deleteFromBank,
       removeScenario,
