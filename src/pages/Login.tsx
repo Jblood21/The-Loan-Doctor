@@ -21,7 +21,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
-  const [code, setCode] = useState('');
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -37,7 +36,7 @@ export default function Login() {
       if (mode === 'login') {
         await login(cleanEmail, password, remember);
       } else {
-        await register({ email: cleanEmail, password, name: name.trim(), company: company.trim(), code: code.trim() });
+        await register({ email: cleanEmail, password, name: name.trim(), company: company.trim() });
       }
       navigate('/compare', { replace: true });
     } catch (err) {
@@ -129,18 +128,6 @@ export default function Login() {
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
               />
-              <Label>Access code</Label>
-              <TextField
-                size="lg"
-                className="mb-[6px]"
-                placeholder="Provided by your administrator"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                autoComplete="off"
-              />
-              <p className="mb-[18px] text-[12px] leading-[1.5] text-text-dim2">
-                Required only if this workspace is invite-only. Leave blank if you weren’t given one.
-              </p>
             </>
           )}
 

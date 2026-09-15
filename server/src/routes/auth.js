@@ -6,24 +6,18 @@ import { requireAuth, signToken } from '../auth.js';
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Registration gate. Closed by default so a public deployment can't be self-registered
-// into (which would expose the shared borrower pool to strangers). Three states:
-//   • SIGNUP_CODE set       → anyone with the matching access code may register (invite-only).
-//   • ALLOW_SIGNUP === 'true' → open registration (opt-in; convenient for local dev).
-//   • otherwise              → registration closed entirely (default).
-const SIGNUP_CODE = process.env.SIGNUP_CODE || '';
-const SIGNUPS_OPEN = process.env.ALLOW_SIGNUP === 'true';
+// Registration is OPEN and FREE — anyone can create an account (no access code). Each
+// account's data (scenarios, borrowers, settings) is private to that user, so open
+// signup doesn't expose anyone else's information. An operator can still close signups
+// entirely for abuse by setting ALLOW_SIGNUP=false in the environment.
+const SIGNUPS_OPEN = process.env.ALLOW_SIGNUP !== 'false';
 
 router.post('/register', (req, res) => {
-  const { password, name = '', company = '', code = '' } = req.body || {};
+  const { password, name = '', company = '' } = req.body || {};
   const email = normalizeEmail(req.body?.email);
 
-  if (SIGNUP_CODE) {
-    if (String(code).trim() !== SIGNUP_CODE) {
-      return res.status(403).json({ error: 'A valid access code is required to create an account.' });
-    }
-  } else if (!SIGNUPS_OPEN) {
-    return res.status(403).json({ error: 'Account creation is closed. Contact your administrator for access.' });
+  if (!SIGNUPS_OPEN) {
+    return res.status(403).json({ error: 'Account creation is temporarily closed. Please try again later.' });
   }
 
   if (!EMAIL_RE.test(email || '')) return res.status(400).json({ error: 'A valid email is required' });
