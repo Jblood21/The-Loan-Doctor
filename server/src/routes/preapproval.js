@@ -117,6 +117,8 @@ router.post('/pdf', requireAuth, (req, res) => {
     apr: n(loan.apr),
     reLine,
     validityDays: n(loan.validityDays),
+    kind: str(loan.kind),
+    creditScore: str(loan.creditScore),
   });
 });
 

@@ -15,6 +15,7 @@ import { api, ApiError } from '@/lib/api';
 import { computeScenario } from '@/lib/finance';
 import {
   buildPreApprovalLetter,
+  creditAdjective,
   LETTER_TEMPLATES,
   LETTER_KINDS,
   LETTERHEAD_STYLES,
@@ -224,6 +225,11 @@ export default function PreApproval() {
   const [showHeadshot, setShowHeadshot] = useState(true);
   const [showSubjectAddress, setShowSubjectAddress] = useState(true);
   const [expDays, setExpDays] = useState('90');
+  // Borrower credit score woven into the letter's credit sentence. The adjective
+  // (good/great/fantastic) always adapts; the number itself only prints when the
+  // "Show score on letter" toggle is on. Left blank → falls back to the scenario band.
+  const [creditScore, setCreditScore] = useState('');
+  const [showCreditScore, setShowCreditScore] = useState(false);
 
   // Signature: seeded from the saved settings signature until the user draws/uploads
   // one here (sigTouched), so a signature set once auto-fills every letter.
@@ -267,9 +273,19 @@ export default function PreApproval() {
   };
   const resetHeadshot = () => saveSettings({ headshotDataUrl: '' });
 
+  // Credit score used in the letter: what's typed here, otherwise the scenario's band.
+  const effectiveCredit = (creditScore.trim() || srcScenario.credit || '').trim();
   const tpl = useMemo(
-    () => resolveTemplate(templateId, srcScenario, { borrowerName: pa.borrowerName, propertyAddress: pa.propertyAddress, pronoun, kind: letterKind }),
-    [templateId, srcScenario, pa.borrowerName, pa.propertyAddress, pronoun, letterKind],
+    () =>
+      resolveTemplate(templateId, srcScenario, {
+        borrowerName: pa.borrowerName,
+        propertyAddress: pa.propertyAddress,
+        pronoun,
+        kind: letterKind,
+        creditScore: effectiveCredit,
+        showCreditScore,
+      }),
+    [templateId, srcScenario, pa.borrowerName, pa.propertyAddress, pronoun, letterKind, effectiveCredit, showCreditScore],
   );
   useEffect(() => {
     if (customized) return;
@@ -292,6 +308,8 @@ export default function PreApproval() {
     templateId,
     kind: letterKind,
     pronoun,
+    creditScore: effectiveCredit,
+    showCreditScore,
     paragraphs: parsedParagraphs.length ? parsedParagraphs : undefined,
     reLine,
     salutation,
@@ -457,6 +475,8 @@ export default function PreApproval() {
         monthlyPayment: computeScenario(srcScenario).totalMonthly,
         apr: computeScenario(srcScenario).apr,
         validityDays: parseInt(expDays, 10) || 0,
+        kind: letterKind,
+        creditScore: effectiveCredit,
       },
     };
     try {
@@ -917,6 +937,42 @@ export default function PreApproval() {
             </div>
           </div>
 
+          {/* Borrower credit — the description adapts to the score; the number is optional */}
+          <div className="mb-5">
+            <SectionLabel className="mb-2">BORROWER CREDIT</SectionLabel>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div>
+                <Label>Credit score</Label>
+                <TextField
+                  type="number"
+                  inputMode="numeric"
+                  placeholder={srcScenario.credit ? `Scenario band: ${srcScenario.credit}` : 'e.g. 760'}
+                  value={creditScore}
+                  onChange={(e) => setCreditScore(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end pb-2 text-[12px] text-text-muted">
+                {effectiveCredit ? (
+                  <span>
+                    Reads as{' '}
+                    <span className="font-semibold capitalize text-text-label">{creditAdjective(effectiveCredit)}</span> credit
+                    {creditScore.trim() ? '' : ' (from the scenario band)'}.
+                  </span>
+                ) : (
+                  <span>Enter a score to describe the borrower’s credit.</span>
+                )}
+              </div>
+            </div>
+            <div className="mt-3">
+              <Toggle
+                checked={showCreditScore}
+                onChange={setShowCreditScore}
+                label="Show score on letter"
+                hint="Off keeps just the description (good / great / fantastic); on also prints the FICO number."
+              />
+            </div>
+          </div>
+
           {/* Program template + editable body */}
           <div className="mb-5">
             <div className="mb-2 flex items-center justify-between">
@@ -1216,6 +1272,30 @@ function IssuedPreApprovals({
       .filter(Boolean)
       .join(' · ');
 
+  const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
+  // Every stored field for one issued letter, as label/value pairs (blank ones dropped).
+  const detailFields = (r: PreApprovalRecord): { label: string; value: string }[] => {
+    const isRefi = r.transaction === 'refinance';
+    const rows: { label: string; value: string }[] = [
+      { label: 'Approval level', value: r.kind ? letterKindNoun(r.kind as LetterKind) : 'Pre-Approval' },
+      { label: 'Transaction', value: cap(r.transaction) },
+      { label: 'Loan type', value: r.loanType },
+      { label: isRefi ? 'Est. home value' : 'Purchase price', value: r.price ? fmt(r.price) : '' },
+      { label: 'Loan amount', value: r.loanAmount ? fmt(r.loanAmount) : '' },
+      { label: isRefi ? 'Est. equity' : 'Down payment', value: r.downPayment ? fmt(r.downPayment) : '' },
+      { label: 'Interest rate', value: r.rate ? `${r.rate}%` : '' },
+      { label: 'Loan term', value: r.term ? `${r.term} yr` : '' },
+      { label: 'Monthly payment', value: r.monthlyPayment ? `${fmt(r.monthlyPayment)}/mo` : '' },
+      { label: 'APR', value: r.apr ? `${r.apr}%` : '' },
+      { label: 'Credit score', value: r.creditScore || '' },
+      { label: 'Property', value: r.propertyAddress },
+      { label: 'RE line', value: r.reLine },
+      { label: 'Valid for', value: r.validityDays ? `${r.validityDays} days` : '' },
+      { label: 'Issued', value: fmtDate(r.issuedAt) },
+    ];
+    return rows.filter((row) => row.value && row.value.trim());
+  };
+
   return (
     <Card className="overflow-hidden p-0">
       <div className="flex items-center justify-between gap-3 border-b border-border px-[22px] py-4">
@@ -1268,16 +1348,27 @@ function IssuedPreApprovals({
                       const older = g.records[i + 1]; // newest-first, so i+1 is the previous letter
                       const changes = diffRecords(r, older);
                       return (
-                        <div key={r.id} className="border-l-2 border-[rgba(45,212,191,0.4)] py-2 pl-3.5">
+                        <div key={r.id} className="border-l-2 border-[rgba(45,212,191,0.4)] py-2.5 pl-3.5">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-[12.5px] font-semibold text-text-soft">
                               {i === 0 ? 'Latest' : `Version ${g.records.length - i}`} · {fmtDate(r.issuedAt)}
                             </span>
                             <span className="num text-[12.5px] text-text-muted">{r.monthlyPayment ? `${fmt(r.monthlyPayment)}/mo` : ''}</span>
                           </div>
-                          <div className="mt-0.5 text-[12px] text-text-muted">{summary(r)}</div>
+                          {/* Full detail — every field captured on this letter */}
+                          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+                            {detailFields(r).map((f) => (
+                              <div key={f.label} className="min-w-0">
+                                <dt className="text-[10.5px] uppercase tracking-[0.04em] text-text-dim">{f.label}</dt>
+                                <dd className="num truncate text-[12.5px] text-text-soft" title={f.value}>
+                                  {f.value}
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
                           {changes.length > 0 ? (
-                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            <div className="mt-2.5 flex flex-wrap gap-1.5">
+                              <span className="text-[11px] font-semibold text-text-dim">Changed from prior:</span>
                               {changes.map((c) => (
                                 <span key={c.label} className="rounded-[6px] bg-[rgba(251,191,36,0.14)] px-2 py-0.5 text-[11px] text-[#d9a53a]">
                                   {c.label}: {c.from} → {c.to}
@@ -1285,7 +1376,7 @@ function IssuedPreApprovals({
                               ))}
                             </div>
                           ) : (
-                            older && <div className="mt-1 text-[11px] text-text-dim">No changes from the prior letter.</div>
+                            older && <div className="mt-2 text-[11px] text-text-dim">No changes from the prior letter.</div>
                           )}
                         </div>
                       );
