@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPreApprovalLetter } from './letter';
+import { buildPreApprovalLetter, creditAdjective } from './letter';
 import type { LetterKind } from './letter';
 import type { Scenario, Settings } from '@/types';
 
@@ -73,5 +73,64 @@ describe('pre-approval letter kinds', () => {
     const refi = { ...scenario, transaction: 'refinance' } as unknown as Scenario;
     const l = buildPreApprovalLetter(refi, settings, { borrowerName: 'John Smith', includeAgent: false, kind: 'prequalified' });
     expect(l.paragraphs[0]).toContain('is pre-qualified to refinance');
+  });
+});
+
+describe('credit adjective bands', () => {
+  it('maps FICO scores to good / great / fantastic', () => {
+    expect(creditAdjective(699)).toBe('good');
+    expect(creditAdjective(739)).toBe('good');
+    expect(creditAdjective(740)).toBe('great');
+    expect(creditAdjective(799)).toBe('great');
+    expect(creditAdjective(800)).toBe('fantastic');
+    expect(creditAdjective(810)).toBe('fantastic');
+  });
+
+  it('falls back to "strong" when no usable score is given', () => {
+    expect(creditAdjective('')).toBe('strong');
+    expect(creditAdjective(undefined)).toBe('strong');
+    expect(creditAdjective('n/a')).toBe('strong');
+    expect(creditAdjective(0)).toBe('strong');
+  });
+
+  it('accepts numeric strings', () => {
+    expect(creditAdjective('742')).toBe('great');
+    expect(creditAdjective('803')).toBe('fantastic');
+  });
+});
+
+describe('credit score in the letter body', () => {
+  // Scenario with no credit band so the score comes solely from the options.
+  const noBand = { ...scenario, credit: '' } as unknown as Scenario;
+
+  it('with no score, preapproval keeps "strong" and the others carry no adjective', () => {
+    const pa = buildPreApprovalLetter(noBand, settings, { borrowerName: 'John Smith', includeAgent: false, kind: 'preapproval' });
+    expect(pa.paragraphs[1]).toContain('supported by their strong credit history and credit score');
+
+    const pq = buildPreApprovalLetter(noBand, settings, { borrowerName: 'John Smith', includeAgent: false, kind: 'prequalified' });
+    expect(pq.paragraphs[1]).toContain('stated income, assets, and credit score');
+    expect(pq.paragraphs[1]).not.toContain('strong credit score');
+  });
+
+  it('weaves the band adjective in based on the score', () => {
+    const great = buildPreApprovalLetter(noBand, settings, { borrowerName: 'John Smith', includeAgent: false, kind: 'preapproval', creditScore: 760 });
+    expect(great.paragraphs[1]).toContain('supported by their great credit history');
+
+    const fantastic = buildPreApprovalLetter(noBand, settings, { borrowerName: 'John Smith', includeAgent: false, kind: 'prequalified', creditScore: 805 });
+    expect(fantastic.paragraphs[1]).toContain('assets, and fantastic credit score');
+  });
+
+  it('prints the FICO number only when showCreditScore is on', () => {
+    const hidden = buildPreApprovalLetter(noBand, settings, { borrowerName: 'John Smith', includeAgent: false, kind: 'preapproval', creditScore: 760 });
+    expect(hidden.paragraphs[1]).not.toContain('FICO');
+
+    const shown = buildPreApprovalLetter(noBand, settings, {
+      borrowerName: 'John Smith',
+      includeAgent: false,
+      kind: 'preapproval',
+      creditScore: 760,
+      showCreditScore: true,
+    });
+    expect(shown.paragraphs[1]).toContain('(FICO 760)');
   });
 });

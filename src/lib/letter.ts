@@ -66,6 +66,25 @@ function pronounSet(choice: PronounChoice, twoBorrowers: boolean): PronounSet {
   return { subjCap: 'They', poss: 'their', have: 'have' };
 }
 
+/** Credit descriptor woven into the letter, plus an optional printed number. */
+export interface CreditPhrase {
+  /** Adjective TOKEN placed immediately before the credit noun — already includes its
+   *  trailing space when present (e.g. "great "), or "" for no adjective. */
+  adjective: string;
+  /** Appended after the credit-score noun when the number is shown, else "". */
+  display: string;
+}
+
+/** Map a FICO score to the letter adjective. Bands: <740 good, 740–799 great, 800+
+ *  fantastic. Falls back to "strong" (the prior wording) when no score is provided. */
+export function creditAdjective(score: number | string | undefined | null): string {
+  const n = typeof score === 'number' ? score : parseInt(String(score ?? ''), 10);
+  if (!Number.isFinite(n) || n <= 0) return 'strong';
+  if (n >= 800) return 'fantastic';
+  if (n >= 740) return 'great';
+  return 'good';
+}
+
 /** Per-kind wording. Drives the opening verb, the two supporting paragraphs, and the
  *  nouns used in the RE line, closing paragraph, and validity sentence. */
 interface KindWording {
@@ -75,8 +94,10 @@ interface KindWording {
   nounLower: string;
   /** Opening verb phrase: "${name} is ${verb} for the purchase of…". */
   verb: string;
-  /** Second paragraph — what the decision rests on. */
-  basis: (pr: PronounSet, scores: string) => string;
+  /** Second paragraph — what the decision rests on. `credit` supplies the score
+   *  adjective (good/great/fantastic, or "strong" when no score) and an optional
+   *  printed FICO number. */
+  basis: (pr: PronounSet, scores: string, credit: CreditPhrase) => string;
   /** Third paragraph — readiness / remaining steps. */
   readiness: (name: string) => string;
   /** Tail of the validity sentence ("… and is <validityTail>"), so each level's
@@ -91,8 +112,8 @@ const KIND_WORDING: Record<LetterKind, KindWording> = {
     noun: 'Pre-Approval',
     nounLower: 'pre-approval',
     verb: 'pre-approved',
-    basis: (pr, scores) =>
-      `This pre-approval is supported by ${pr.poss} strong credit history and ${scores}. ${pr.subjCap} ${pr.have} provided income and asset documentation verifying sufficient income and assets needed for this transaction.`,
+    basis: (pr, scores, credit) =>
+      `This pre-approval is supported by ${pr.poss} ${credit.adjective}credit history and ${scores}${credit.display}. ${pr.subjCap} ${pr.have} provided income and asset documentation verifying sufficient income and assets needed for this transaction.`,
     readiness: (name) =>
       `Based on this, ${name} can close in a timely manner once the file is submitted to underwriting, including a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
     validityTail: 'subject to a satisfactory appraisal, clear title, and final underwriting approval.',
@@ -104,8 +125,8 @@ const KIND_WORDING: Record<LetterKind, KindWording> = {
     noun: 'Underwritten Pre-Approval',
     nounLower: 'underwritten pre-approval',
     verb: 'fully underwritten and conditionally approved',
-    basis: (pr, scores) =>
-      `This approval reflects a complete underwriting review of ${pr.poss} credit, income, and asset documentation by a mortgage underwriter, who has verified ${pr.poss} ${scores} and ability to repay. ${pr.subjCap} ${pr.have} met the requirements for this financing, so the approval is subject only to the property-related items and standard closing conditions — not to a further review of income, assets, or credit.`,
+    basis: (pr, scores, credit) =>
+      `This approval reflects a complete underwriting review of ${pr.poss} credit, income, and asset documentation by a mortgage underwriter, who has verified ${pr.poss} ${credit.adjective}${scores}${credit.display} and ability to repay. ${pr.subjCap} ${pr.have} met the requirements for this financing, so the approval is subject only to the property-related items and standard closing conditions — not to a further review of income, assets, or credit.`,
     readiness: (name) =>
       `Because the file has already been underwritten, ${name} can close quickly — the remaining items are a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
     validityTail: 'subject to a satisfactory appraisal, clear title, and satisfaction of the remaining underwriting conditions.',
@@ -116,8 +137,8 @@ const KIND_WORDING: Record<LetterKind, KindWording> = {
     noun: 'Pre-Qualification',
     nounLower: 'pre-qualification',
     verb: 'pre-qualified',
-    basis: (pr, scores) =>
-      `This pre-qualification is based on ${pr.poss} stated income, assets, and ${scores}, which have not yet been verified with documentation or reviewed by an underwriter.`,
+    basis: (pr, scores, credit) =>
+      `This pre-qualification is based on ${pr.poss} stated income, assets, and ${credit.adjective}${scores}${credit.display}, which have not yet been verified with documentation or reviewed by an underwriter.`,
     readiness: (name) =>
       `Based on the information provided, this financing looks like a strong fit for ${name}. Moving to a full pre-approval requires verification of income and assets and an underwriting review, followed by a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
     validityTail:
@@ -156,6 +177,24 @@ interface BodyOpts {
   pronoun?: PronounChoice;
   /** Approval level — defaults to a standard pre-approval. */
   kind?: LetterKind;
+  /** Borrower credit score — drives the descriptor woven into the credit sentence. */
+  creditScore?: string | number;
+  /** When true (and a score is present), the FICO number is printed in the letter too. */
+  showCreditScore?: boolean;
+}
+
+/** Build the credit descriptor + optional printed number from the body options. The
+ *  adjective token carries its own trailing space so it can be dropped in front of the
+ *  credit noun. With a score it's the FICO band word (good/great/fantastic); without one
+ *  it falls back to the kind's prior wording — "strong" for a pre-approval, none for the
+ *  underwritten and pre-qualified letters (which never described credit as "strong"). */
+function creditPhraseFrom(opts: BodyOpts): CreditPhrase {
+  const raw = opts.creditScore == null ? '' : String(opts.creditScore).trim();
+  const kind = opts.kind || 'preapproval';
+  const word = raw ? creditAdjective(raw) : kind === 'preapproval' ? 'strong' : '';
+  const adjective = word ? `${word} ` : '';
+  const display = raw && opts.showCreditScore ? ` (FICO ${raw})` : '';
+  return { adjective, display };
 }
 
 export function resolveTemplate(id: string, scenario: Scenario, opts: BodyOpts = {}): ResolvedTemplate {
@@ -180,7 +219,7 @@ function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: stri
   const p1 = isRefi
     ? `${name} ${isAre} ${w.verb} to refinance the property located at ${property} with a loan amount of ${loan} using ${financingLabel} financing${tail}.`
     : `${name} ${isAre} ${w.verb} for the purchase of the home located at ${property} at a purchase price of ${price} using ${financingLabel} financing${tail}.`;
-  const p2 = w.basis(pr, scores);
+  const p2 = w.basis(pr, scores, creditPhraseFrom(opts));
   const p3 = w.readiness(name);
   const p4 = `Please contact me with any questions regarding this ${w.nounLower}.`;
   return [p1, p2, p3, p4];
@@ -233,6 +272,11 @@ export interface LetterOptions {
   kind?: LetterKind;
   /** How to reference the borrower (single-borrower pronoun). */
   pronoun?: PronounChoice;
+  /** Borrower credit score. Drives the credit descriptor (good/great/fantastic); the
+   *  number itself is only printed when `showCreditScore` is true. */
+  creditScore?: string | number;
+  /** Print the FICO number in the letter body (default off — the adjective still adapts). */
+  showCreditScore?: boolean;
   /** Edited body override (paragraphs). */
   paragraphs?: string[];
   // Editable parts (empty/undefined → sensible default).
@@ -258,6 +302,8 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
     propertyAddress: opts.propertyAddress,
     pronoun: opts.pronoun,
     kind: opts.kind,
+    creditScore: opts.creditScore,
+    showCreditScore: opts.showCreditScore,
   });
   const paragraphs = opts.paragraphs && opts.paragraphs.length ? opts.paragraphs : def.paragraphs;
 
