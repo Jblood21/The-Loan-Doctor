@@ -160,6 +160,11 @@ export interface PreApprovalRecord {
   reLine: string;
   validityDays: number;
   issuedAt: string;
+  /** Approval level the letter was issued at (raw LetterKind value). Optional — older
+   *  records predate this field. */
+  kind?: string;
+  /** Borrower credit score captured on the letter (may be blank if none was entered). */
+  creditScore?: string;
 }
 
 export interface PreApprovalState {
