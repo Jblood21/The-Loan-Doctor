@@ -97,59 +97,64 @@ export default function Admin() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border px-[22px] py-[18px]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-[22px] py-[18px]">
           <span className="text-[15px] font-semibold">Users</span>
           <TextField
             placeholder="Search users…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="!h-9 !w-[220px] !rounded-[9px] !bg-input !text-[13px]"
+            className="!h-9 !w-full !rounded-[9px] !bg-input !text-[13px] sm:!w-[220px]"
           />
         </div>
-        <div
-          className="grid border-b border-[rgba(140,165,195,0.08)] px-[22px] py-3 text-[11.5px] font-bold tracking-[0.5px] text-text-dim"
-          style={{ gridTemplateColumns: COLS }}
-        >
-          <span>NAME</span>
-          <span>EMAIL</span>
-          <span>COMPANY</span>
-          <span>SCENARIOS</span>
-          <span>STATUS</span>
-        </div>
-        {filtered.map((u, i) => {
-          const tint = STATUS_TINT[u.status || 'Active'] || STATUS_TINT.Active;
-          return (
+        {/* Horizontal scroll on phones keeps the 5-column table readable instead of clipping it. */}
+        <div className="overflow-x-auto">
+          <div className="min-w-[640px]">
             <div
-              key={u.id}
-              className="grid items-center border-b border-[rgba(140,165,195,0.06)] px-[22px] py-3.5 text-[13.5px]"
+              className="grid border-b border-[rgba(140,165,195,0.08)] px-[22px] py-3 text-[11.5px] font-bold tracking-[0.5px] text-text-dim"
               style={{ gridTemplateColumns: COLS }}
             >
-              <span className="flex items-center gap-2.5 font-semibold text-text-primary">
-                <span
-                  className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px] text-[12px] font-bold text-app"
-                  style={{ background: AVATAR_PALETTE[i % AVATAR_PALETTE.length] }}
-                >
-                  {initials(u.name)}
-                </span>
-                {u.name}
-              </span>
-              <span className="text-text-soft">{u.email}</span>
-              <span className="text-text-soft">{u.company}</span>
-              <span className="num text-text-softer">{num(u.scenarioCount || 0)}</span>
-              <span>
-                <span
-                  className="rounded-[20px] px-[11px] py-1 text-[11.5px] font-semibold"
-                  style={{ background: tint.bg, color: tint.fg }}
-                >
-                  {u.status || 'Active'}
-                </span>
-              </span>
+              <span>NAME</span>
+              <span>EMAIL</span>
+              <span>COMPANY</span>
+              <span>SCENARIOS</span>
+              <span>STATUS</span>
             </div>
-          );
-        })}
-        {filtered.length === 0 && (
-          <div className="px-[22px] py-6 text-[13.5px] text-text-muted">No users match “{query}”.</div>
-        )}
+            {filtered.map((u, i) => {
+              const tint = STATUS_TINT[u.status || 'Active'] || STATUS_TINT.Active;
+              return (
+                <div
+                  key={u.id}
+                  className="grid items-center border-b border-[rgba(140,165,195,0.06)] px-[22px] py-3.5 text-[13.5px]"
+                  style={{ gridTemplateColumns: COLS }}
+                >
+                  <span className="flex items-center gap-2.5 font-semibold text-text-primary">
+                    <span
+                      className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px] text-[12px] font-bold text-app"
+                      style={{ background: AVATAR_PALETTE[i % AVATAR_PALETTE.length] }}
+                    >
+                      {initials(u.name)}
+                    </span>
+                    {u.name}
+                  </span>
+                  <span className="text-text-soft">{u.email}</span>
+                  <span className="text-text-soft">{u.company}</span>
+                  <span className="num text-text-softer">{num(u.scenarioCount || 0)}</span>
+                  <span>
+                    <span
+                      className="rounded-[20px] px-[11px] py-1 text-[11.5px] font-semibold"
+                      style={{ background: tint.bg, color: tint.fg }}
+                    >
+                      {u.status || 'Active'}
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div className="px-[22px] py-6 text-[13.5px] text-text-muted">No users match “{query}”.</div>
+            )}
+          </div>
+        </div>
       </Card>
     </div>
   );

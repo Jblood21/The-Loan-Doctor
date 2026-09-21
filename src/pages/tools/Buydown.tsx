@@ -142,20 +142,24 @@ export default function Buydown({ open, onClose }: CalcProps) {
         <div className="flex flex-col gap-4">
           {/* comparison table */}
           <div className="overflow-hidden rounded-xl border border-border">
-            <div className="grid grid-cols-[1.3fr_1fr_1fr_1fr] bg-elevated px-4 py-2.5 text-[11.5px] font-bold tracking-[0.4px] text-text-dim">
-              <span></span>
-              {cols.map((c) => (
-                <span key={c.key} className="text-right">{c.label}</span>
-              ))}
-            </div>
-            {rows.map((r) => (
-              <div key={r.label} className="grid grid-cols-[1.3fr_1fr_1fr_1fr] border-b border-[rgba(140,165,195,0.06)] px-4 py-2 text-[13px] last:border-0">
-                <span className="text-text-soft">{r.label}</span>
-                <span className="num text-right text-text-muted">{r.none}</span>
-                <span className="num text-right text-brand-teal">{r.temp}</span>
-                <span className="num text-right text-brand-blue-light">{r.perm}</span>
+            <div className="overflow-x-auto">
+              <div className="min-w-[360px]">
+                <div className="grid grid-cols-[1.3fr_1fr_1fr_1fr] bg-elevated px-4 py-2.5 text-[11.5px] font-bold tracking-[0.4px] text-text-dim">
+                  <span></span>
+                  {cols.map((c) => (
+                    <span key={c.key} className="text-right">{c.label}</span>
+                  ))}
+                </div>
+                {rows.map((r) => (
+                  <div key={r.label} className="grid grid-cols-[1.3fr_1fr_1fr_1fr] border-b border-[rgba(140,165,195,0.06)] px-4 py-2 text-[13px] last:border-0">
+                    <span className="text-text-soft">{r.label}</span>
+                    <span className="num text-right text-text-muted">{r.none}</span>
+                    <span className="num text-right text-brand-teal">{r.temp}</span>
+                    <span className="num text-right text-brand-blue-light">{r.perm}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
 
           {/* temporary year-by-year */}

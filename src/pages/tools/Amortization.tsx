@@ -70,21 +70,23 @@ export default function Amortization({ open, onClose }: CalcProps) {
             </ResultPanel>
           </div>
         </div>
-        <div className="max-h-[360px] overflow-y-auto rounded-xl border border-border">
-          <div className="sticky top-0 grid grid-cols-4 gap-2 bg-elevated px-4 py-2.5 text-[11px] font-bold tracking-[0.5px] text-text-dim">
-            <span>YEAR</span>
-            <span className="text-right">PRINCIPAL</span>
-            <span className="text-right">INTEREST</span>
-            <span className="text-right">BALANCE</span>
-          </div>
-          {byYear.map((y) => (
-            <div key={y.year} className="grid grid-cols-4 gap-2 border-b border-[rgba(140,165,195,0.06)] px-4 py-2 text-[13px]">
-              <span className="text-text-soft">{y.year}</span>
-              <span className="num text-right text-text-softer">{fmt(y.principal)}</span>
-              <span className="num text-right text-warn-text">{fmt(y.interest)}</span>
-              <span className="num text-right text-text-primary">{fmt(y.balance)}</span>
+        <div className="max-h-[360px] overflow-auto rounded-xl border border-border">
+          <div className="min-w-[420px]">
+            <div className="sticky top-0 grid grid-cols-4 gap-2 bg-elevated px-4 py-2.5 text-[11px] font-bold tracking-[0.5px] text-text-dim">
+              <span>YEAR</span>
+              <span className="text-right">PRINCIPAL</span>
+              <span className="text-right">INTEREST</span>
+              <span className="text-right">BALANCE</span>
             </div>
-          ))}
+            {byYear.map((y) => (
+              <div key={y.year} className="grid grid-cols-4 gap-2 border-b border-[rgba(140,165,195,0.06)] px-4 py-2 text-[13px]">
+                <span className="text-text-soft">{y.year}</span>
+                <span className="num text-right text-text-softer">{fmt(y.principal)}</span>
+                <span className="num text-right text-warn-text">{fmt(y.interest)}</span>
+                <span className="num text-right text-text-primary">{fmt(y.balance)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -89,7 +89,7 @@ export function Headline({ label, value, sub }: { label: string; value: string; 
   return (
     <div className="mb-4">
       <div className="text-[12.5px] font-semibold text-[#8fb8c9]">{label}</div>
-      <div className="num my-1 text-[34px] font-semibold tracking-[-1px] text-text-heading">{value}</div>
+      <div className="num my-1 text-[27px] font-semibold tracking-[-1px] text-text-heading sm:text-[34px]">{value}</div>
       {sub && <div className="text-[13px] text-text-muted">{sub}</div>}
     </div>
   );

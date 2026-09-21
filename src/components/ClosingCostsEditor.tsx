@@ -63,7 +63,9 @@ export function ClosingCostsEditor({
   const remove = (id: string) => onChange(items.filter((it) => it.id !== id));
   const applySchedule = (mode: 'full' | 'premiums') => onChange(applyTitleSchedule(items, { transaction, mode, newId: newFeeId }));
 
-  const cols = withAmounts ? 'grid-cols-[1fr_104px_96px_84px_24px]' : 'grid-cols-[1fr_104px_104px_24px]';
+  // Fixed grid columns kick in only at sm+; on phones each fee row stacks vertically so
+  // the fields never overflow the narrow card.
+  const cols = withAmounts ? 'sm:grid-cols-[1fr_104px_96px_84px_24px]' : 'sm:grid-cols-[1fr_104px_104px_24px]';
 
   const titleControl = enableTitleSchedule && (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[9px] border border-dashed border-border-input bg-input/60 px-3 py-2">
@@ -113,7 +115,7 @@ export function ClosingCostsEditor({
         {items.map((it) => {
           const auto = isTitleBasis(it.basis);
           return (
-            <div key={it.id} className={`grid ${cols} items-center gap-2`}>
+            <div key={it.id} className={`flex flex-col gap-2 rounded-[10px] border border-border-input p-2.5 sm:grid ${cols} sm:items-center sm:rounded-none sm:border-0 sm:p-0`}>
               <TextField value={it.label} onChange={(e) => update(it.id, { label: e.target.value })} className="!h-[38px] !rounded-[8px] !text-[13px]" aria-label="Fee name" />
               <Select value={it.basis} onChange={(e) => update(it.id, { basis: e.target.value as FeeBasis })} options={FEE_BASES} className="!h-[38px] !rounded-[8px] !px-2.5 !text-[12.5px]" />
               {auto ? (
@@ -131,8 +133,13 @@ export function ClosingCostsEditor({
                   ariaLabel={`${it.label} amount`}
                 />
               )}
-              {withAmounts && <span className="num text-right text-[13px] text-text-softer">{fmt(closingCostAmount(it, ln, pr))}</span>}
-              <button onClick={() => remove(it.id)} title="Remove fee" className="flex h-6 w-6 items-center justify-center rounded text-[16px] leading-none text-text-dim transition-colors hover:text-danger">
+              {withAmounts && (
+                <span className="num text-[13px] text-text-softer sm:text-right">
+                  <span className="text-text-dim sm:hidden">Total: </span>
+                  {fmt(closingCostAmount(it, ln, pr))}
+                </span>
+              )}
+              <button onClick={() => remove(it.id)} title="Remove fee" aria-label="Remove fee" className="flex h-6 w-6 items-center justify-center self-end rounded text-[16px] leading-none text-text-dim transition-colors hover:text-danger sm:self-auto">
                 ×
               </button>
             </div>
