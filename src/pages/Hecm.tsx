@@ -115,12 +115,12 @@ export default function Hecm() {
         </Card>
 
         {/* RIGHT — result */}
-        <div className="sticky top-5 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:sticky lg:top-5">
           <Card variant="result" className="p-6">
             <div className="text-[12.5px] font-semibold text-[#8fb8c9]">
               {isPurchase ? 'Down Payment Required (est.)' : 'Available to Borrower (est.)'}
             </div>
-            <div className="num my-2 text-[42px] font-semibold tracking-[-1.5px] text-text-heading">
+            <div className="num my-2 text-[32px] font-semibold tracking-[-1.5px] text-text-heading sm:text-[42px]">
               {fmt(isPurchase ? res.requiredDownPayment : res.available)}
             </div>
             <div className="text-[13px] text-text-muted">

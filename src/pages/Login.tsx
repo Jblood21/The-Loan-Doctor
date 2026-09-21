@@ -99,7 +99,7 @@ export default function Login() {
       </div>
 
       {/* RIGHT — form */}
-      <div className="flex flex-1 items-center justify-center bg-[#091522] p-10 lg:flex-[.95]">
+      <div className="flex flex-1 items-center justify-center bg-[#091522] p-6 sm:p-10 lg:flex-[.95]">
         <form onSubmit={onSubmit} className="w-full max-w-[380px] animate-lp-fade-slow">
           <h1 className="m-0 font-display text-[28px] font-semibold tracking-[-0.6px]">
             {mode === 'login' ? 'Welcome back' : 'Create your account'}

@@ -707,7 +707,7 @@ export default function Compare() {
         </Card>
 
         {/* RIGHT — results */}
-        <div className="sticky top-5 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:sticky lg:top-5">
           <Card variant="result" className="relative overflow-hidden p-6">
             <div
               className="pointer-events-none absolute -right-10 -top-10 h-[140px] w-[140px]"
@@ -716,7 +716,7 @@ export default function Compare() {
             <div className="text-[12.5px] font-semibold tracking-[0.3px] text-[#8fb8c9]">
               {r.typeLabel} · Estimated Monthly Payment
             </div>
-            <div className="num my-2 text-[46px] font-semibold leading-none tracking-[-1.5px] text-text-heading">
+            <div className="num my-2 text-[34px] font-semibold leading-none tracking-[-1.5px] text-text-heading sm:text-[46px]">
               {fmt2(r.totalMonthly)}
             </div>
             <div className="text-[13px] text-text-muted">{r.subline}</div>
