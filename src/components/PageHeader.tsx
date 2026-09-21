@@ -10,13 +10,13 @@ interface PageHeaderProps {
 /** Consistent page title block used across screens. */
 export function PageHeader({ title, subtitle, badge, actions }: PageHeaderProps) {
   return (
-    <div className="mb-[26px] flex items-end justify-between gap-4">
-      <div>
+    <div className="mb-[26px] flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+      <div className="min-w-0">
         {badge && <div className="mb-[14px]">{badge}</div>}
-        <h1 className="m-0 font-display text-[27px] font-semibold tracking-[-0.6px] text-text-heading">{title}</h1>
+        <h1 className="m-0 font-display text-[22px] font-semibold tracking-[-0.6px] text-text-heading sm:text-[27px]">{title}</h1>
         {subtitle && <p className="mt-1.5 text-[14px] text-text-muted">{subtitle}</p>}
       </div>
-      {actions && <div className="flex flex-shrink-0 gap-[9px]">{actions}</div>}
+      {actions && <div className="flex flex-shrink-0 flex-wrap gap-[9px]">{actions}</div>}
     </div>
   );
 }

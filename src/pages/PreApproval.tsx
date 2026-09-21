@@ -511,7 +511,7 @@ export default function PreApproval() {
 
   // --- shared letter body (used by both styles) ---
   const LetterBody = (
-    <div className="flex-1 px-10 py-7 text-[#1b2733]" style={{ textAlign: isClassic ? 'left' : undefined }}>
+    <div className="flex-1 px-5 py-6 text-[#1b2733] sm:px-10 sm:py-7" style={{ textAlign: isClassic ? 'left' : undefined }}>
       {letter.title && <div className="mb-3 text-center text-[16px] font-bold" style={{ color: GREEN }}>{letter.title}</div>}
       <div className="text-[12.5px] text-[#555]">{letter.date}</div>
       <div className="mt-5 text-[13.5px]">
@@ -940,7 +940,7 @@ export default function PreApproval() {
           {/* Borrower credit — the description adapts to the score; the number is optional */}
           <div className="mb-5">
             <SectionLabel className="mb-2">BORROWER CREDIT</SectionLabel>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
               <div>
                 <Label>Credit score</Label>
                 <TextField
@@ -999,7 +999,7 @@ export default function PreApproval() {
           {/* Letter options */}
           <Divider className="mb-5" />
           <SectionLabel className="mb-3">LETTER OPTIONS</SectionLabel>
-          <div className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
+          <div className="mb-4 grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
             <div className="col-span-2">
               <Label>Letterhead style</Label>
               <Select value={styleId} onChange={(e) => setStyleId(e.target.value)} options={LETTERHEAD_STYLES.map((s) => ({ value: s.id, label: s.label }))} />
@@ -1208,11 +1208,11 @@ export default function PreApproval() {
         </Card>
 
         {/* RIGHT — live preview */}
-        <div className="sticky top-5">
+        <div className="lg:sticky lg:top-5">
           <div className="rounded-2xl bg-[#eef1f5] p-1.5 shadow-letter">
             <div className="flex min-h-[660px] flex-col overflow-hidden rounded-[11px] bg-white" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
               {/* Letterhead */}
-              <div className={`px-10 pt-9 ${isClassic ? 'flex flex-col items-center' : ''}`}>
+              <div className={`px-5 pt-7 sm:px-10 sm:pt-9 ${isClassic ? 'flex flex-col items-center' : ''}`}>
                 <img src={settings.logoDataUrl || '/brand/letterhead-logo.jpg'} alt={settings.lenderName || settings.company || 'Company logo'} className="h-[58px] w-auto" />
                 <div className="mt-4 h-[3px] w-full rounded" style={{ background: GOLD }} />
               </div>
@@ -1221,7 +1221,7 @@ export default function PreApproval() {
 
               {/* Footer */}
               {isClassic ? (
-                <div className="mt-auto px-10 pb-7 pt-4 text-center" style={{ borderTop: `3px solid ${GOLD}` }}>
+                <div className="mt-auto px-5 pb-6 pt-4 text-center sm:px-10 sm:pb-7" style={{ borderTop: `3px solid ${GOLD}` }}>
                   {showHeadshot && (
                     <img src={settings.headshotDataUrl || '/brand/officer-headshot.png'} alt={settings.name} className="mx-auto mb-2 h-[54px] w-[54px] rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
                   )}
@@ -1231,7 +1231,7 @@ export default function PreApproval() {
                 </div>
               ) : (
                 <div className="mt-auto" style={{ background: GREEN, borderTop: `4px solid ${GOLD}` }}>
-                  <div className="flex items-center gap-4 px-9 py-5">
+                  <div className="flex items-center gap-4 px-5 py-4 sm:px-9 sm:py-5">
                     {showHeadshot && (
                       <img src={settings.headshotDataUrl || '/brand/officer-headshot.png'} alt={settings.name} className="h-[62px] w-[62px] flex-shrink-0 rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
                     )}
