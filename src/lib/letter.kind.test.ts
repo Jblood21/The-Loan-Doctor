@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPreApprovalLetter, creditAdjective } from './letter';
+import { buildPreApprovalLetter, creditAdjective, andify } from './letter';
 import type { LetterKind } from './letter';
 import type { Scenario, Settings } from '@/types';
 
@@ -73,6 +73,54 @@ describe('pre-approval letter kinds', () => {
     const refi = { ...scenario, transaction: 'refinance' } as unknown as Scenario;
     const l = buildPreApprovalLetter(refi, settings, { borrowerName: 'John Smith', includeAgent: false, kind: 'prequalified' });
     expect(l.paragraphs[0]).toContain('is pre-qualified to refinance');
+  });
+});
+
+describe('financing label casing', () => {
+  it('lowercases a common-noun financing type mid-sentence', () => {
+    const l = buildPreApprovalLetter(scenario, settings, { borrowerName: 'John Smith', includeAgent: false });
+    expect(l.paragraphs[0]).toContain('using conventional financing');
+    expect(l.paragraphs[0]).not.toContain('using Conventional financing');
+  });
+
+  it('keeps acronym financing types uppercase', () => {
+    const fha = { ...scenario, loanType: 'fha' } as unknown as Scenario;
+    const l = buildPreApprovalLetter(fha, settings, { borrowerName: 'John Smith', includeAgent: false });
+    expect(l.paragraphs[0]).toContain('using FHA financing');
+  });
+});
+
+describe('ampersands spelled out', () => {
+  it('andify replaces "&" with "and"', () => {
+    expect(andify('Ferris & Co')).toBe('Ferris and Co');
+    expect(andify('Smith&Jones')).toBe('Smith and Jones');
+    expect(andify('no ampersand here')).toBe('no ampersand here');
+  });
+
+  it('spells out "&" in the borrower name throughout the letter', () => {
+    const two = { ...scenario, borrowers: '2' } as unknown as Scenario;
+    const l = buildPreApprovalLetter(two, settings, { borrowerName: 'John & Jane Smith', includeAgent: false });
+    expect(l.reLine).toBe('Pre-Approval for John and Jane Smith');
+    expect(l.paragraphs[0]).toContain('John and Jane Smith');
+    expect(JSON.stringify(l)).not.toContain('&');
+  });
+});
+
+describe('real-estate agent acknowledgment', () => {
+  const withAgent = (include: boolean) =>
+    buildPreApprovalLetter(scenario, settings, {
+      borrowerName: 'John Smith',
+      includeAgent: include,
+      agent: { name: 'Jane Doe', brokerage: 'Ferris & Associates', phone: '(555) 123-4567' },
+    });
+
+  it('builds a top acknowledgment line with "&" spelled out', () => {
+    const l = withAgent(true);
+    expect(l.agentAck).toBe('Jane Doe, Ferris and Associates · (555) 123-4567');
+  });
+
+  it('is empty when the agent is not included', () => {
+    expect(withAgent(false).agentAck).toBe('');
   });
 });
 
