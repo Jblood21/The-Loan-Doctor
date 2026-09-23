@@ -235,6 +235,14 @@ export default function PreApproval() {
   // drops the appraisal from the remaining conditions.
   const [appraisalWaiver, setAppraisalWaiver] = useState(false);
 
+  // Assign-to-agent modal.
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignEmail, setAssignEmail] = useState('');
+  const [assignAllowPrice, setAssignAllowPrice] = useState(false);
+  const [assignApprovedPrice, setAssignApprovedPrice] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [assignMsg, setAssignMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+
   // Signature: seeded from the saved settings signature until the user draws/uploads
   // one here (sigTouched), so a signature set once auto-fills every letter.
   const [signature, setSignature] = useState('');
@@ -514,6 +522,89 @@ export default function PreApproval() {
       )}.\n\n${closing}\n${settings.name}`,
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
+
+  // The letter-only slice of the payload (no history `loan` block, no borrowerName),
+  // shared with an agent assignment so the agent's regenerated letter matches this one.
+  const letterSnapshot = () => ({
+    style: styleId,
+    showHeadshot,
+    date: letter.date,
+    title: letter.title,
+    reLine: letter.reLine,
+    subjectAddress: letter.subjectAddress,
+    salutation: letter.salutation,
+    paragraphs: letter.paragraphs,
+    terms: letter.terms,
+    validity: letter.validity,
+    closing: letter.closing,
+    signature: showSignature && signature ? signature : undefined,
+    officer: { name: letter.officerName, title: letter.officerTitle, nmls: settings.nmls, email: settings.email, phone: settings.phone },
+    lender: {
+      name: andify(settings.lenderName || settings.company),
+      address: andify(settings.lenderAddress),
+      phone: settings.lenderPhone || settings.phone,
+      email: settings.email,
+      nmls: settings.lenderNmls || settings.nmls,
+      website: settings.website,
+    },
+    agentAck: letter.agentAck,
+    logo: settings.logoDataUrl || undefined,
+    headshot: settings.headshotDataUrl || undefined,
+  });
+
+  const openAssign = () => {
+    setAssignMsg(null);
+    setAssignApprovedPrice(String(Math.round(srcScenario.homePrice || 0)));
+    setAssignAllowPrice(false);
+    setAssignOpen(true);
+  };
+
+  const createAssignment = async () => {
+    const addr = (pa.propertyAddress || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assignEmail.trim())) {
+      setAssignMsg({ tone: 'error', text: 'Enter a valid agent email.' });
+      return;
+    }
+    if (!addr) {
+      setAssignMsg({ tone: 'error', text: 'Add a property address on the letter before assigning.' });
+      return;
+    }
+    setAssigning(true);
+    setAssignMsg(null);
+    // Turn the opening paragraph into a template the server can re-fill with the agent's
+    // address/price. Replacing the exact strings this letter used keeps it reliable.
+    const priceStr = fmt(srcScenario.homePrice || 0);
+    let p1Template = letter.paragraphs[0] || '';
+    if (addr) p1Template = p1Template.split(addr).join('{{ADDR}}');
+    p1Template = p1Template.split(priceStr).join('{{PRICE}}');
+    const isRefi = srcScenario.transaction === 'refinance';
+    try {
+      await api.createAssignment({
+        agentEmail: assignEmail.trim(),
+        borrowerName: pa.borrowerName || '',
+        propertyAddress: addr,
+        price: Math.round(srcScenario.homePrice || 0),
+        approvedPrice: Math.max(0, Math.round(parseFloat(assignApprovedPrice) || srcScenario.homePrice || 0)),
+        allowPriceChange: assignAllowPrice,
+        letter: letterSnapshot(),
+        ctx: {
+          p1Template,
+          priceLabel: isRefi ? 'Estimated Home Value' : 'Purchase Price',
+          downLabel: isRefi ? 'Estimated Equity' : 'Down Payment',
+          loanAmount: computeScenario(srcScenario).baseLoan,
+          showSubjectAddress: !!letter.subjectAddress,
+          isRefi,
+        },
+      });
+      setAssignMsg({ tone: 'ok', text: `Assigned to ${assignEmail.trim()}. They can access it in the agent portal.` });
+      setAssignEmail('');
+      window.setTimeout(() => setAssignOpen(false), 1400);
+    } catch (err) {
+      setAssignMsg({ tone: 'error', text: err instanceof ApiError ? err.message : 'Could not assign. Try again.' });
+    } finally {
+      setAssigning(false);
+    }
   };
 
   // --- shared letter body (used by both styles) ---
@@ -1229,6 +1320,11 @@ export default function PreApproval() {
               Email
             </Button>
           </div>
+          <div className="mt-2.5">
+            <Button variant="secondary" className="w-full !h-[44px]" onClick={openAssign}>
+              Assign to real-estate agent
+            </Button>
+          </div>
           <div className="mt-3.5">
             <StubNote>
               The letterhead, signature, and contact footer come from Settings. Arive borrowers arrive via a Zapier webhook
@@ -1273,6 +1369,45 @@ export default function PreApproval() {
           </div>
         </div>
       </div>
+
+      {assignOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(4,9,15,0.6)] p-4 backdrop-blur-[2px] sm:items-center"
+          onClick={() => !assigning && setAssignOpen(false)}
+        >
+          <div className="w-full max-w-[440px] rounded-2xl border border-border bg-card p-6 shadow-letter" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 text-[16px] font-semibold text-text-heading">Assign to a real-estate agent</div>
+            <p className="mb-4 text-[12.5px] leading-[1.55] text-text-muted">
+              The agent signs in at <span className="font-semibold text-text-soft">{`${window.location.origin}/agent`}</span> and can update the property address (and the price, if you allow it). The loan terms and branding stay locked.
+            </p>
+            <Label>Agent email</Label>
+            <TextField type="email" className="mb-4" placeholder="agent@brokerage.com" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} />
+            <div className="mb-4">
+              <Toggle
+                checked={assignAllowPrice}
+                onChange={setAssignAllowPrice}
+                label="Allow price change"
+                hint="Off: only the address is editable. On: the agent can also change the price, up to the approved amount."
+              />
+            </div>
+            {assignAllowPrice && (
+              <div className="mb-4">
+                <Label>Maximum approved price</Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px] text-text-dim">$</span>
+                  <TextField type="number" inputMode="numeric" className="!pl-7" value={assignApprovedPrice} onChange={(e) => setAssignApprovedPrice(e.target.value)} />
+                </div>
+                <div className="mt-1.5 text-[12px] text-text-muted">The agent can’t set a price above this.</div>
+              </div>
+            )}
+            {assignMsg && <div className={`mb-3 text-[12.5px] ${assignMsg.tone === 'error' ? 'text-danger' : 'text-good'}`}>{assignMsg.text}</div>}
+            <div className="flex justify-end gap-2.5">
+              <Button variant="ghost" onClick={() => setAssignOpen(false)} disabled={assigning}>Cancel</Button>
+              <Button variant="primary" onClick={createAssignment} disabled={assigning}>{assigning ? 'Assigning…' : 'Assign'}</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

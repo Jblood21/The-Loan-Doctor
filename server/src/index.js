@@ -17,6 +17,7 @@ import scenarioRoutes from './routes/scenarios.js';
 import adminRoutes from './routes/admin.js';
 import losRoutes from './routes/los.js';
 import preApprovalRoutes from './routes/preapproval.js';
+import agentRoutes from './routes/agents.js';
 import compareRoutes from './routes/compare.js';
 import shareRoutes from './routes/share.js';
 import aiRoutes from './routes/ai.js';
@@ -69,6 +70,10 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/los/webhook', webhookLimiter);
 app.use('/api/los', losRoutes);
 app.use('/api/preapproval', preApprovalRoutes);
+// Agent auth is brute-force throttled like the loan-officer auth; the rest of the
+// agent routes are JWT-gated.
+app.use('/api/agent/auth', authLimiter);
+app.use('/api/agent', agentRoutes);
 app.use('/api/compare', compareRoutes);
 app.use('/api/report', reportRoutes);
 app.use('/api/share', shareRoutes);

@@ -3,7 +3,7 @@
 // In development the Vite dev server proxies /api to the Express backend, so
 // API_BASE can stay empty. In production set VITE_API_BASE to the API origin.
 
-import type { PreApprovalRecord, Scenario, Settings, User } from '@/types';
+import type { Assignment, PreApprovalRecord, Scenario, Settings, User } from '@/types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
 const TOKEN_KEY = 'loandr.token';
@@ -111,6 +111,12 @@ export const api = {
   // pre-approval PDF — returns a Blob
   preApprovalPdf: (payload: unknown) => request<Blob>('POST', '/preapproval/pdf', payload),
   preApprovalHistory: () => request<{ history: PreApprovalRecord[] }>('GET', '/preapproval/history'),
+
+  // agent assignments (loan-officer side): hand a pre-approval to an agent to edit
+  listAssignments: () => request<{ assignments: Assignment[] }>('GET', '/preapproval/assignments'),
+  createAssignment: (payload: unknown) => request<{ assignment: Assignment }>('POST', '/preapproval/assignments', payload),
+  updateAssignment: (id: string, patch: unknown) => request<{ assignment: Assignment }>('PATCH', `/preapproval/assignments/${id}`, patch),
+  deleteAssignment: (id: string) => request<{ ok: boolean }>('DELETE', `/preapproval/assignments/${id}`),
 
   // AI assistant (Claude, server-side) for the loan comparison
   aiCompare: (question: string, context: string) => request<{ answer: string }>('POST', '/ai/compare', { question, context }),
