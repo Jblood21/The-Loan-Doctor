@@ -167,6 +167,31 @@ export interface PreApprovalRecord {
   creditScore?: string;
 }
 
+/** A real-estate agent account (separate login surface from loan officers). */
+export interface AgentUser {
+  id: string;
+  email: string;
+  name: string;
+  phone: string;
+  status?: string;
+  createdAt?: string;
+}
+
+/** A pre-approval a loan officer assigned to an agent for light editing. */
+export interface Assignment {
+  id: string;
+  ownerName: string;
+  agentEmail: string;
+  borrowerName: string;
+  propertyAddress: string;
+  price: number;
+  approvedPrice: number;
+  allowPriceChange: boolean;
+  createdAt: string;
+  updatedAt: string;
+  editedByAgentAt: string | null;
+}
+
 export interface PreApprovalState {
   source: 'scenario' | 'los' | 'import';
   scenarioIdx: number;

@@ -6,6 +6,7 @@ import {
   Wrench,
   HelpCircle,
   LayoutDashboard,
+  Users,
   Settings as SettingsIcon,
   LogOut,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ const WORKSPACE: NavItem[] = [
   { to: '/compare', label: 'Compare Loans', icon: BarChart2 },
   { to: '/hecm', label: 'Reverse (HECM)', icon: Building2 },
   { to: '/pre-approval', label: 'Pre-Approval', icon: FileText },
+  { to: '/agents', label: 'Agents', icon: Users },
   { to: '/tools', label: 'Tools', icon: Wrench },
   { to: '/help', label: 'Help Center', icon: HelpCircle },
 ];

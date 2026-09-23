@@ -9,7 +9,9 @@ import PreApproval from '@/pages/PreApproval';
 import Tools from '@/pages/Tools';
 import Help from '@/pages/Help';
 import Admin from '@/pages/Admin';
+import Agents from '@/pages/Agents';
 import SharedQuote from '@/pages/SharedQuote';
+import AgentPortal from '@/pages/AgentPortal';
 
 function Splash() {
   return (
@@ -41,6 +43,8 @@ function AppRoutes() {
     <Routes>
       {/* Public borrower-facing shared quote — no login required. */}
       <Route path="/q/:id" element={<SharedQuote />} />
+      {/* Public real-estate agent portal — its own login surface. */}
+      <Route path="/agent" element={<AgentPortal />} />
       <Route path="/login" element={<LoginGate />} />
       <Route element={<RequireAuth />}>
         <Route path="/compare" element={<Compare />} />
@@ -48,6 +52,7 @@ function AppRoutes() {
         <Route path="/pre-approval" element={<PreApproval />} />
         <Route path="/tools" element={<Tools />} />
         <Route path="/help" element={<Help />} />
+        <Route path="/agents" element={<Agents />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/" element={<Navigate to="/compare" replace />} />
         <Route path="*" element={<Navigate to="/compare" replace />} />
