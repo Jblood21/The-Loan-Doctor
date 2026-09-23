@@ -14,6 +14,7 @@ import { useUI } from '@/context/UIContext';
 import { api, ApiError } from '@/lib/api';
 import { computeScenario } from '@/lib/finance';
 import {
+  andify,
   buildPreApprovalLetter,
   creditAdjective,
   LETTER_TEMPLATES,
@@ -452,14 +453,15 @@ export default function PreApproval() {
       borrowerName: pa.borrowerName || '—',
       officer: { name: letter.officerName, title: letter.officerTitle, nmls: settings.nmls, email: settings.email, phone: settings.phone },
       lender: {
-        name: settings.lenderName || settings.company,
-        address: settings.lenderAddress,
+        name: andify(settings.lenderName || settings.company),
+        address: andify(settings.lenderAddress),
         phone: settings.lenderPhone || settings.phone,
         email: settings.email,
         nmls: settings.lenderNmls || settings.nmls,
         website: settings.website,
       },
       agent: letter.agent,
+      agentAck: letter.agentAck,
       logo: settings.logoDataUrl || undefined,
       headshot: settings.headshotDataUrl || undefined,
       // Structured loan snapshot recorded in the issued-pre-approvals history.
@@ -514,12 +516,25 @@ export default function PreApproval() {
     <div className="flex-1 px-5 py-6 text-[#1b2733] sm:px-10 sm:py-7" style={{ textAlign: isClassic ? 'left' : undefined }}>
       {letter.title && <div className="mb-3 text-center text-[16px] font-bold" style={{ color: GREEN }}>{letter.title}</div>}
       <div className="text-[12.5px] text-[#555]">{letter.date}</div>
-      <div className="mt-5 text-[13.5px]">
-        <span className="font-bold">RE:</span> {letter.reLine}
+      <div className="mt-5 flex text-[13.5px]">
+        <span className="w-[36px] flex-shrink-0 font-bold">RE:</span>
+        {/* reLine and the subject address share this column so the address lines up
+            directly beneath "Pre-Approval …", not under "RE:". */}
+        <div className="min-w-0">
+          <div>{letter.reLine}</div>
+          {letter.subjectAddress && (
+            <div className="font-bold" style={{ color: GREEN }}>
+              {letter.subjectAddress}
+            </div>
+          )}
+        </div>
       </div>
-      {letter.subjectAddress && (
-        <div className="ml-[30px] text-[13.5px] font-bold" style={{ color: GREEN }}>
-          {letter.subjectAddress}
+      {letter.agentAck && (
+        <div className="mt-3.5 flex text-[13px]">
+          <span className="flex-shrink-0 font-semibold" style={{ color: GREEN }}>
+            Real Estate Agent:&nbsp;
+          </span>
+          <span className="min-w-0">{letter.agentAck}</span>
         </div>
       )}
       <div className="mt-5 text-[13.5px]">{letter.salutation}</div>
@@ -549,7 +564,6 @@ export default function PreApproval() {
         {letter.officerName}
       </div>
       <div className="text-[12.5px] text-[#5b6b7b]">{letter.officerTitle}</div>
-      {letter.partnerLine && <div className="mt-2 text-[12px] italic text-[#5b6b7b]">{letter.partnerLine}</div>}
     </div>
   );
 
@@ -559,8 +573,8 @@ export default function PreApproval() {
         {settings.phone}
         {settings.email ? `   ·   ${settings.email}` : ''}
       </div>
-      <div>{settings.lenderAddress}</div>
-      <div>{settings.lenderName}</div>
+      <div>{andify(settings.lenderAddress)}</div>
+      <div>{andify(settings.lenderName)}</div>
       <div style={{ color: GOLD }}>
         NMLS# {settings.lenderNmls || settings.nmls}
         {settings.website ? `   ·   ${settings.website}` : ''}
@@ -1140,10 +1154,10 @@ export default function PreApproval() {
             <div className="rounded-[10px] border border-border-input bg-input px-3.5 py-2.5">
               <div className="flex items-center justify-between">
                 <div className="pr-3">
-                  <div className="text-[13px] font-semibold text-text-label">Dual branding (real-estate agent)</div>
+                  <div className="text-[13px] font-semibold text-text-label">Acknowledge real-estate agent</div>
                   <div className="text-[11.5px] text-text-muted">
                     {hasAgent ? (
-                      <>Co-brand the letter with a saved agent</>
+                      <>Names the agent near the top of the letter</>
                     ) : (
                       <>
                         No agents saved.{' '}

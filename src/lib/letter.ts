@@ -75,6 +75,12 @@ export interface CreditPhrase {
   display: string;
 }
 
+/** Replace ampersands with the word "and" — spelled out reads cleaner in a formal
+ *  letter. Collapses the surrounding spaces so "Ferris & Co" and "A&B" both normalize. */
+export function andify(s: string): string {
+  return (s || '').replace(/\s*&\s*/g, ' and ').replace(/\s{2,}/g, ' ').trim();
+}
+
 /** Map a FICO score to the letter adjective. Bands: <740 good, 740–799 great, 800+
  *  fantastic. Falls back to "strong" (the prior wording) when no score is provided. */
 export function creditAdjective(score: number | string | undefined | null): string {
@@ -216,9 +222,13 @@ function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: stri
   const scores = two ? 'credit scores' : 'credit score';
   const w = KIND_WORDING[opts.kind || 'preapproval'] || KIND_WORDING.preapproval;
 
+  // Mid-sentence the financing type reads as a common noun ("conventional financing"),
+  // so lowercase the first letter — but leave acronyms (FHA, VA, USDA) fully uppercase.
+  const fin = financingLabel === financingLabel.toUpperCase() ? financingLabel : financingLabel.charAt(0).toLowerCase() + financingLabel.slice(1);
+
   const p1 = isRefi
-    ? `${name} ${isAre} ${w.verb} to refinance the property located at ${property} with a loan amount of ${loan} using ${financingLabel} financing${tail}.`
-    : `${name} ${isAre} ${w.verb} for the purchase of the home located at ${property} at a purchase price of ${price} using ${financingLabel} financing${tail}.`;
+    ? `${name} ${isAre} ${w.verb} to refinance the property located at ${property} with a loan amount of ${loan} using ${fin} financing${tail}.`
+    : `${name} ${isAre} ${w.verb} for the purchase of the home located at ${property} at a purchase price of ${price} using ${fin} financing${tail}.`;
   const p2 = w.basis(pr, scores, creditPhraseFrom(opts));
   const p3 = w.readiness(name);
   const p4 = `Please contact me with any questions regarding this ${w.nounLower}.`;
@@ -258,7 +268,8 @@ export interface PreApprovalLetter {
   closing: string;
   officerName: string;
   officerTitle: string;
-  partnerLine: string;
+  /** Professional acknowledgment of the real-estate agent, rendered near the top. */
+  agentAck: string;
   agent: LetterAgent | null;
 }
 
@@ -326,22 +337,29 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
         : null;
   const includeAgent = opts.includeAgent && !!chosenAgent;
   const agent: LetterAgent | null = includeAgent ? chosenAgent : null;
-  const partnerLine =
-    includeAgent && agent ? `Prepared in partnership with ${agent.name}${agent.brokerage ? `, ${agent.brokerage}` : ''}.` : '';
+  // A professional acknowledgment of the borrower's real-estate agent (shown near the
+  // top of the letter), rather than a co-branded "partnership" line at the foot.
+  const agentAck =
+    includeAgent && agent && agent.name
+      ? andify(
+          [agent.name, agent.brokerage].filter((v) => v && v.trim()).join(', ') +
+            (agent.phone && agent.phone.trim() ? ` · ${agent.phone.trim()}` : ''),
+        )
+      : '';
 
   return {
     date: (opts.dateText || '').trim() || longDateWeekday(now),
-    title: (opts.title || '').trim(),
-    reLine: (opts.reLine || '').trim() || `${w.noun} for ${name}`,
-    subjectAddress: showSubjectAddress ? (opts.propertyAddress || '').trim() : '',
-    salutation: (opts.salutation || '').trim() || 'To Whom It May Concern:',
-    paragraphs,
+    title: andify((opts.title || '').trim()),
+    reLine: andify((opts.reLine || '').trim() || `${w.noun} for ${name}`),
+    subjectAddress: showSubjectAddress ? andify((opts.propertyAddress || '').trim()) : '',
+    salutation: andify((opts.salutation || '').trim() || 'To Whom It May Concern:'),
+    paragraphs: paragraphs.map(andify),
     terms: opts.showTerms ? buildTerms(scenario) : null,
-    validity: opts.showValidity ? validity : '',
-    closing: (opts.closing || '').trim() || 'Best regards,',
-    officerName: settings.name || 'Your Loan Officer',
-    officerTitle: settings.officerTitle || 'Mortgage Specialist',
-    partnerLine,
+    validity: andify(opts.showValidity ? validity : ''),
+    closing: andify((opts.closing || '').trim() || 'Best regards,'),
+    officerName: andify(settings.name || 'Your Loan Officer'),
+    officerTitle: andify(settings.officerTitle || 'Mortgage Specialist'),
+    agentAck,
     agent,
   };
 }

@@ -18,13 +18,12 @@ export const FOOTER_H = 104;
  * `d` holds the already-coerced fields plus resolved image sources:
  *   { classic, showHeadshot, headshotSource, logoSource, signatureBuf,
  *     title, date, reLine, subjectAddress, salutation, paragraphs, terms,
- *     validity, closing, officer, lender, agent }
+ *     validity, closing, officer, lender, agentAck }
  */
 export function drawLetter(doc, d) {
   const { classic, showHeadshot, headshotSource, logoSource, signatureBuf } = d;
   const lender = d.lender || {};
   const officer = d.officer || {};
-  const agent = d.agent || {};
 
   const phoneEmail = [lender.phone, lender.email].filter(Boolean).join('   ·   ');
   const nmlsLine = `NMLS# ${lender.nmls || ''}${lender.website ? `     ·     ${lender.website}` : ''}`;
@@ -123,9 +122,20 @@ export function drawLetter(doc, d) {
   doc.fillColor('#555555').font('Helvetica').fontSize(11.5).text(d.date, LEFT, doc.y);
   doc.moveDown(0.95);
 
-  doc.fillColor('#1b2733').font('Helvetica-Bold').fontSize(12.5).text('RE: ', LEFT, doc.y, { continued: true });
-  doc.font('Helvetica').text(d.reLine);
-  if (d.subjectAddress) doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(12.5).text(d.subjectAddress, LEFT + 30, doc.y);
+  // "RE:" is a fixed-width label; the reference line and the subject address both start
+  // at REX so the address lines up directly beneath the reference text (not under "RE:").
+  const REX = LEFT + 36;
+  const reY = doc.y;
+  doc.fillColor('#1b2733').font('Helvetica-Bold').fontSize(12.5).text('RE:', LEFT, reY);
+  doc.fillColor('#1b2733').font('Helvetica').fontSize(12.5).text(d.reLine, REX, reY, { width: RIGHT - REX });
+  if (d.subjectAddress) doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(12.5).text(d.subjectAddress, REX, doc.y, { width: RIGHT - REX });
+
+  // Professional acknowledgment of the borrower's real-estate agent, near the top.
+  if (d.agentAck) {
+    doc.moveDown(0.45);
+    doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(11.5).text('Real Estate Agent: ', LEFT, doc.y, { continued: true });
+    doc.fillColor('#1b2733').font('Helvetica').fontSize(11.5).text(d.agentAck);
+  }
   doc.moveDown(0.95);
 
   doc.fillColor('#1b2733').font('Helvetica').fontSize(12.5).text(d.salutation, LEFT, doc.y);
@@ -187,13 +197,4 @@ export function drawLetter(doc, d) {
   if (!signaturePlaced) doc.moveDown(0.4);
   doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(15.5).text(officer.name || lender.name || 'Your Loan Officer', LEFT, doc.y);
   doc.fillColor('#5b6b7b').font('Helvetica').fontSize(11.5).text(officer.title || 'Mortgage Loan Officer', LEFT, doc.y);
-  if (agent && agent.name) {
-    doc.moveDown(0.35);
-    doc.fillColor('#5b6b7b').font('Helvetica-Oblique').fontSize(10.5).text(
-      `Prepared in partnership with ${agent.name}${agent.brokerage ? `, ${agent.brokerage}` : ''}${agent.phone ? ` · ${agent.phone}` : ''}.`,
-      LEFT,
-      doc.y,
-      { width: RIGHT - LEFT },
-    );
-  }
 }
