@@ -67,7 +67,10 @@ export function streamLetterPdf(res, body) {
   const headshotSource = headshotBuf || (fs.existsSync(HEADSHOT) ? HEADSHOT : null);
 
   const classic = style === 'classic';
-  const doc = new PDFDocument({ size: 'LETTER', margins: { top: 56, bottom: FOOTER_H + 8, left: LEFT, right: 64 } });
+  // Bottom text area reaches the footer band's top edge, so a tight one-page letter's
+  // last line isn't auto-paginated onto a second page (the letter body manages its own
+  // spacing and page breaks).
+  const doc = new PDFDocument({ size: 'LETTER', margins: { top: 56, bottom: FOOTER_H, left: LEFT, right: 64 } });
   // Filename must be a safe token — control chars (\n, etc.) make setHeader throw.
   const lastName = (borrowerName.trim().split(/\s+/).pop() || '').replace(/[^A-Za-z0-9_-]/g, '') || 'letter';
   res.setHeader('Content-Type', 'application/pdf');

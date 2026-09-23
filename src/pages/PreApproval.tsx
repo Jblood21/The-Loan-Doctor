@@ -608,58 +608,68 @@ export default function PreApproval() {
   };
 
   // --- shared letter body (used by both styles) ---
+  // Three groups (opening / body / signature) spread top-to-bottom with justify-between
+  // so the letter fills the page instead of leaving dead space above the footer — the
+  // same effect the generated PDF produces.
   const LetterBody = (
-    <div className="flex-1 px-5 py-6 text-[#1b2733] sm:px-10 sm:py-7" style={{ textAlign: isClassic ? 'left' : undefined }}>
-      {letter.title && <div className="mb-3 text-center text-[16px] font-bold" style={{ color: GREEN }}>{letter.title}</div>}
-      <div className="text-[12.5px] text-[#555]">{letter.date}</div>
-      <div className="mt-5 flex text-[13.5px]">
-        <span className="w-[36px] flex-shrink-0 font-bold">RE:</span>
-        {/* reLine and the subject address share this column so the address lines up
-            directly beneath "Pre-Approval …", not under "RE:". */}
-        <div className="min-w-0">
-          <div>{letter.reLine}</div>
-          {letter.subjectAddress && (
-            <div className="font-bold" style={{ color: GREEN }}>
-              {letter.subjectAddress}
-            </div>
-          )}
+    <div className="flex flex-1 flex-col justify-between px-5 py-6 text-[#1b2733] sm:px-10 sm:py-7" style={{ textAlign: isClassic ? 'left' : undefined }}>
+      <div>
+        {letter.title && <div className="mb-3 text-center text-[16px] font-bold" style={{ color: GREEN }}>{letter.title}</div>}
+        <div className="text-[12.5px] text-[#555]">{letter.date}</div>
+        <div className="mt-5 flex text-[13.5px]">
+          <span className="w-[36px] flex-shrink-0 font-bold">RE:</span>
+          {/* reLine and the subject address share this column so the address lines up
+              directly beneath "Pre-Approval …", not under "RE:". */}
+          <div className="min-w-0">
+            <div>{letter.reLine}</div>
+            {letter.subjectAddress && (
+              <div className="font-bold" style={{ color: GREEN }}>
+                {letter.subjectAddress}
+              </div>
+            )}
+          </div>
         </div>
+        {letter.agentAck && (
+          <div className="mt-3.5 flex text-[13px]">
+            <span className="flex-shrink-0 font-semibold" style={{ color: GREEN }}>
+              Real Estate Agent:&nbsp;
+            </span>
+            <span className="min-w-0">{letter.agentAck}</span>
+          </div>
+        )}
       </div>
-      {letter.agentAck && (
-        <div className="mt-3.5 flex text-[13px]">
-          <span className="flex-shrink-0 font-semibold" style={{ color: GREEN }}>
-            Real Estate Agent:&nbsp;
-          </span>
-          <span className="min-w-0">{letter.agentAck}</span>
-        </div>
-      )}
-      <div className="mt-5 text-[13.5px]">{letter.salutation}</div>
-      {letter.paragraphs.map((p, i) => (
-        <p key={i} className="mt-3.5 text-[13.5px] leading-[1.65]">
-          {p}
-        </p>
-      ))}
 
-      {letter.terms && (
-        <div className="mt-4 rounded-[8px] bg-[#f4f6f9] px-5 py-3.5">
-          {letter.terms.map((row) => (
-            <div key={row.label} className="flex justify-between border-b border-[#e3e8ee] py-[6px] text-[12.5px] last:border-0">
-              <span className="text-[#5b6b7b]">{row.label}</span>
-              <span className="font-semibold text-[#0c2238]">{row.value}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {letter.validity && <p className="mt-4 text-[13px] leading-[1.6] text-[#444]">{letter.validity}</p>}
+      <div className="mt-5">
+        <div className="text-[13.5px]">{letter.salutation}</div>
+        {letter.paragraphs.map((p, i) => (
+          <p key={i} className="mt-3.5 text-[13.5px] leading-[1.65]">
+            {p}
+          </p>
+        ))}
 
-      <div className="mt-7 text-[13.5px]">{letter.closing}</div>
-      {showSignature && signature && (
-        <img src={signature} alt={`${letter.officerName} signature`} className="mt-1.5 h-[52px] w-auto max-w-[240px] object-contain object-left" />
-      )}
-      <div className={`text-[15px] font-bold ${showSignature && signature ? 'mt-0.5' : 'mt-1'}`} style={{ color: GREEN }}>
-        {letter.officerName}
+        {letter.terms && (
+          <div className="mt-4 rounded-[8px] bg-[#f4f6f9] px-5 py-3.5">
+            {letter.terms.map((row) => (
+              <div key={row.label} className="flex justify-between border-b border-[#e3e8ee] py-[6px] text-[12.5px] last:border-0">
+                <span className="text-[#5b6b7b]">{row.label}</span>
+                <span className="font-semibold text-[#0c2238]">{row.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {letter.validity && <p className="mt-4 text-[13px] leading-[1.6] text-[#444]">{letter.validity}</p>}
       </div>
-      <div className="text-[12.5px] text-[#5b6b7b]">{letter.officerTitle}</div>
+
+      <div className="mt-6">
+        <div className="text-[13.5px]">{letter.closing}</div>
+        {showSignature && signature && (
+          <img src={signature} alt={`${letter.officerName} signature`} className="mt-1.5 h-[52px] w-auto max-w-[240px] object-contain object-left" />
+        )}
+        <div className={`text-[15px] font-bold ${showSignature && signature ? 'mt-0.5' : 'mt-2'}`} style={{ color: GREEN }}>
+          {letter.officerName}
+        </div>
+        <div className="text-[12.5px] text-[#5b6b7b]">{letter.officerTitle}</div>
+      </div>
     </div>
   );
 

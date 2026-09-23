@@ -115,86 +115,138 @@ export function drawLetter(doc, d) {
   doc.on('pageAdded', drawFooter); // footer for any overflow page
 
   // --- Body ---
+  // The body is laid out as a measured sequence of blocks separated by gaps. Short
+  // letters (the common case: no terms table, no validity line) used to end well above
+  // the footer, leaving a large blank gap. So we measure the whole body first, then
+  // spread the leftover vertical space evenly across the flexible gaps to fill the page.
+  // Long letters that overflow one page keep their normal spacing and paginate.
+  const CW = RIGHT - LEFT; // content width
+  const REX = LEFT + 36; // "RE:" label column
+  const bodyTop = doc.y; // 136, just under the letterhead rule
+  const fillBottom = PAGE_H - FOOTER_H - 30; // fill to here, keeping breathing room above the footer
+  const pageBottom = PAGE_H - FOOTER_H - 8; // hard limit before a page break
+  const topMargin = 56;
+
+  const measure = (text, font, size, opts = {}) => {
+    doc.font(font).fontSize(size);
+    return doc.heightOfString(text || '', { width: CW, ...opts });
+  };
+
+  const seq = [];
+  const block = (h, render) => seq.push({ block: true, h, render });
+  const gap = (base, flex = false) => seq.push({ base, flex });
+
   if (d.title) {
-    doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(17).text(d.title, LEFT, doc.y, { width: RIGHT - LEFT, align: 'center' });
-    doc.moveDown(0.5);
+    block(measure(d.title, 'Helvetica-Bold', 17, { align: 'center' }), (y) =>
+      doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(17).text(d.title, LEFT, y, { width: CW, align: 'center' }),
+    );
+    gap(8);
   }
-  doc.fillColor('#555555').font('Helvetica').fontSize(11.5).text(d.date, LEFT, doc.y);
-  doc.moveDown(0.95);
 
-  // "RE:" is a fixed-width label; the reference line and the subject address both start
-  // at REX so the address lines up directly beneath the reference text (not under "RE:").
-  const REX = LEFT + 36;
-  const reY = doc.y;
-  doc.fillColor('#1b2733').font('Helvetica-Bold').fontSize(12.5).text('RE:', LEFT, reY);
-  doc.fillColor('#1b2733').font('Helvetica').fontSize(12.5).text(d.reLine, REX, reY, { width: RIGHT - REX });
-  if (d.subjectAddress) doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(12.5).text(d.subjectAddress, REX, doc.y, { width: RIGHT - REX });
+  block(measure(d.date, 'Helvetica', 11.5), (y) => doc.fillColor('#555555').font('Helvetica').fontSize(11.5).text(d.date, LEFT, y));
+  gap(14, true);
 
-  // Professional acknowledgment of the borrower's real-estate agent, near the top.
+  // RE line + subject address share the same left indent (REX).
+  const reH = measure(d.reLine, 'Helvetica', 12.5, { width: RIGHT - REX });
+  const addrH = d.subjectAddress ? measure(d.subjectAddress, 'Helvetica-Bold', 12.5, { width: RIGHT - REX }) : 0;
+  block(reH + addrH, (y) => {
+    doc.fillColor('#1b2733').font('Helvetica-Bold').fontSize(12.5).text('RE:', LEFT, y);
+    doc.fillColor('#1b2733').font('Helvetica').fontSize(12.5).text(d.reLine, REX, y, { width: RIGHT - REX });
+    if (d.subjectAddress) doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(12.5).text(d.subjectAddress, REX, y + reH, { width: RIGHT - REX });
+  });
+  gap(14, true);
+
   if (d.agentAck) {
-    doc.moveDown(0.45);
-    doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(11.5).text('Real Estate Agent: ', LEFT, doc.y, { continued: true });
-    doc.fillColor('#1b2733').font('Helvetica').fontSize(11.5).text(d.agentAck);
+    block(measure(`Real Estate Agent: ${d.agentAck}`, 'Helvetica-Bold', 11.5), (y) => {
+      doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(11.5).text('Real Estate Agent: ', LEFT, y, { continued: true });
+      doc.fillColor('#1b2733').font('Helvetica').fontSize(11.5).text(d.agentAck);
+    });
+    gap(14, true);
   }
-  doc.moveDown(0.95);
 
-  doc.fillColor('#1b2733').font('Helvetica').fontSize(12.5).text(d.salutation, LEFT, doc.y);
-  doc.moveDown(0.6);
+  block(measure(d.salutation, 'Helvetica', 12.5), (y) => doc.fillColor('#1b2733').font('Helvetica').fontSize(12.5).text(d.salutation, LEFT, y));
+  gap(10, true);
+
   (Array.isArray(d.paragraphs) ? d.paragraphs : []).forEach((p) => {
-    doc.fillColor('#1b2733').font('Helvetica').fontSize(12.5).text(p, LEFT, doc.y, { width: RIGHT - LEFT, lineGap: 3 });
-    doc.moveDown(0.55);
+    block(measure(p, 'Helvetica', 12.5, { lineGap: 3 }), (y) =>
+      doc.fillColor('#1b2733').font('Helvetica').fontSize(12.5).text(p, LEFT, y, { width: CW, lineGap: 3 }),
+    );
+    gap(9, true);
   });
 
   if (Array.isArray(d.terms) && d.terms.length) {
     const rowH = 17;
     const padY = 8;
     const boxH = d.terms.length * rowH + padY * 2;
-    // Anchor to the box top: the per-row doc.text() calls advance doc.y as a side
-    // effect, so we must set doc.y relative to boxTop, not the post-loop doc.y
-    // (otherwise the box height is counted twice and leaves a large empty gap).
-    const boxTop = doc.y;
-    doc.save();
-    doc.roundedRect(LEFT, boxTop, RIGHT - LEFT, boxH, 6).fill('#f4f6f9');
-    doc.restore();
-    let ry = boxTop + padY + 1;
-    d.terms.forEach((row) => {
-      doc.fillColor('#5b6b7b').font('Helvetica').fontSize(10.5).text(row.label, LEFT + 14, ry);
-      doc.fillColor('#0c2238').font('Helvetica-Bold').fontSize(10.5).text(row.value, LEFT + 14, ry, { width: RIGHT - LEFT - 28, align: 'right' });
-      ry += rowH;
+    block(boxH, (y) => {
+      doc.save();
+      doc.roundedRect(LEFT, y, CW, boxH, 6).fill('#f4f6f9');
+      doc.restore();
+      let ry = y + padY + 1;
+      d.terms.forEach((row) => {
+        doc.fillColor('#5b6b7b').font('Helvetica').fontSize(10.5).text(row.label, LEFT + 14, ry);
+        doc.fillColor('#0c2238').font('Helvetica-Bold').fontSize(10.5).text(row.value, LEFT + 14, ry, { width: CW - 28, align: 'right' });
+        ry += rowH;
+      });
     });
-    doc.y = boxTop + boxH + 9;
+    gap(12, true);
   }
 
   if (d.validity) {
-    doc.fillColor('#444444').font('Helvetica').fontSize(11.5).text(d.validity, LEFT, doc.y, { width: RIGHT - LEFT, lineGap: 2.5 });
-    doc.moveDown(0.55);
+    block(measure(d.validity, 'Helvetica', 11.5, { lineGap: 2.5 }), (y) =>
+      doc.fillColor('#444444').font('Helvetica').fontSize(11.5).text(d.validity, LEFT, y, { width: CW, lineGap: 2.5 }),
+    );
+    gap(10, true);
   }
 
-  doc.moveDown(0.55);
-  doc.fillColor('#1b2733').font('Helvetica').fontSize(12.5).text(d.closing, LEFT, doc.y);
+  block(measure(d.closing, 'Helvetica', 12.5), (y) => doc.fillColor('#1b2733').font('Helvetica').fontSize(12.5).text(d.closing, LEFT, y));
+  gap(6);
 
-  // Signature above the name: constrain to a signature-sized box (never wider than
-  // the text column) and keep it and the name together on one page.
-  let signaturePlaced = false;
+  // Signature image above the officer name (kept tight to the name — not a flexible gap).
   if (signatureBuf) {
     try {
       const img = doc.openImage(signatureBuf);
-      const maxH = 50;
-      const maxW = 250;
-      const scale = Math.min(maxH / img.height, maxW / img.width, 1);
+      const scale = Math.min(50 / img.height, 250 / img.width, 1);
       const drawW = img.width * scale;
       const drawH = img.height * scale;
-      // Page-break if the signature + name wouldn't fit above the footer.
-      if (doc.y + drawH + 24 > PAGE_H - FOOTER_H - 8) doc.addPage();
-      doc.moveDown(0.2);
-      doc.image(signatureBuf, LEFT, doc.y, { width: drawW, height: drawH });
-      doc.y += drawH + 2;
-      signaturePlaced = true;
+      block(drawH, (y) => doc.image(signatureBuf, LEFT, y, { width: drawW, height: drawH }));
+      gap(2);
     } catch {
-      /* signature optional — fall back to the plain name spacing */
+      /* signature optional */
     }
   }
-  if (!signaturePlaced) doc.moveDown(0.4);
-  doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(15.5).text(officer.name || lender.name || 'Your Loan Officer', LEFT, doc.y);
-  doc.fillColor('#5b6b7b').font('Helvetica').fontSize(11.5).text(officer.title || 'Mortgage Loan Officer', LEFT, doc.y);
+
+  block(measure(officer.name || lender.name || 'Your Loan Officer', 'Helvetica-Bold', 15.5), (y) =>
+    doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(15.5).text(officer.name || lender.name || 'Your Loan Officer', LEFT, y),
+  );
+  gap(1);
+  block(measure(officer.title || 'Mortgage Loan Officer', 'Helvetica', 11.5), (y) =>
+    doc.fillColor('#5b6b7b').font('Helvetica').fontSize(11.5).text(officer.title || 'Mortgage Loan Officer', LEFT, y),
+  );
+
+  // Decide single-page up front: if the whole body fits, draw it on one page and never
+  // break (measurement drift on the last line must not spill a fitting letter onto page 2).
+  // When it fits, spread the leftover space across the flexible gaps to fill the page.
+  const contentH = seq.reduce((s, e) => s + (e.block ? e.h : e.base), 0);
+  const flexCount = seq.filter((e) => e.flex).length;
+  // A letter counts as single-page as long as it ends by the footer band's top edge
+  // (matching the original tight one-page fit); only genuinely longer letters paginate.
+  const singlePage = contentH <= PAGE_H - FOOTER_H - bodyTop;
+  const slack = fillBottom - bodyTop - contentH;
+  const extra = singlePage && slack > 0 && flexCount > 0 ? Math.min(slack / flexCount, 42) : 0;
+
+  let y = bodyTop;
+  for (const e of seq) {
+    if (e.block) {
+      if (!singlePage && y + e.h > pageBottom && y > topMargin + 1) {
+        doc.addPage();
+        y = topMargin;
+      }
+      e.render(y);
+      y += e.h;
+    } else {
+      y += e.base + (e.flex ? extra : 0);
+    }
+  }
+  doc.y = y;
 }
