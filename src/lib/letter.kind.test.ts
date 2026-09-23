@@ -106,6 +106,36 @@ describe('ampersands spelled out', () => {
   });
 });
 
+describe('appraisal waiver', () => {
+  const base = { borrowerName: 'John Smith', propertyAddress: '123 Main St', includeAgent: false, showValidity: true, now: new Date('2026-09-04T12:00:00Z') };
+
+  it('off (default): keeps the compliant-appraisal requirement', () => {
+    const l = buildPreApprovalLetter(scenario, settings, { ...base });
+    expect(l.paragraphs[0]).not.toContain('appraisal waiver');
+    expect(l.paragraphs[2]).toContain('including a compliant appraisal');
+    expect(l.validity).toContain('satisfactory appraisal');
+  });
+
+  it('on: notes the waiver up front and drops the appraisal from the conditions', () => {
+    const l = buildPreApprovalLetter(scenario, settings, { ...base, appraisalWaiver: true });
+    expect(l.paragraphs[0]).toContain('appraisal waiver');
+    expect(l.paragraphs[0]).toContain('a property appraisal is not required');
+    expect(l.paragraphs[2]).not.toContain('appraisal');
+    expect(l.validity).not.toContain('appraisal');
+    // The other remaining conditions are still present.
+    expect(l.paragraphs[2]).toContain('title insurance commitment');
+    expect(l.validity).toContain('final underwriting approval');
+  });
+
+  it('drops the appraisal for every approval level', () => {
+    for (const kind of ['preapproval', 'preunderwritten', 'prequalified'] as LetterKind[]) {
+      const l = buildPreApprovalLetter(scenario, settings, { ...base, kind, appraisalWaiver: true });
+      expect(l.paragraphs[2]).not.toContain('appraisal');
+      expect(l.validity).not.toContain('appraisal');
+    }
+  });
+});
+
 describe('real-estate agent acknowledgment', () => {
   const withAgent = (include: boolean) =>
     buildPreApprovalLetter(scenario, settings, {
