@@ -231,6 +231,9 @@ export default function PreApproval() {
   // "Show score on letter" toggle is on. Left blank → falls back to the scenario band.
   const [creditScore, setCreditScore] = useState('');
   const [showCreditScore, setShowCreditScore] = useState(false);
+  // Appraisal waiver — when on, the letter notes the waiver in the first paragraph and
+  // drops the appraisal from the remaining conditions.
+  const [appraisalWaiver, setAppraisalWaiver] = useState(false);
 
   // Signature: seeded from the saved settings signature until the user draws/uploads
   // one here (sigTouched), so a signature set once auto-fills every letter.
@@ -285,8 +288,9 @@ export default function PreApproval() {
         kind: letterKind,
         creditScore: effectiveCredit,
         showCreditScore,
+        appraisalWaiver,
       }),
-    [templateId, srcScenario, pa.borrowerName, pa.propertyAddress, pronoun, letterKind, effectiveCredit, showCreditScore],
+    [templateId, srcScenario, pa.borrowerName, pa.propertyAddress, pronoun, letterKind, effectiveCredit, showCreditScore, appraisalWaiver],
   );
   useEffect(() => {
     if (customized) return;
@@ -311,6 +315,7 @@ export default function PreApproval() {
     pronoun,
     creditScore: effectiveCredit,
     showCreditScore,
+    appraisalWaiver,
     paragraphs: parsedParagraphs.length ? parsedParagraphs : undefined,
     reLine,
     salutation,
@@ -948,6 +953,17 @@ export default function PreApproval() {
             />
             <div className="mt-1.5 text-[12px] text-text-muted">
               Changes the wording between Pre-Approval, Pre-Underwritten, and Pre-Qualified throughout the letter.
+            </div>
+            <div className="mt-3">
+              <Toggle
+                checked={appraisalWaiver}
+                onChange={(v) => {
+                  setCustomized(false);
+                  setAppraisalWaiver(v);
+                }}
+                label="Appraisal waiver"
+                hint="Notes the waiver in the first paragraph and removes the appraisal from the remaining conditions."
+              />
             </div>
           </div>
 

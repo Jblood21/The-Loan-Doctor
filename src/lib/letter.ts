@@ -104,11 +104,13 @@ interface KindWording {
    *  adjective (good/great/fantastic, or "strong" when no score) and an optional
    *  printed FICO number. */
   basis: (pr: PronounSet, scores: string, credit: CreditPhrase) => string;
-  /** Third paragraph — readiness / remaining steps. */
-  readiness: (name: string) => string;
+  /** Third paragraph — readiness / remaining steps. Drops the appraisal from the
+   *  remaining items when the borrower has an appraisal waiver. */
+  readiness: (name: string, appraisalWaiver: boolean) => string;
   /** Tail of the validity sentence ("… and is <validityTail>"), so each level's
-   *  remaining conditions match what has actually been done. */
-  validityTail: string;
+   *  remaining conditions match what has actually been done. Omits the appraisal
+   *  condition when an appraisal waiver applies. */
+  validityTail: (appraisalWaiver: boolean) => string;
 }
 
 const KIND_WORDING: Record<LetterKind, KindWording> = {
@@ -120,9 +122,14 @@ const KIND_WORDING: Record<LetterKind, KindWording> = {
     verb: 'pre-approved',
     basis: (pr, scores, credit) =>
       `This pre-approval is supported by ${pr.poss} ${credit.adjective}credit history and ${scores}${credit.display}. ${pr.subjCap} ${pr.have} provided income and asset documentation verifying sufficient income and assets needed for this transaction.`,
-    readiness: (name) =>
-      `Based on this, ${name} can close in a timely manner once the file is submitted to underwriting, including a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
-    validityTail: 'subject to a satisfactory appraisal, clear title, and final underwriting approval.',
+    readiness: (name, waived) =>
+      waived
+        ? `Based on this, ${name} can close in a timely manner once the file is submitted to underwriting, along with a fully executed sales contract and an acceptable title insurance commitment.`
+        : `Based on this, ${name} can close in a timely manner once the file is submitted to underwriting, including a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+    validityTail: (waived) =>
+      waived
+        ? 'subject to clear title and final underwriting approval.'
+        : 'subject to a satisfactory appraisal, clear title, and final underwriting approval.',
   },
   // Pre-underwritten: the file HAS been reviewed and approved by a mortgage underwriter.
   // What remains are the property-side items and the underwriter's stated conditions —
@@ -133,9 +140,14 @@ const KIND_WORDING: Record<LetterKind, KindWording> = {
     verb: 'fully underwritten and conditionally approved',
     basis: (pr, scores, credit) =>
       `This approval reflects a complete underwriting review of ${pr.poss} credit, income, and asset documentation by a mortgage underwriter, who has verified ${pr.poss} ${credit.adjective}${scores}${credit.display} and ability to repay. ${pr.subjCap} ${pr.have} met the requirements for this financing, so the approval is subject only to the property-related items and standard closing conditions — not to a further review of income, assets, or credit.`,
-    readiness: (name) =>
-      `Because the file has already been underwritten, ${name} can close quickly — the remaining items are a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
-    validityTail: 'subject to a satisfactory appraisal, clear title, and satisfaction of the remaining underwriting conditions.',
+    readiness: (name, waived) =>
+      waived
+        ? `Because the file has already been underwritten, ${name} can close quickly — the remaining items are a fully executed sales contract and an acceptable title insurance commitment.`
+        : `Because the file has already been underwritten, ${name} can close quickly — the remaining items are a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+    validityTail: (waived) =>
+      waived
+        ? 'subject to clear title and satisfaction of the remaining underwriting conditions.'
+        : 'subject to a satisfactory appraisal, clear title, and satisfaction of the remaining underwriting conditions.',
   },
   // Pre-qualified: based on information the borrower stated but that has NOT been
   // verified, and the file has not been underwritten. Everything is still ahead.
@@ -145,10 +157,14 @@ const KIND_WORDING: Record<LetterKind, KindWording> = {
     verb: 'pre-qualified',
     basis: (pr, scores, credit) =>
       `This pre-qualification is based on ${pr.poss} stated income, assets, and ${credit.adjective}${scores}${credit.display}, which have not yet been verified with documentation or reviewed by an underwriter.`,
-    readiness: (name) =>
-      `Based on the information provided, this financing looks like a strong fit for ${name}. Moving to a full pre-approval requires verification of income and assets and an underwriting review, followed by a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
-    validityTail:
-      "subject to verification of the borrower's income, assets, and credit, a satisfactory appraisal, clear title, and full underwriting approval.",
+    readiness: (name, waived) =>
+      waived
+        ? `Based on the information provided, this financing looks like a strong fit for ${name}. Moving to a full pre-approval requires verification of income and assets and an underwriting review, followed by a fully executed sales contract and an acceptable title insurance commitment.`
+        : `Based on the information provided, this financing looks like a strong fit for ${name}. Moving to a full pre-approval requires verification of income and assets and an underwriting review, followed by a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+    validityTail: (waived) =>
+      waived
+        ? "subject to verification of the borrower's income, assets, and credit, clear title, and full underwriting approval."
+        : "subject to verification of the borrower's income, assets, and credit, a satisfactory appraisal, clear title, and full underwriting approval.",
   },
 };
 
@@ -187,6 +203,9 @@ interface BodyOpts {
   creditScore?: string | number;
   /** When true (and a score is present), the FICO number is printed in the letter too. */
   showCreditScore?: boolean;
+  /** The transaction has an appraisal waiver — the letter notes it up front and drops
+   *  the appraisal from the remaining conditions. */
+  appraisalWaiver?: boolean;
 }
 
 /** Build the credit descriptor + optional printed number from the body options. The
@@ -226,11 +245,16 @@ function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: stri
   // so lowercase the first letter — but leave acronyms (FHA, VA, USDA) fully uppercase.
   const fin = financingLabel === financingLabel.toUpperCase() ? financingLabel : financingLabel.charAt(0).toLowerCase() + financingLabel.slice(1);
 
+  const waived = !!opts.appraisalWaiver;
+  // When an appraisal waiver applies, note it in the opening paragraph.
+  const waiverSentence = waived
+    ? ` This transaction has been granted an appraisal waiver, so a property appraisal is not required.`
+    : '';
   const p1 = isRefi
-    ? `${name} ${isAre} ${w.verb} to refinance the property located at ${property} with a loan amount of ${loan} using ${fin} financing${tail}.`
-    : `${name} ${isAre} ${w.verb} for the purchase of the home located at ${property} at a purchase price of ${price} using ${fin} financing${tail}.`;
+    ? `${name} ${isAre} ${w.verb} to refinance the property located at ${property} with a loan amount of ${loan} using ${fin} financing${tail}.${waiverSentence}`
+    : `${name} ${isAre} ${w.verb} for the purchase of the home located at ${property} at a purchase price of ${price} using ${fin} financing${tail}.${waiverSentence}`;
   const p2 = w.basis(pr, scores, creditPhraseFrom(opts));
-  const p3 = w.readiness(name);
+  const p3 = w.readiness(name, waived);
   const p4 = `Please contact me with any questions regarding this ${w.nounLower}.`;
   return [p1, p2, p3, p4];
 }
@@ -288,6 +312,9 @@ export interface LetterOptions {
   creditScore?: string | number;
   /** Print the FICO number in the letter body (default off — the adjective still adapts). */
   showCreditScore?: boolean;
+  /** The transaction has an appraisal waiver. Notes it in the first paragraph and drops
+   *  the appraisal from the remaining conditions / validity sentence. */
+  appraisalWaiver?: boolean;
   /** Edited body override (paragraphs). */
   paragraphs?: string[];
   // Editable parts (empty/undefined → sensible default).
@@ -315,6 +342,7 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
     kind: opts.kind,
     creditScore: opts.creditScore,
     showCreditScore: opts.showCreditScore,
+    appraisalWaiver: opts.appraisalWaiver,
   });
   const paragraphs = opts.paragraphs && opts.paragraphs.length ? opts.paragraphs : def.paragraphs;
 
@@ -325,7 +353,7 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
 
   const expDays = opts.expDays || 90;
   const exp = new Date(now.getTime() + expDays * 86_400_000);
-  const validity = `This ${w.nounLower} is valid through ${longDate(exp)} and is ${w.validityTail}`;
+  const validity = `This ${w.nounLower} is valid through ${longDate(exp)} and is ${w.validityTail(!!opts.appraisalWaiver)}`;
 
   // The selected agent (from the saved contacts) wins; otherwise fall back to the legacy
   // single agent fields on settings.
