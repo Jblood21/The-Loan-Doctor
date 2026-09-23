@@ -119,7 +119,7 @@ describe('appraisal waiver', () => {
   it('on: notes the waiver up front and drops the appraisal from the conditions', () => {
     const l = buildPreApprovalLetter(scenario, settings, { ...base, appraisalWaiver: true });
     expect(l.paragraphs[0]).toContain('appraisal waiver');
-    expect(l.paragraphs[0]).toContain('a property appraisal is not required');
+    expect(l.paragraphs[0]).toContain('no appraisal is required');
     expect(l.paragraphs[2]).not.toContain('appraisal');
     expect(l.validity).not.toContain('appraisal');
     // The other remaining conditions are still present.
