@@ -247,9 +247,7 @@ function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: stri
 
   const waived = !!opts.appraisalWaiver;
   // When an appraisal waiver applies, note it in the opening paragraph.
-  const waiverSentence = waived
-    ? ` This transaction has been granted an appraisal waiver, so a property appraisal is not required.`
-    : '';
+  const waiverSentence = waived ? ` This loan has an appraisal waiver, so no appraisal is required.` : '';
   const p1 = isRefi
     ? `${name} ${isAre} ${w.verb} to refinance the property located at ${property} with a loan amount of ${loan} using ${fin} financing${tail}.${waiverSentence}`
     : `${name} ${isAre} ${w.verb} for the purchase of the home located at ${property} at a purchase price of ${price} using ${fin} financing${tail}.${waiverSentence}`;
