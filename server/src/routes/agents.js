@@ -9,16 +9,20 @@ import {
   findAgentByEmail,
   findAgentById,
   publicAgent,
+  updateAgent,
   normalizeEmail,
   getAssignmentsByAgentEmail,
   findAssignmentById,
   updateAssignment,
+  addAgentShare,
+  findLetterShareForAssignment,
 } from '../store.js';
 import { requireAgent, signAgentToken } from '../auth.js';
 import { streamLetterPdf } from '../lib/letterPdfRender.js';
 import { assignmentLetterPayload, cappedPrice } from '../lib/assignmentLetter.js';
 import { publicAssignment } from './preapproval.js';
 import { parseReportSections, streamReportPdf } from './report.js';
+import { streamFlyerPdf } from '../lib/flyerPdf.js';
 
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -52,6 +56,35 @@ router.post('/auth/login', (req, res) => {
 router.get('/auth/me', requireAgent, (req, res) => {
   res.json({ agent: publicAgent(req.agent) });
 });
+
+// Agent profile — name, phone, brokerage, license, and an optional headshot (data URL),
+// used to co-brand the report, flyers, and shared pages.
+router.put('/auth/profile', requireAgent, (req, res) => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  const patch = {};
+  if (b.name !== undefined) patch.name = String(b.name).slice(0, 120);
+  if (b.phone !== undefined) patch.phone = String(b.phone).slice(0, 40);
+  if (b.brokerage !== undefined) patch.brokerage = String(b.brokerage).slice(0, 160);
+  if (b.license !== undefined) patch.license = String(b.license).slice(0, 60);
+  if (b.photo !== undefined) {
+    const p = typeof b.photo === 'string' ? b.photo : '';
+    // Accept an image data URL (capped ~1.5 MB) or empty string to clear it.
+    patch.photo = p.startsWith('data:image/') && p.length < 1_500_000 ? p : '';
+  }
+  res.json({ agent: publicAgent(updateAgent(req.agent.id, patch)) });
+});
+
+/** The agent's co-branding block, shared by the report, flyer, and afford share. */
+function agentBranding(agent) {
+  return {
+    name: agent.name || '',
+    brokerage: agent.brokerage || '',
+    phone: agent.phone || '',
+    email: agent.email || '',
+    license: agent.license || '',
+    photo: agent.photo || '',
+  };
+}
 
 // The agent sees only pre-approvals assigned to their email.
 router.get('/assignments', requireAgent, (req, res) => {
@@ -102,13 +135,50 @@ router.post('/assignments/:id/pdf', requireAgent, (req, res) => {
 // aren't lenders, so there's no NMLS/logo). The section data is client-computed.
 router.post('/report/pdf', requireAgent, (req, res) => {
   const { preparedFor, sections } = parseReportSections(req.body);
+  const brokerage = req.agent.brokerage || '';
   streamReportPdf(res, {
     preparedFor,
-    officer: { name: req.agent.name || '', title: 'Real Estate Agent' },
-    lender: { name: req.agent.name || '', phone: req.agent.phone || '', email: req.agent.email || '' },
+    officer: { name: req.agent.name || '', title: brokerage || 'Real Estate Agent' },
+    lender: { name: brokerage || req.agent.name || '', phone: req.agent.phone || '', email: req.agent.email || '' },
     logoBuf: null,
     sections,
   });
+});
+
+// Open-house / listing payment flyer — client computes the payment scenarios; this
+// renders a branded one-pager.
+router.post('/flyer/pdf', requireAgent, (req, res) => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  streamFlyerPdf(res, {
+    agent: agentBranding(req.agent),
+    listing: b.listing,
+    terms: b.terms,
+    scenarios: b.scenarios,
+  });
+});
+
+// Publish a pre-approval letter at a public link (stable per assignment).
+router.post('/assignments/:id/share', requireAgent, (req, res) => {
+  const a = ownedAssignment(req);
+  if (!a) return res.status(404).json({ error: 'Assignment not found' });
+  let share = findLetterShareForAssignment(a.id);
+  if (!share) share = addAgentShare({ kind: 'letter', agentId: req.agent.id, assignmentId: a.id });
+  res.status(201).json({ token: share.token });
+});
+
+// Publish a buyer-facing affordability snapshot (client-computed) at a public link.
+router.post('/share/afford', requireAgent, (req, res) => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  const s = (v, n = 80) => String(v == null ? '' : v).slice(0, n);
+  const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 12).map((r) => ({ label: s(r && r.label), value: s(r && r.value) }));
+  const data = {
+    buyerName: s(b.buyerName, 120),
+    maxPrice: s(b.maxPrice),
+    headline: s(b.headline, 120),
+    rows,
+  };
+  const share = addAgentShare({ kind: 'afford', agentId: req.agent.id, agent: agentBranding(req.agent), data });
+  res.status(201).json({ token: share.token });
 });
 
 export default router;

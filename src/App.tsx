@@ -12,6 +12,7 @@ import Admin from '@/pages/Admin';
 import Agents from '@/pages/Agents';
 import SharedQuote from '@/pages/SharedQuote';
 import AgentPortal from '@/pages/AgentPortal';
+import AgentShare from '@/pages/AgentShare';
 
 function Splash() {
   return (
@@ -45,6 +46,8 @@ function AppRoutes() {
       <Route path="/q/:id" element={<SharedQuote />} />
       {/* Public real-estate agent portal — its own login surface. */}
       <Route path="/agent" element={<AgentPortal />} />
+      {/* Public buyer-facing share links (pre-approval letter / affordability). */}
+      <Route path="/s/:token" element={<AgentShare />} />
       <Route path="/login" element={<LoginGate />} />
       <Route element={<RequireAuth />}>
         <Route path="/compare" element={<Compare />} />
