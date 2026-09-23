@@ -18,6 +18,7 @@ import { requireAgent, signAgentToken } from '../auth.js';
 import { streamLetterPdf } from '../lib/letterPdfRender.js';
 import { assignmentLetterPayload, cappedPrice } from '../lib/assignmentLetter.js';
 import { publicAssignment } from './preapproval.js';
+import { parseReportSections, streamReportPdf } from './report.js';
 
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -95,6 +96,19 @@ router.post('/assignments/:id/pdf', requireAgent, (req, res) => {
   const a = ownedAssignment(req);
   if (!a) return res.status(404).json({ error: 'Assignment not found' });
   streamLetterPdf(res, assignmentLetterPayload(a));
+});
+
+// Tools report PDF for the agent — branded with the agent's own contact info (agents
+// aren't lenders, so there's no NMLS/logo). The section data is client-computed.
+router.post('/report/pdf', requireAgent, (req, res) => {
+  const { preparedFor, sections } = parseReportSections(req.body);
+  streamReportPdf(res, {
+    preparedFor,
+    officer: { name: req.agent.name || '', title: 'Real Estate Agent' },
+    lender: { name: req.agent.name || '', phone: req.agent.phone || '', email: req.agent.email || '' },
+    logoBuf: null,
+    sections,
+  });
 });
 
 export default router;
