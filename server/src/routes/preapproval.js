@@ -43,6 +43,7 @@ router.post('/pdf', requireAuth, (req, res) => {
   const officer = obj(body.officer);
   const lender = obj(body.lender);
   const agent = obj(body.agent);
+  const agentAck = str(body.agentAck);
   const logo = body.logo ?? null;
   const loan = obj(body.loan); // structured loan snapshot for the issued-pre-approvals history
 
@@ -96,6 +97,7 @@ router.post('/pdf', requireAuth, (req, res) => {
     officer,
     lender,
     agent,
+    agentAck,
   });
 
   doc.end();
