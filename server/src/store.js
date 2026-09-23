@@ -92,7 +92,7 @@ export function dataDirInfo() {
   return { dir: DATA_DIR, persistent, explicit, onKnownMount };
 }
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, counters: { preApprovals: 0 } };
+const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, agents: [], assignments: [], counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -344,6 +344,92 @@ export function addPreApproval(userId, record) {
   db.preApprovals[userId] = list.slice(0, 500);
   persist();
   return rec;
+}
+
+// ---- real-estate agents (separate login surface) -----------------------
+// Agents are a distinct account type from loan-officer users. They sign up with
+// name / phone / email + password and see only the pre-approvals a loan officer
+// has assigned to them (matched by email). They never see borrower financials.
+export function getAgents() {
+  return db.agents;
+}
+export function findAgentByEmail(email) {
+  const e = normalizeEmail(email);
+  return db.agents.find((a) => a.email === e);
+}
+export function findAgentById(id) {
+  return db.agents.find((a) => a.id === id);
+}
+export function addAgent({ email, password, name = '', phone = '' }) {
+  const agent = {
+    id: `agt_${randomUUID().replace(/-/g, '').slice(0, 20)}`,
+    email: normalizeEmail(email),
+    passwordHash: bcrypt.hashSync(password, 12),
+    name,
+    phone,
+    status: 'Active',
+    sessionEpoch: 0,
+    createdAt: new Date().toISOString(),
+  };
+  db.agents.push(agent);
+  persist();
+  return agent;
+}
+export function updateAgent(id, patch) {
+  const a = findAgentById(id);
+  if (!a) return null;
+  Object.assign(a, patch);
+  persist();
+  return a;
+}
+/** Strip the password hash before returning an agent to the client. */
+export function publicAgent(a) {
+  if (!a) return null;
+  return { id: a.id, email: a.email, name: a.name, phone: a.phone, status: a.status, createdAt: a.createdAt };
+}
+
+// ---- pre-approval assignments (loan officer → agent) --------------------
+// One assignment is a pre-approval a loan officer hands to an agent. The agent
+// may edit the property address (always) and the price (only when allowPriceChange
+// is on, capped at approvedPrice). The letter is regenerated server-side from the
+// stored snapshot so the agent can never alter the loan terms or branding.
+export function addAssignment(record) {
+  const a = {
+    id: `asn_${randomUUID().replace(/-/g, '').slice(0, 20)}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    editedByAgentAt: null,
+    ...record,
+    agentEmail: normalizeEmail(record.agentEmail),
+  };
+  db.assignments.push(a);
+  persist();
+  return a;
+}
+export function findAssignmentById(id) {
+  return db.assignments.find((a) => a.id === id);
+}
+export function getAssignmentsByOwner(ownerId) {
+  return db.assignments.filter((a) => a.ownerId === ownerId).sort((x, y) => (y.updatedAt || '').localeCompare(x.updatedAt || ''));
+}
+export function getAssignmentsByAgentEmail(email) {
+  const e = normalizeEmail(email);
+  return db.assignments.filter((a) => a.agentEmail === e).sort((x, y) => (y.updatedAt || '').localeCompare(x.updatedAt || ''));
+}
+export function updateAssignment(id, patch) {
+  const a = findAssignmentById(id);
+  if (!a) return null;
+  Object.assign(a, patch, { updatedAt: new Date().toISOString() });
+  if (patch.agentEmail) a.agentEmail = normalizeEmail(patch.agentEmail);
+  persist();
+  return a;
+}
+export function deleteAssignment(id) {
+  const i = db.assignments.findIndex((a) => a.id === id);
+  if (i < 0) return false;
+  db.assignments.splice(i, 1);
+  persist();
+  return true;
 }
 
 // ---- counters ----------------------------------------------------------
