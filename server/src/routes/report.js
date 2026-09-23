@@ -39,14 +39,12 @@ const decodeDataUrl = (v) => {
   }
 };
 
-router.post('/pdf', requireAuth, (req, res) => {
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const preparedFor = str(body.preparedFor).slice(0, 120);
-  const officer = obj(body.officer);
-  const lender = obj(body.lender);
-  const logoBuf = decodeDataUrl(body.logo);
-
-  const sections = arr(body.sections)
+/** Coerce/cap the client's report sections + preparedFor to safe values. Shared by the
+ *  loan-officer route and the agent route (each supplies its own branding). */
+export function parseReportSections(body) {
+  const b = body && typeof body === 'object' ? body : {};
+  const preparedFor = str(b.preparedFor).slice(0, 120);
+  const sections = arr(b.sections)
     .slice(0, 20)
     .map((s) => {
       const sec = obj(s);
@@ -65,23 +63,34 @@ router.post('/pdf', requireAuth, (req, res) => {
         title: str(sec.title, 'Result'),
         subtitle: str(sec.subtitle),
         headline: sec.headline ? { label: str(h.label), value: str(h.value), sub: str(h.sub) } : null,
-        inputs: arr(sec.inputs)
-          .slice(0, 20)
-          .map((l) => ({ label: str(obj(l).label), value: str(obj(l).value) })),
-        rows: arr(sec.rows)
-          .slice(0, 40)
-          .map((l) => ({ label: str(obj(l).label), value: str(obj(l).value) })),
+        inputs: arr(sec.inputs).slice(0, 20).map((l) => ({ label: str(obj(l).label), value: str(obj(l).value) })),
+        rows: arr(sec.rows).slice(0, 40).map((l) => ({ label: str(obj(l).label), value: str(obj(l).value) })),
         table,
       };
     });
+  return { preparedFor, sections };
+}
 
+/** Stream a report PDF to `res` with the given branding + already-parsed sections. */
+export function streamReportPdf(res, { preparedFor, officer, lender, logoBuf, sections }) {
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: 40, bottom: 60, left: LEFT, right: LEFT } });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="loan-analysis-report.pdf"`);
   doc.pipe(res);
-
   renderReport(doc, { preparedFor, officer, lender, logoBuf, sections });
   doc.end();
+}
+
+router.post('/pdf', requireAuth, (req, res) => {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const { preparedFor, sections } = parseReportSections(body);
+  streamReportPdf(res, {
+    preparedFor,
+    officer: obj(body.officer),
+    lender: obj(body.lender),
+    logoBuf: decodeDataUrl(body.logo),
+    sections,
+  });
 });
 
 // Draw the whole report onto an existing PDFDocument (shared with render tests).
