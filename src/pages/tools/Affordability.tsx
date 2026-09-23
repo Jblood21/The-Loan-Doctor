@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { monthlyPayment } from '@/lib/finance';
+import { affordability } from '@/lib/affordability';
 import { fmt } from '@/lib/format';
 import { CalcField, CalcSelect, Headline, ResultPanel, Row, TERM_OPTIONS, type CalcProps } from './_shared';
 
@@ -17,25 +17,17 @@ export default function Affordability({ open, onClose }: CalcProps) {
 
   const set = (fn: (v: number) => void) => (v: string) => fn(v === '' ? 0 : parseFloat(v) || 0);
 
-  // Max housing budget from DTI, then back out taxes/ins/HOA to leave room for P&I.
-  const monthlyIncome = income / 12;
-  const maxHousing = Math.max(0, (monthlyIncome * dti) / 100 - debts);
-  // Iteratively solve: taxes + insurance scale with home price, which depends on the loan.
-  // Approximate by solving for loan with taxes/ins on (loan + down).
-  const r = rate / 100 / 12;
-  const months = (parseInt(term, 10) || 30) * 12;
-  const factor = r > 0 ? (r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1) : 1 / months;
-  // maxHousing = P&I + (price)*(tax+ins)/12 + hoa ; price = loan + down ; loan = piBudget / factor
-  // Let monthlyEscrowRate = (taxRate+insRate)/100/12. Solve loan:
-  const escRate = (taxRate + insRate) / 100 / 12;
-  // maxHousing - hoa = loan*factor + (loan+down)*escRate
-  // loan*(factor+escRate) = maxHousing - hoa - down*escRate
-  const loanBudget = maxHousing - hoa - down * escRate;
-  const maxLoan = Math.max(0, loanBudget / (factor + escRate));
-  const maxPrice = maxLoan + down;
-  const pi = monthlyPayment(maxLoan, rate, parseInt(term, 10) || 30);
-  const escrow = maxPrice * escRate;
-  const totalPayment = pi + escrow + hoa;
+  const { maxPrice, maxLoan, pi, escrow, totalPayment, maxHousing } = affordability({
+    income,
+    debts,
+    down,
+    rate,
+    term,
+    dti,
+    taxRate,
+    insRate,
+    hoa,
+  });
 
   return (
     <Modal open={open} onClose={onClose} title="Affordability" subtitle="How much home a borrower can afford by income and DTI." width={720}>

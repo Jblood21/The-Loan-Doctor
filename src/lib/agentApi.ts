@@ -3,7 +3,7 @@
 // session in the same browser.
 
 import { ApiError } from './api';
-import type { AgentUser, Assignment } from '@/types';
+import type { AgentUser, Assignment, ShareView } from '@/types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
 const AGENT_TOKEN_KEY = 'loandr.agent.token';
@@ -52,12 +52,33 @@ export const agentApi = {
     agentRequest<AgentAuthResponse>('POST', '/auth/register', data),
   login: (data: { email: string; password: string }) => agentRequest<AgentAuthResponse>('POST', '/auth/login', data),
   me: () => agentRequest<{ agent: AgentUser }>('GET', '/auth/me'),
+  updateProfile: (data: Partial<Pick<AgentUser, 'name' | 'phone' | 'brokerage' | 'license' | 'photo'>>) =>
+    agentRequest<{ agent: AgentUser }>('PUT', '/auth/profile', data),
 
   listAssignments: () => agentRequest<{ assignments: Assignment[] }>('GET', '/assignments'),
   getAssignment: (id: string) => agentRequest<{ assignment: Assignment }>('GET', `/assignments/${id}`),
   updateAssignment: (id: string, patch: { propertyAddress?: string; price?: number }) =>
     agentRequest<{ assignment: Assignment }>('PATCH', `/assignments/${id}`, patch),
   assignmentPdf: (id: string) => agentRequest<Blob>('POST', `/assignments/${id}/pdf`),
+  shareAssignment: (id: string) => agentRequest<{ token: string }>('POST', `/assignments/${id}/share`),
 
   reportPdf: (payload: unknown) => agentRequest<Blob>('POST', '/report/pdf', payload),
+  flyerPdf: (payload: unknown) => agentRequest<Blob>('POST', '/flyer/pdf', payload),
+  shareAfford: (payload: unknown) => agentRequest<{ token: string }>('POST', '/share/afford', payload),
 };
+
+/** Public (no-auth) fetch for a shared buyer-facing link, plus the shared-letter PDF URL. */
+export async function getPublicShare(token: string): Promise<ShareView> {
+  const res = await fetch(`${API_BASE}/api/public/share/${token}`);
+  if (!res.ok) {
+    let message = 'This link is no longer available.';
+    try {
+      message = (await res.json()).error || message;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, message);
+  }
+  return (await res.json()).share as ShareView;
+}
+export const publicSharePdfUrl = (token: string) => `${API_BASE}/api/public/share/${token}/pdf`;

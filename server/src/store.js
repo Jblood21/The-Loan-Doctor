@@ -92,7 +92,7 @@ export function dataDirInfo() {
   return { dir: DATA_DIR, persistent, explicit, onKnownMount };
 }
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, agents: [], assignments: [], counters: { preApprovals: 0 } };
+const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, agents: [], assignments: [], agentShares: [], counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -367,6 +367,9 @@ export function addAgent({ email, password, name = '', phone = '' }) {
     passwordHash: bcrypt.hashSync(password, 12),
     name,
     phone,
+    brokerage: '',
+    license: '',
+    photo: '',
     status: 'Active',
     sessionEpoch: 0,
     createdAt: new Date().toISOString(),
@@ -385,7 +388,38 @@ export function updateAgent(id, patch) {
 /** Strip the password hash before returning an agent to the client. */
 export function publicAgent(a) {
   if (!a) return null;
-  return { id: a.id, email: a.email, name: a.name, phone: a.phone, status: a.status, createdAt: a.createdAt };
+  return {
+    id: a.id,
+    email: a.email,
+    name: a.name,
+    phone: a.phone,
+    brokerage: a.brokerage || '',
+    license: a.license || '',
+    photo: a.photo || '',
+    status: a.status,
+    createdAt: a.createdAt,
+  };
+}
+
+// ---- agent shares (public, token-gated buyer-facing links) --------------
+// An agent can publish a pre-approval letter or an affordability snapshot at an
+// unguessable public URL to hand to a buyer or listing agent (no login required).
+export function addAgentShare(record) {
+  const share = {
+    token: `shr_${randomUUID().replace(/-/g, '')}`,
+    createdAt: new Date().toISOString(),
+    ...record,
+  };
+  db.agentShares.push(share);
+  persist();
+  return share;
+}
+export function findAgentShareByToken(token) {
+  return db.agentShares.find((s) => s.token === token);
+}
+/** The one existing letter share for an assignment, if any (so re-sharing is stable). */
+export function findLetterShareForAssignment(assignmentId) {
+  return db.agentShares.find((s) => s.kind === 'letter' && s.assignmentId === assignmentId);
 }
 
 // ---- pre-approval assignments (loan officer → agent) --------------------

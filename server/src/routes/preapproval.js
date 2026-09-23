@@ -31,6 +31,11 @@ function pick(src, keys) {
 
 /** What the loan officer and the agent both see about an assignment (no internals). */
 export function publicAssignment(a) {
+  // Surface the loan officer's contact details (snapshotted in the letter) so the agent
+  // can reach out — name/email/phone only, nothing sensitive.
+  const letter = a.letter && typeof a.letter === 'object' ? a.letter : {};
+  const officer = letter.officer && typeof letter.officer === 'object' ? letter.officer : {};
+  const lender = letter.lender && typeof letter.lender === 'object' ? letter.lender : {};
   return {
     id: a.id,
     ownerName: a.ownerName || '',
@@ -40,6 +45,12 @@ export function publicAssignment(a) {
     price: a.price || 0,
     approvedPrice: a.approvedPrice || 0,
     allowPriceChange: !!a.allowPriceChange,
+    loanOfficer: {
+      name: str(officer.name) || a.ownerName || '',
+      email: str(officer.email),
+      phone: str(officer.phone),
+      company: str(lender.name),
+    },
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
     editedByAgentAt: a.editedByAgentAt || null,
