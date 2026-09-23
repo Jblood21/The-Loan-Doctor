@@ -6,6 +6,8 @@ import { TextField, Label } from '@/components/ui/TextField';
 import { agentApi, getAgentToken, setAgentToken } from '@/lib/agentApi';
 import { ApiError } from '@/lib/api';
 import { fmt } from '@/lib/format';
+import { ReportProvider } from '@/context/ReportContext';
+import { ToolsWorkspace } from '@/components/ToolsWorkspace';
 import type { AgentUser, Assignment } from '@/types';
 
 /**
@@ -155,8 +157,45 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
   );
 }
 
-/** The signed-in agent's list of assigned pre-approvals. */
+/** The signed-in agent shell: a Pre-Approvals / Tools switcher over the two views. */
 function AgentDashboard({ agent, onSignOut }: { agent: AgentUser; onSignOut: () => void }) {
+  const [tab, setTab] = useState<'preapprovals' | 'tools'>('preapprovals');
+  const navBtn = (key: 'preapprovals' | 'tools', label: string) => (
+    <button
+      onClick={() => setTab(key)}
+      className={`rounded-[9px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+        tab === key ? 'bg-[rgba(47,128,237,0.14)] text-brand-blue-nav' : 'text-text-soft hover:text-text-primary'
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="min-h-screen bg-app">
+      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border bg-sidebar/95 px-5 py-3 backdrop-blur">
+        <div className="flex items-center gap-4">
+          <Logo size={28} wordmark={17} />
+          <nav className="flex items-center gap-1">
+            {navBtn('preapprovals', 'Pre-Approvals')}
+            {navBtn('tools', 'Tools')}
+          </nav>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="hidden text-[13px] text-text-muted sm:inline">{agent.name || agent.email}</span>
+          <Button variant="ghost" size="sm" onClick={onSignOut}>Sign out</Button>
+        </div>
+      </header>
+
+      <div className={`mx-auto px-5 py-8 ${tab === 'tools' ? 'max-w-[1080px]' : 'max-w-[760px]'}`}>
+        {tab === 'preapprovals' ? <PreApprovalsView agent={agent} /> : <ToolsView />}
+      </div>
+    </div>
+  );
+}
+
+/** The agent's list of assigned pre-approvals. */
+function PreApprovalsView({ agent }: { agent: AgentUser }) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -173,40 +212,48 @@ function AgentDashboard({ agent, onSignOut }: { agent: AgentUser; onSignOut: () 
   useEffect(load, []);
 
   return (
-    <div className="min-h-screen bg-app">
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border bg-sidebar/95 px-5 py-3.5 backdrop-blur">
-        <Logo size={28} wordmark={17} />
-        <div className="flex items-center gap-3">
-          <span className="hidden text-[13px] text-text-muted sm:inline">{agent.name || agent.email}</span>
-          <Button variant="ghost" size="sm" onClick={onSignOut}>Sign out</Button>
+    <>
+      <div className="mb-5 flex items-end justify-between gap-3">
+        <div>
+          <h1 className="m-0 font-display text-[22px] font-semibold tracking-[-0.5px] text-text-heading">Your Pre-Approvals</h1>
+          <p className="mt-1 text-[13.5px] text-text-muted">Update the property address (and price, when your loan officer allows it), then download the letter.</p>
         </div>
-      </header>
-
-      <div className="mx-auto max-w-[760px] px-5 py-8">
-        <div className="mb-5 flex items-end justify-between gap-3">
-          <div>
-            <h1 className="m-0 font-display text-[22px] font-semibold tracking-[-0.5px] text-text-heading">Your Pre-Approvals</h1>
-            <p className="mt-1 text-[13.5px] text-text-muted">Update the property address (and price, when your loan officer allows it), then download the letter.</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={load} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
-        </div>
-
-        {error && <div className="mb-4 rounded-[11px] border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] px-[15px] py-3 text-[13px] text-danger">{error}</div>}
-
-        {!loading && !assignments.length && !error && (
-          <div className="rounded-2xl border border-border bg-card px-6 py-12 text-center text-[14px] text-text-muted">
-            No pre-approvals have been assigned to <span className="font-semibold text-text-soft">{agent.email}</span> yet.
-            <div className="mt-1 text-[12.5px]">When your loan officer assigns one, it will appear here.</div>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-4">
-          {assignments.map((a) => (
-            <AssignmentCard key={a.id} assignment={a} onSaved={(next) => setAssignments((list) => list.map((x) => (x.id === next.id ? next : x)))} />
-          ))}
-        </div>
+        <Button variant="ghost" size="sm" onClick={load} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
       </div>
-    </div>
+
+      {error && <div className="mb-4 rounded-[11px] border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] px-[15px] py-3 text-[13px] text-danger">{error}</div>}
+
+      {!loading && !assignments.length && !error && (
+        <div className="rounded-2xl border border-border bg-card px-6 py-12 text-center text-[14px] text-text-muted">
+          No pre-approvals have been assigned to <span className="font-semibold text-text-soft">{agent.email}</span> yet.
+          <div className="mt-1 text-[12.5px]">When your loan officer assigns one, it will appear here.</div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4">
+        {assignments.map((a) => (
+          <AssignmentCard key={a.id} assignment={a} onSaved={(next) => setAssignments((list) => list.map((x) => (x.id === next.id ? next : x)))} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+/** The agent's Tools workspace — the same calculators loan officers have (minus the
+ *  auth-gated county-income tool), with a report they can download branded with their
+ *  own contact info. */
+function ToolsView() {
+  return (
+    <ReportProvider>
+      <div className="mb-5">
+        <h1 className="m-0 font-display text-[22px] font-semibold tracking-[-0.5px] text-text-heading">Tools</h1>
+        <p className="mt-1 text-[13.5px] text-text-muted">Quick calculators for your clients. Add results to a report and download a branded PDF.</p>
+      </div>
+      <ToolsWorkspace
+        exclude={['countyincome']}
+        downloadReport={({ preparedFor, sections }) => agentApi.reportPdf({ preparedFor, sections })}
+      />
+    </ReportProvider>
   );
 }
 

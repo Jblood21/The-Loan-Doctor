@@ -58,4 +58,6 @@ export const agentApi = {
   updateAssignment: (id: string, patch: { propertyAddress?: string; price?: number }) =>
     agentRequest<{ assignment: Assignment }>('PATCH', `/assignments/${id}`, patch),
   assignmentPdf: (id: string) => agentRequest<Blob>('POST', `/assignments/${id}/pdf`),
+
+  reportPdf: (payload: unknown) => agentRequest<Blob>('POST', '/report/pdf', payload),
 };
