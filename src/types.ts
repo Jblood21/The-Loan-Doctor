@@ -173,8 +173,20 @@ export interface AgentUser {
   email: string;
   name: string;
   phone: string;
+  brokerage: string;
+  license: string;
+  /** Optional headshot data URL used to co-brand reports/flyers/shares. */
+  photo: string;
   status?: string;
   createdAt?: string;
+}
+
+/** The loan officer's public contact details, surfaced to the assigned agent. */
+export interface LoanOfficerContact {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
 }
 
 /** A pre-approval a loan officer assigned to an agent for light editing. */
@@ -187,9 +199,23 @@ export interface Assignment {
   price: number;
   approvedPrice: number;
   allowPriceChange: boolean;
+  loanOfficer?: LoanOfficerContact;
   createdAt: string;
   updatedAt: string;
   editedByAgentAt: string | null;
+}
+
+/** A public share (buyer-facing) — a pre-approval letter or an affordability snapshot. */
+export interface ShareView {
+  kind: 'letter' | 'afford';
+  createdAt?: string;
+  // letter
+  borrowerName?: string;
+  propertyAddress?: string;
+  loanOfficer?: LoanOfficerContact & { title?: string };
+  agent?: Partial<AgentUser>;
+  // afford
+  data?: { buyerName?: string; maxPrice?: string; headline?: string; rows?: { label: string; value: string }[] };
 }
 
 export interface PreApprovalState {

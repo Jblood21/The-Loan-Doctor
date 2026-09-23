@@ -18,6 +18,7 @@ import adminRoutes from './routes/admin.js';
 import losRoutes from './routes/los.js';
 import preApprovalRoutes from './routes/preapproval.js';
 import agentRoutes from './routes/agents.js';
+import publicShareRoutes from './routes/publicShare.js';
 import compareRoutes from './routes/compare.js';
 import shareRoutes from './routes/share.js';
 import aiRoutes from './routes/ai.js';
@@ -74,6 +75,8 @@ app.use('/api/preapproval', preApprovalRoutes);
 // agent routes are JWT-gated.
 app.use('/api/agent/auth', authLimiter);
 app.use('/api/agent', agentRoutes);
+// Public buyer-facing share links (no auth) — throttled against scraping/abuse.
+app.use('/api/public/share', censusLimiter, publicShareRoutes);
 app.use('/api/compare', compareRoutes);
 app.use('/api/report', reportRoutes);
 app.use('/api/share', shareRoutes);
