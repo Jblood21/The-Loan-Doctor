@@ -51,6 +51,14 @@ export default function DTI({ open, onClose }: CalcProps) {
               { label: 'Total Monthly Debts', value: fmt(housing + debts) },
               { label: 'Non-housing debts', value: fmt(debts) },
             ],
+            chart: {
+              type: 'gauge',
+              title: 'Debt-to-income vs. common limits',
+              gauges: [
+                { label: 'Front-End (housing)', value: frontEnd, display: pct(frontEnd, 1), limit: 28, limitLabel: '28% guide' },
+                { label: 'Back-End (total)', value: backEnd, display: pct(backEnd, 1), limit: 43, limitLabel: '43% limit' },
+              ],
+            },
           }}
         >
           <Headline label="Back-End DTI" value={pct(backEnd, 1)} sub={`Rating: ${r.label}`} />

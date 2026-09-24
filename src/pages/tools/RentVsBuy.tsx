@@ -112,6 +112,14 @@ export default function RentVsBuy({ open, onClose }: CalcProps) {
               { label: `Selling costs (${sellCostPct}%)`, value: `–${fmt(sellingCosts)}` },
               { label: 'Net equity at sale', value: fmt(equity) },
             ],
+            chart: {
+              type: 'bars',
+              title: `Net cost over ${years} years`,
+              data: [
+                { label: 'Renting', value: rentNetCost, display: fmt(rentNetCost) },
+                { label: 'Buying', value: ownNetCost, display: fmt(ownNetCost) },
+              ],
+            },
           }}
         >
           <Headline

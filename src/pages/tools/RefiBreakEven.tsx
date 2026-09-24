@@ -57,6 +57,14 @@ export default function RefiBreakEven({ open, onClose }: CalcProps) {
               { label: 'Lifetime Interest (current)', value: fmt(curInterest) },
               { label: 'Lifetime Interest (new)', value: fmt(newInterest) },
             ],
+            chart: {
+              type: 'bars',
+              title: 'Monthly payment',
+              data: [
+                { label: 'Current', value: curPayment, display: fmt2(curPayment) },
+                { label: 'New', value: newPayment, display: fmt2(newPayment) },
+              ],
+            },
           }}
         >
           <Headline

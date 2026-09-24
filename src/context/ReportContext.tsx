@@ -13,6 +13,38 @@ export interface ReportTable {
   rows: { label: string; cells: string[] }[];
 }
 
+/** One datum in a donut or bar chart. `value` drives the geometry (arc/height);
+ *  `display` is the pre-formatted label shown to the reader (e.g. "$3,491"). */
+export interface ReportChartDatum {
+  label: string;
+  value: number;
+  display?: string;
+  color?: string;
+}
+
+/** One horizontal gauge bar (e.g. a DTI ratio measured against a limit). `value`
+ *  and `limit` are percentages on the same 0-based scale. */
+export interface ReportChartGauge {
+  label: string;
+  value: number;
+  display?: string;
+  limit?: number;
+  limitLabel?: string;
+}
+
+/** An optional chart rendered natively in the report PDF. Tools supply the numbers
+ *  (they have them); the server draws donuts, bar comparisons, or gauge bars. */
+export interface ReportChart {
+  type: 'donut' | 'bars' | 'gauge';
+  title?: string;
+  /** Slices (donut) or bars (bars). */
+  data?: ReportChartDatum[];
+  /** Optional donut center caption. */
+  center?: { label?: string; value?: string };
+  /** Gauge bars (gauge). */
+  gauges?: ReportChartGauge[];
+}
+
 export interface ReportSection {
   /** Stable id (the tool key) — one section per tool in a report. */
   key: string;
@@ -23,6 +55,8 @@ export interface ReportSection {
   rows: ReportLine[];
   /** Optional multi-column table rendered in place of the flat rows. */
   table?: ReportTable;
+  /** Optional chart (donut / bars / gauge) rendered above the detail rows. */
+  chart?: ReportChart;
 }
 
 interface ReportContextValue {

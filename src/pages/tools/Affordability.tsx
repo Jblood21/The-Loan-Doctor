@@ -64,6 +64,16 @@ export default function Affordability({ open, onClose }: CalcProps) {
               { label: 'HOA', value: fmt(hoa) },
               { label: 'Total Housing Payment', value: fmt(totalPayment) },
             ],
+            chart: {
+              type: 'donut',
+              title: 'Monthly payment breakdown',
+              center: { label: 'Total / mo', value: fmt(totalPayment) },
+              data: [
+                { label: 'Principal & Interest', value: pi, display: fmt(pi) },
+                { label: 'Taxes + Insurance', value: escrow, display: fmt(escrow) },
+                { label: 'HOA', value: hoa, display: fmt(hoa) },
+              ],
+            },
           }}
         >
           <Headline label="Max Home Price" value={fmt(maxPrice)} sub={`At ${dti}% DTI · ${rate}% · ${term} yr`} />
