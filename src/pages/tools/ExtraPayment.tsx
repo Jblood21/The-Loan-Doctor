@@ -51,6 +51,14 @@ export default function ExtraPayment({ open, onClose }: CalcProps) {
               { label: 'Total Interest (base)', value: fmt(baseInterest) },
               { label: 'Total Interest (with extra)', value: fmt(extraInterest) },
             ],
+            chart: {
+              type: 'bars',
+              title: 'Lifetime interest paid',
+              data: [
+                { label: 'No extra', value: baseInterest, display: fmt(baseInterest) },
+                { label: 'With extra', value: extraInterest, display: fmt(extraInterest) },
+              ],
+            },
           }}
         >
           <Headline

@@ -57,6 +57,17 @@ export default function SellerNet({ open, onClose }: CalcProps) {
               { label: 'Closing Costs', value: `− ${fmt(costs)}` },
               { label: 'Net to Seller', value: fmt(r.netProceeds) },
             ],
+            chart: {
+              type: 'donut',
+              title: 'Where the sale price goes',
+              center: { label: 'Sale price', value: fmt(r.salePrice) },
+              data: [
+                { label: 'Net to seller', value: r.netProceeds, display: fmt(r.netProceeds) },
+                { label: 'Mortgage payoff', value: payoff, display: fmt(payoff) },
+                { label: 'Commission', value: r.commission, display: fmt(r.commission) },
+                { label: 'Closing costs', value: costs, display: fmt(costs) },
+              ],
+            },
           }}
         >
           <Headline

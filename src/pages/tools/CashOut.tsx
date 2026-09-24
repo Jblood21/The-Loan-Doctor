@@ -64,6 +64,14 @@ export default function CashOut({ open, onClose }: CalcProps) {
               { label: 'Today: Mortgage + Debts', value: fmt2(r.currentTotalMonthly) },
               { label: 'Monthly Difference', value: `${r.monthlySavings >= 0 ? '−' : '+'} ${fmt2(Math.abs(r.monthlySavings))}` },
             ],
+            chart: {
+              type: 'bars',
+              title: 'Monthly outflow',
+              data: [
+                { label: 'Today (mortgage + debts)', value: r.currentTotalMonthly, display: fmt2(r.currentTotalMonthly) },
+                { label: 'After (new mortgage)', value: r.newPayment, display: fmt2(r.newPayment) },
+              ],
+            },
           }}
         >
           <Headline

@@ -15,6 +15,10 @@ const BAND_BG = '#e9eff7'; // section header band
 const PANEL_BG = '#f6f8fb'; // assumptions grid
 const ZEBRA_BG = '#f4f7fb'; // alternating table rows
 const HAIRLINE = '#e7ecf2'; // row dividers
+// Sequential navy palette for donut slices / bars.
+const CHART_COLORS = ['#13355f', '#3f6699', '#6f93c0', '#a9c2de', '#5f7fa8', '#88a7c8'];
+const GAUGE_OK = '#2f7d5b'; // fill at or under the limit
+const GAUGE_OVER = '#c0552f'; // fill over the limit
 const LEFT = 56;
 const RIGHT = 556;
 const PAGE_W = 612;
@@ -33,6 +37,47 @@ const clean = (s) =>
 const str = (v, f = '') => (v == null ? clean(f) : clean(String(v)));
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const arr = (v) => (Array.isArray(v) ? v : []);
+const num = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
+const hex = (v) => (typeof v === 'string' && HEX_RE.test(v.trim()) ? v.trim() : '');
+
+/** Coerce/cap a section's optional chart (donut / bars / gauge) to safe values. */
+function parseChart(raw) {
+  const c = obj(raw);
+  const type = c.type === 'donut' || c.type === 'bars' || c.type === 'gauge' ? c.type : null;
+  if (!type) return null;
+  const title = str(c.title).slice(0, 80);
+  if (type === 'gauge') {
+    const gauges = arr(c.gauges)
+      .slice(0, 6)
+      .map((g) => {
+        const o = obj(g);
+        return {
+          label: str(o.label).slice(0, 60),
+          value: num(o.value),
+          display: str(o.display).slice(0, 24),
+          limit: o.limit == null ? null : num(o.limit),
+          limitLabel: str(o.limitLabel).slice(0, 40),
+        };
+      })
+      .filter((g) => g.label);
+    return gauges.length ? { type, title, gauges } : null;
+  }
+  const data = arr(c.data)
+    .slice(0, 8)
+    .map((d) => {
+      const o = obj(d);
+      return { label: str(o.label).slice(0, 60), value: num(o.value), display: str(o.display).slice(0, 24), color: hex(o.color) };
+    })
+    .filter((d) => d.label);
+  if (!data.length) return null;
+  const ctr = obj(c.center);
+  const center = c.center ? { label: str(ctr.label).slice(0, 40), value: str(ctr.value).slice(0, 24) } : null;
+  return { type, title, data, center };
+}
 
 const decodeDataUrl = (v) => {
   if (typeof v !== 'string' || !v.startsWith('data:')) return null;
@@ -72,6 +117,7 @@ export function parseReportSections(body) {
         inputs: arr(sec.inputs).slice(0, 20).map((l) => ({ label: str(obj(l).label), value: str(obj(l).value) })),
         rows: arr(sec.rows).slice(0, 40).map((l) => ({ label: str(obj(l).label), value: str(obj(l).value) })),
         table,
+        chart: parseChart(sec.chart),
       };
     });
   return { preparedFor, sections };
@@ -126,6 +172,21 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
       ? {
           columns: (sec.table.columns || []).map((c) => C(c)),
           rows: (sec.table.rows || []).map((r) => ({ label: C(r.label), cells: (r.cells || []).map((c) => C(c)) })),
+        }
+      : null,
+    chart: sec.chart
+      ? {
+          type: sec.chart.type,
+          title: C(sec.chart.title),
+          center: sec.chart.center ? { label: C(sec.chart.center.label), value: C(sec.chart.center.value) } : null,
+          data: (sec.chart.data || []).map((d) => ({ label: C(d.label), value: Number(d.value) || 0, display: C(d.display), color: typeof d.color === 'string' ? d.color : '' })),
+          gauges: (sec.chart.gauges || []).map((g) => ({
+            label: C(g.label),
+            value: Number(g.value) || 0,
+            display: C(g.display),
+            limit: g.limit == null ? null : Number(g.limit) || 0,
+            limitLabel: C(g.limitLabel),
+          })),
         }
       : null,
   }));
@@ -247,6 +308,11 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
       y = top + cardH + 14;
     }
 
+    // --- Chart (donut / bars / gauge) ---
+    if (sec.chart) {
+      y = drawChart(doc, y, sec.chart);
+    }
+
     // --- Assumptions panel (two-column key/value grid) ---
     if (sec.inputs.length) {
       const gap = 18;
@@ -336,6 +402,144 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
   if (!sections.length) {
     doc.fillColor(MUTED).font('Helvetica').fontSize(11).text('No tools were added to this report.', LEFT, y);
   }
+}
+
+// ---- Native chart rendering (no external chart library) ----
+
+const CONTENT_W = RIGHT - LEFT;
+
+/** Total vertical space a chart block needs, so it can be kept off a page edge. */
+function chartHeight(chart) {
+  const t = chart.title ? 16 : 4;
+  if (chart.type === 'donut') return t + Math.max(96, (chart.data || []).length * 15) + 8;
+  if (chart.type === 'bars') return t + 12 + 84 + 6 + 14 + 6;
+  if (chart.type === 'gauge') return t + (chart.gauges || []).length * 42 + 4;
+  return 0;
+}
+
+/** Draw a chart at `y`, paginating first if it wouldn't fit; returns the new y. */
+function drawChart(doc, y, chart) {
+  const H = chartHeight(chart);
+  if (y + H > BOTTOM) {
+    doc.addPage();
+    y = CONT_TOP;
+  }
+  let top = y;
+  if (chart.title) {
+    doc.fillColor('#9aa7b5').font('Helvetica-Bold').fontSize(7.5).text(chart.title.toUpperCase(), LEFT, top, { characterSpacing: 0.8, lineBreak: false });
+    top += 16;
+  } else {
+    top += 4;
+  }
+  if (chart.type === 'donut') drawDonut(doc, top, chart);
+  else if (chart.type === 'bars') drawBars(doc, top, chart);
+  else if (chart.type === 'gauge') drawGauges(doc, top, chart);
+  return y + H;
+}
+
+function drawDonut(doc, top, chart) {
+  const slices = (chart.data || []).filter((d) => d.value > 0);
+  const total = slices.reduce((s, d) => s + d.value, 0) || 1;
+  const outerR = 46;
+  const innerR = 28;
+  const cx = LEFT + 6 + outerR;
+  const cy = top + outerR;
+  let a0 = -Math.PI / 2;
+  slices.forEach((d, i) => {
+    const a1 = a0 + (d.value / total) * Math.PI * 2;
+    const col = d.color || CHART_COLORS[i % CHART_COLORS.length];
+    const steps = Math.max(2, Math.ceil(((a1 - a0) / Math.PI) * 60));
+    doc.save();
+    doc.moveTo(cx, cy);
+    for (let s = 0; s <= steps; s++) {
+      const a = a0 + (a1 - a0) * (s / steps);
+      doc.lineTo(cx + outerR * Math.cos(a), cy + outerR * Math.sin(a));
+    }
+    doc.closePath().fill(col);
+    doc.restore();
+    a0 = a1;
+  });
+  // Punch the hole (report background is white).
+  doc.circle(cx, cy, innerR).fill('#ffffff');
+  if (chart.center && (chart.center.value || chart.center.label)) {
+    if (chart.center.label) {
+      doc.fillColor(MUTED).font('Helvetica').fontSize(6.5).text(chart.center.label.toUpperCase(), cx - innerR - 6, cy - 11, { width: (innerR + 6) * 2, align: 'center', characterSpacing: 0.3, lineBreak: false });
+    }
+    if (chart.center.value) {
+      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10).text(chart.center.value, cx - innerR - 8, cy - 1, { width: (innerR + 8) * 2, align: 'center', lineBreak: false });
+    }
+  }
+  // Legend (uses the full slice list, including zero-value ones for context).
+  const lx = cx + outerR + 22;
+  const lw = RIGHT - lx;
+  const rows = chart.data || [];
+  let ly = cy - (rows.length * 15) / 2 + 1;
+  if (ly < top) ly = top;
+  rows.forEach((d, i) => {
+    const col = d.color || CHART_COLORS[i % CHART_COLORS.length];
+    doc.save();
+    doc.roundedRect(lx, ly + 1.5, 9, 9, 2).fill(col);
+    doc.restore();
+    doc.fillColor(INK).font('Helvetica').fontSize(9).text(d.label, lx + 15, ly + 1.5, { width: lw - 95, lineBreak: false });
+    if (d.display) doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(9).text(d.display, lx, ly + 1.5, { width: lw, align: 'right', lineBreak: false });
+    ly += 15;
+  });
+}
+
+function drawBars(doc, top, chart) {
+  const data = chart.data || [];
+  const n = Math.max(1, data.length);
+  const maxV = Math.max(...data.map((d) => Math.abs(d.value)), 1);
+  const minV = Math.min(...data.map((d) => Math.abs(d.value)));
+  const barMaxH = 84;
+  const barsTop = top + 12; // headroom for the value labels above each bar
+  const baseY = barsTop + barMaxH;
+  const slot = CONTENT_W / n;
+  const bw = Math.min(88, slot * 0.5);
+  doc.moveTo(LEFT, baseY).lineTo(RIGHT, baseY).lineWidth(0.8).strokeColor('#d9e0ea').stroke();
+  data.forEach((d, i) => {
+    const h = Math.max(2, (Math.abs(d.value) / maxV) * barMaxH);
+    const slotCenter = LEFT + slot * i + slot / 2;
+    const x = slotCenter - bw / 2;
+    const yTop = baseY - h;
+    // Emphasize the lowest bar (usually the best option); others in steel.
+    const col = d.color || (Math.abs(d.value) === minV ? NAVY : STEEL);
+    const r = Math.min(3, h / 2);
+    doc.save();
+    doc.roundedRect(x, yTop, bw, h, r).fill(col);
+    doc.restore();
+    if (d.display) doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(9).text(d.display, slotCenter - slot / 2, yTop - 12, { width: slot, align: 'center', lineBreak: false });
+    doc.fillColor(MUTED).font('Helvetica').fontSize(8.5).text(d.label, slotCenter - slot / 2, baseY + 5, { width: slot, align: 'center', lineBreak: false });
+  });
+}
+
+function drawGauges(doc, top, chart) {
+  const gauges = chart.gauges || [];
+  const scale = Math.max(50, ...gauges.map((g) => Math.max(g.value, g.limit || 0))) * 1.25;
+  const trackH = 11;
+  let gy = top;
+  gauges.forEach((g) => {
+    doc.fillColor(INK).font('Helvetica-Bold').fontSize(9).text(g.label, LEFT, gy, { width: CONTENT_W * 0.7, lineBreak: false });
+    if (g.display) doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(9.5).text(g.display, LEFT, gy, { width: CONTENT_W, align: 'right', lineBreak: false });
+    gy += 14;
+    doc.save();
+    doc.roundedRect(LEFT, gy, CONTENT_W, trackH, 5).fill('#e9eef4');
+    doc.restore();
+    const over = g.limit != null && g.value > g.limit;
+    const fillW = Math.max(3, Math.min(1, g.value / scale) * CONTENT_W);
+    doc.save();
+    doc.roundedRect(LEFT, gy, fillW, trackH, Math.min(5, fillW / 2)).fill(over ? GAUGE_OVER : GAUGE_OK);
+    doc.restore();
+    if (g.limit != null) {
+      const mx = LEFT + Math.min(1, g.limit / scale) * CONTENT_W;
+      doc.moveTo(mx, gy - 2).lineTo(mx, gy + trackH + 2).lineWidth(1.2).strokeColor(NAVY).stroke();
+    }
+    gy += trackH + 3;
+    if (g.limitLabel) {
+      doc.fillColor(MUTED).font('Helvetica').fontSize(7.5).text(g.limitLabel, LEFT, gy, { width: CONTENT_W, lineBreak: false });
+    }
+    gy += 12;
+  });
 }
 
 export default router;
