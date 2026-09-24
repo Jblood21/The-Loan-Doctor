@@ -100,6 +100,26 @@ function PresetChips({ presets, onPick }: { presets: string[]; onPick: (v: strin
   );
 }
 
+/** Equal Housing Lender compliance mark (house + equals sign) as inline SVG so it stays
+ *  crisp at any size. `house` fills the house; `cut` draws the equals sign as a cut-out. */
+function EqualHousingMark({ house, cut }: { house: string; cut: string }) {
+  return (
+    <div className="flex flex-shrink-0 flex-col items-center" style={{ width: 62 }}>
+      <svg width="24" height="23" viewBox="0 0 40 38" role="img" aria-label="Equal Housing Lender">
+        <polygon points="20,2 2,15 38,15" fill={house} />
+        <rect x="7" y="15" width="26" height="20" fill={house} />
+        <rect x="12" y="20" width="16" height="3.4" fill={cut} />
+        <rect x="12" y="27" width="16" height="3.4" fill={cut} />
+      </svg>
+      <div className="mt-0.5 text-center font-semibold leading-[1.1]" style={{ color: house, fontSize: 6 }}>
+        EQUAL HOUSING
+        <br />
+        LENDER
+      </div>
+    </div>
+  );
+}
+
 export default function PreApproval() {
   // Pre-Approval draws from the same saved bank of scenarios as Compare.
   const { bank } = useScenarios();
@@ -227,7 +247,7 @@ export default function PreApproval() {
   const [showSubjectAddress, setShowSubjectAddress] = useState(true);
   const [expDays, setExpDays] = useState('90');
   // Borrower credit score woven into the letter's credit sentence. The adjective
-  // (good/great/fantastic) always adapts; the number itself only prints when the
+  // (acceptable/good/excellent/exceptional) always adapts; the number itself only prints when the
   // "Show score on letter" toggle is on. Left blank → falls back to the scenario band.
   const [creditScore, setCreditScore] = useState('');
   const [showCreditScore, setShowCreditScore] = useState(false);
@@ -1104,7 +1124,7 @@ export default function PreApproval() {
                 checked={showCreditScore}
                 onChange={setShowCreditScore}
                 label="Show score on letter"
-                hint="Off keeps just the description (good / great / fantastic); on also prints the FICO number."
+                hint="Off keeps just the description (acceptable / good / excellent / exceptional); on also prints the number for scores above 680."
               />
             </div>
           </div>
@@ -1369,6 +1389,9 @@ export default function PreApproval() {
                   <div className="text-[11.5px] leading-[1.55]" style={{ color: GREEN }}>
                     {contactLines}
                   </div>
+                  <div className="mt-2 flex justify-center">
+                    <EqualHousingMark house={GREEN} cut="#ffffff" />
+                  </div>
                 </div>
               ) : (
                 <div className="mt-auto" style={{ background: GREEN, borderTop: `4px solid ${GOLD}` }}>
@@ -1376,7 +1399,8 @@ export default function PreApproval() {
                     {showHeadshot && (
                       <img src={settings.headshotDataUrl || '/brand/officer-headshot.png'} alt={settings.name} className="h-[62px] w-[62px] flex-shrink-0 rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
                     )}
-                    <div className="text-[11.5px] leading-[1.5] text-white">{contactLines}</div>
+                    <div className="flex-1 text-[11.5px] leading-[1.5] text-white">{contactLines}</div>
+                    <EqualHousingMark house="#ffffff" cut={GREEN} />
                   </div>
                 </div>
               )}
