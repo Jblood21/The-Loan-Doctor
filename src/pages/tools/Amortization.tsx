@@ -61,6 +61,15 @@ export default function Amortization({ open, onClose }: CalcProps) {
                   { label: 'Total Paid', value: fmt(totalPaid) },
                   { label: 'Payoff', value: `${Math.floor(schedule.length / 12)} yr ${schedule.length % 12} mo` },
                 ],
+                chart: {
+                  type: 'donut',
+                  title: 'Principal vs. interest over the loan',
+                  center: { label: 'Total paid', value: fmt(totalPaid) },
+                  data: [
+                    { label: 'Principal (loan)', value: loan, display: fmt(loan) },
+                    { label: 'Interest', value: totalInterest, display: fmt(totalInterest) },
+                  ],
+                },
               }}
             >
               <Headline label="Monthly Principal & Interest" value={fmt2(pi)} sub={`${rate}% · ${years} yr`} />

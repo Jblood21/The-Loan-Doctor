@@ -3,7 +3,7 @@ import { Modal } from '@/components/ui/Modal';
 import { permanentBuydown, temporaryBuydown, TEMP_BUYDOWN_STRUCTURES } from '@/lib/finance';
 import { fmt, fmt2, pct } from '@/lib/format';
 import { CalcField, CalcSelect, TERM_OPTIONS, type CalcProps } from './_shared';
-import { useReport } from '@/context/ReportContext';
+import { useReport, type ReportSection } from '@/context/ReportContext';
 
 const STRUCTURE_OPTIONS = Object.entries(TEMP_BUYDOWN_STRUCTURES).map(([value, s]) => ({
   value,
@@ -89,7 +89,7 @@ export default function Buydown({ open, onClose }: CalcProps) {
 
   const { has, add, remove, sync } = useReport();
   const inReport = has('buydown');
-  const report = {
+  const report: ReportSection = {
     key: 'buydown',
     title: 'Rate Buydown',
     subtitle: `Recommendation: ${rec.pick}`,
@@ -103,6 +103,15 @@ export default function Buydown({ open, onClose }: CalcProps) {
       { label: "Years You'll Keep the Loan", value: String(holdYears) },
     ],
     rows: [],
+    chart: {
+      type: 'bars',
+      title: 'Year-1 monthly P&I',
+      data: [
+        { label: 'No Buydown', value: temp.noteMonthly, display: fmt(temp.noteMonthly) },
+        { label: 'Temporary', value: temp.firstYearMonthly, display: fmt(temp.firstYearMonthly) },
+        { label: 'Permanent', value: perm.buydownMonthly, display: fmt(perm.buydownMonthly) },
+      ],
+    },
     // Full 3-column comparison — No Buydown / Temporary / Permanent — like the tool.
     table: {
       columns: cols.map((c) => c.label),
