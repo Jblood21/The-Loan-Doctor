@@ -32,7 +32,7 @@ import { rankBorrowers } from '@/lib/borrowerSearch';
 import { parseMismo } from '@/lib/mismo';
 import type { MismoResult } from '@/lib/mismo';
 import { groupByBorrower, diffRecords } from '@/lib/preApprovalHistory';
-import type { PreApprovalRecord, PreApprovalState, Scenario } from '@/types';
+import type { AgentContact, PreApprovalRecord, PreApprovalState, Scenario } from '@/types';
 import { losBorrowerToScenario } from '@/lib/losBorrower';
 
 // Summit Home Loans brand palette (navy + steel accent).
@@ -198,7 +198,7 @@ export default function PreApproval() {
   // Saved agent contacts, and the one selected to co-brand this letter. Defaults to the
   // first saved agent (or the legacy single agent) so existing behavior is preserved.
   const agentContacts = settings.agents ?? [];
-  const legacyAgent = settings.agentName?.trim()
+  const legacyAgent: AgentContact | null = settings.agentName?.trim()
     ? { id: '__legacy__', name: settings.agentName, brokerage: settings.brokerage, phone: settings.agentPhone }
     : null;
   const allAgents = agentContacts.length ? agentContacts : legacyAgent ? [legacyAgent] : [];
@@ -557,6 +557,10 @@ export default function PreApproval() {
     setAssignMsg(null);
     setAssignApprovedPrice(String(Math.round(srcScenario.homePrice || 0)));
     setAssignAllowPrice(false);
+    // Tie the portal assignment to the agent already acknowledged on the letter, so the
+    // agent is chosen once (in Letter options) instead of re-typed here. If that agent
+    // has a saved email, it pre-fills; otherwise the field stays open to type one in.
+    if (includeAgent && selectedAgent?.email) setAssignEmail(selectedAgent.email);
     setAssignOpen(true);
   };
 
@@ -1390,6 +1394,30 @@ export default function PreApproval() {
             <p className="mb-4 text-[12.5px] leading-[1.55] text-text-muted">
               The agent signs in at <span className="font-semibold text-text-soft">{`${window.location.origin}/agent`}</span> and can update the property address (and the price, if you allow it). The loan terms and branding stay locked.
             </p>
+            {includeAgent && selectedAgent && (
+              <div className="mb-4 rounded-[10px] border border-border-input bg-input/60 px-3.5 py-2.5 text-[12.5px] leading-[1.55]">
+                <div>
+                  <span className="font-semibold text-text-soft">{selectedAgent.name}</span>
+                  {selectedAgent.brokerage ? <span className="text-text-muted"> · {selectedAgent.brokerage}</span> : null}
+                </div>
+                <div className="mt-0.5 text-[11.5px] text-text-muted">
+                  {selectedAgent.email ? (
+                    <>This is the agent acknowledged on the letter — their email is filled in below.</>
+                  ) : (
+                    <>
+                      Acknowledged on the letter. Add their email in{' '}
+                      <button
+                        onClick={() => { setAssignOpen(false); openSettings(); }}
+                        className="cursor-pointer border-none bg-transparent p-0 font-semibold text-brand-blue-light underline"
+                      >
+                        Settings
+                      </button>{' '}
+                      to auto-fill it here next time.
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
             <Label>Agent email</Label>
             <TextField type="email" className="mb-4" placeholder="agent@brokerage.com" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} />
             <div className="mb-4">

@@ -166,14 +166,19 @@ type AgentTab = 'preapprovals' | 'tools' | 'marketing';
 function AgentDashboard({ agent, onSignOut, onAgentUpdate }: { agent: AgentUser; onSignOut: () => void; onAgentUpdate: (a: AgentUser) => void }) {
   const [tab, setTab] = useState<AgentTab>('preapprovals');
   const [profileOpen, setProfileOpen] = useState(false);
-  const navBtn = (key: AgentTab, label: string) => (
+  const navBtn = (key: AgentTab, label: string, soon = false) => (
     <button
       onClick={() => setTab(key)}
-      className={`rounded-[9px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+      className={`flex items-center gap-1.5 rounded-[9px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
         tab === key ? 'bg-[rgba(47,128,237,0.14)] text-brand-blue-nav' : 'text-text-soft hover:text-text-primary'
       }`}
     >
       {label}
+      {soon && (
+        <span className="rounded-full bg-[rgba(140,165,195,0.16)] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.04em] text-text-dim">
+          Soon
+        </span>
+      )}
     </button>
   );
 
@@ -185,7 +190,7 @@ function AgentDashboard({ agent, onSignOut, onAgentUpdate }: { agent: AgentUser;
           <nav className="flex items-center gap-1">
             {navBtn('preapprovals', 'Pre-Approvals')}
             {navBtn('tools', 'Tools')}
-            {navBtn('marketing', 'Marketing')}
+            {navBtn('marketing', 'Marketing', true)}
           </nav>
         </div>
         <div className="flex items-center gap-2">
@@ -538,7 +543,9 @@ function ProfileModal({ open, onClose, agent, onSaved }: { open: boolean; onClos
   );
 }
 
-/** Marketing tab — buyer-facing materials the agent can hand out. */
+/** Marketing tab — buyer-facing materials the agent can hand out.
+ *  Shipping soon: the tools below are shown as a preview but covered by a
+ *  "Coming soon" overlay so they can't be used yet. */
 function MarketingView() {
   return (
     <>
@@ -546,9 +553,29 @@ function MarketingView() {
         <h1 className="m-0 font-display text-[22px] font-semibold tracking-[-0.5px] text-text-heading">Marketing</h1>
         <p className="mt-1 text-[13.5px] text-text-muted">Create buyer-facing materials, co-branded with your profile.</p>
       </div>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <OpenHouseFlyer />
-        <BuyerAffordability />
+
+      <div className="relative overflow-hidden rounded-2xl">
+        {/* Preview of what's coming — dimmed, blurred, and non-interactive. */}
+        <div aria-hidden className="pointer-events-none select-none opacity-60 blur-[2px]">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <OpenHouseFlyer />
+            <BuyerAffordability />
+          </div>
+        </div>
+
+        {/* Coming-soon cover */}
+        <div className="absolute inset-0 flex items-center justify-center bg-app/40 backdrop-blur-[1px]">
+          <div className="mx-4 max-w-[360px] rounded-2xl border border-border bg-card/95 px-6 py-7 text-center shadow-letter">
+            <span className="inline-block rounded-full bg-[rgba(47,128,237,0.14)] px-3 py-1 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-brand-blue-light">
+              Coming soon
+            </span>
+            <div className="mt-3 text-[16px] font-semibold text-text-heading">Marketing tools are on the way</div>
+            <p className="mt-1.5 text-[13px] leading-[1.6] text-text-muted">
+              Open-house payment flyers and shareable buyer-affordability pages, co-branded with your profile. We're
+              putting the finishing touches on them — check back shortly.
+            </p>
+          </div>
+        </div>
       </div>
     </>
   );
