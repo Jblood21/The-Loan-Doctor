@@ -673,18 +673,19 @@ export default function PreApproval() {
           {letter.officerName}
         </div>
         <div className="text-[12.5px] text-[#5b6b7b]">{letter.officerTitle}</div>
+        {settings.nmls && <div className="text-[12px] text-[#5b6b7b]">NMLS# {settings.nmls}</div>}
       </div>
     </div>
   );
 
   const contactLines: ReactNode = (
     <>
-      <div className="font-semibold">
-        {settings.phone}
+      <div className="font-semibold">{andify(settings.lenderName)}</div>
+      <div>{andify(settings.lenderAddress)}</div>
+      <div>
+        {settings.lenderPhone || settings.phone}
         {settings.email ? `   ·   ${settings.email}` : ''}
       </div>
-      <div>{andify(settings.lenderAddress)}</div>
-      <div>{andify(settings.lenderName)}</div>
       <div style={{ color: GOLD }}>
         NMLS# {settings.lenderNmls || settings.nmls}
         {settings.website ? `   ·   ${settings.website}` : ''}

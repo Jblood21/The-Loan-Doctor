@@ -57,9 +57,9 @@ export function drawLetter(doc, d) {
         doc.fillColor(color).font(font).fontSize(size).text(text, LEFT, ty, { width: RIGHT - LEFT, align: 'center', lineBreak: false });
         ty += size + 3;
       };
-      center(phoneEmail, GREEN, 'Helvetica-Bold', 11);
+      if (lender.name) center(lender.name, GREEN, 'Helvetica-Bold', 11);
       if (lender.address) center(lender.address, '#3a4a3a');
-      if (lender.name) center(lender.name, '#3a4a3a');
+      if (phoneEmail) center(phoneEmail, '#3a4a3a');
       center(nmlsLine, GOLD, 'Helvetica-Bold');
     } else {
       const bandY = PAGE_H - FOOTER_H;
@@ -86,9 +86,9 @@ export function drawLetter(doc, d) {
         doc.fillColor(color).font(font).fontSize(size).text(text, tx, ty, { width: PAGE_W - tx - 24, lineBreak: false });
         ty += size + 5;
       };
-      line(phoneEmail, '#ffffff', 'Helvetica-Bold', 11);
+      if (lender.name) line(lender.name, '#ffffff', 'Helvetica-Bold', 11);
       if (lender.address) line(lender.address, '#dfeae0');
-      if (lender.name) line(lender.name, '#dfeae0');
+      if (phoneEmail) line(phoneEmail, '#dfeae0');
       line(nmlsLine, GOLD, 'Helvetica-Bold', 11);
     }
 
@@ -223,6 +223,13 @@ export function drawLetter(doc, d) {
   block(measure(officer.title || 'Mortgage Loan Officer', 'Helvetica', 11.5), (y) =>
     doc.fillColor('#5b6b7b').font('Helvetica').fontSize(11.5).text(officer.title || 'Mortgage Loan Officer', LEFT, y),
   );
+  // NMLS number under the job title.
+  if (officer.nmls) {
+    gap(1);
+    block(measure(`NMLS# ${officer.nmls}`, 'Helvetica', 11), (y) =>
+      doc.fillColor('#5b6b7b').font('Helvetica').fontSize(11).text(`NMLS# ${officer.nmls}`, LEFT, y),
+    );
+  }
 
   // Decide single-page up front: if the whole body fits, draw it on one page and never
   // break (measurement drift on the last line must not spill a fitting letter onto page 2).
