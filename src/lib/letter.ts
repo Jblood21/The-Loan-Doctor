@@ -53,6 +53,8 @@ export const PRONOUN_OPTIONS: { value: PronounChoice; label: string }[] = [
 ];
 
 interface PronounSet {
+  /** Lowercase subject pronoun for mid-sentence use ("they/he/she"). */
+  subj: string;
   subjCap: string;
   poss: string;
   have: string;
@@ -60,19 +62,20 @@ interface PronounSet {
 
 /** Two borrowers always read as plural "they". */
 function pronounSet(choice: PronounChoice, twoBorrowers: boolean): PronounSet {
-  if (twoBorrowers) return { subjCap: 'They', poss: 'their', have: 'have' };
-  if (choice === 'he') return { subjCap: 'He', poss: 'his', have: 'has' };
-  if (choice === 'she') return { subjCap: 'She', poss: 'her', have: 'has' };
-  return { subjCap: 'They', poss: 'their', have: 'have' };
+  if (twoBorrowers) return { subj: 'they', subjCap: 'They', poss: 'their', have: 'have' };
+  if (choice === 'he') return { subj: 'he', subjCap: 'He', poss: 'his', have: 'has' };
+  if (choice === 'she') return { subj: 'she', subjCap: 'She', poss: 'her', have: 'has' };
+  return { subj: 'they', subjCap: 'They', poss: 'their', have: 'have' };
 }
 
-/** Credit descriptor woven into the letter, plus an optional printed number. */
-export interface CreditPhrase {
-  /** Adjective TOKEN placed immediately before the credit noun — already includes its
-   *  trailing space when present (e.g. "great "), or "" for no adjective. */
+/** Credit descriptor woven into the letter, plus an optional inline score clause. */
+interface CreditClause {
+  /** Adjective TOKEN placed immediately before "credit history" — already includes its
+   *  trailing space when present (e.g. "excellent "), or "" for no adjective. */
   adjective: string;
-  /** Appended after the credit-score noun when the number is shown, else "". */
-  display: string;
+  /** Inline " and credit score(s) of NNN" appended after the credit-history phrase when
+   *  the number is shown, else "". */
+  scoreClause: string;
 }
 
 /** Replace ampersands with the word "and" — spelled out reads cleaner in a formal
@@ -81,14 +84,17 @@ export function andify(s: string): string {
   return (s || '').replace(/\s*&\s*/g, ' and ').replace(/\s{2,}/g, ' ').trim();
 }
 
-/** Map a FICO score to the letter adjective. Bands: <740 good, 740–799 great, 800+
- *  fantastic. Falls back to "strong" (the prior wording) when no score is provided. */
+/** Map a FICO score to the letter adjective. Bands: ≤680 acceptable, 681–700 good,
+ *  701–740 excellent, 741+ exceptional. Falls back to "strong" (the prior wording) when
+ *  no score is provided. Scores in the "acceptable" band are described but never printed
+ *  (see creditClauseFrom). */
 export function creditAdjective(score: number | string | undefined | null): string {
   const n = typeof score === 'number' ? score : parseInt(String(score ?? ''), 10);
   if (!Number.isFinite(n) || n <= 0) return 'strong';
-  if (n >= 800) return 'fantastic';
-  if (n >= 740) return 'great';
-  return 'good';
+  if (n >= 741) return 'exceptional';
+  if (n >= 701) return 'excellent';
+  if (n >= 681) return 'good';
+  return 'acceptable';
 }
 
 /** Per-kind wording. Drives the opening verb, the two supporting paragraphs, and the
@@ -100,13 +106,12 @@ interface KindWording {
   nounLower: string;
   /** Opening verb phrase: "${name} is ${verb} for the purchase of…". */
   verb: string;
-  /** Second paragraph — what the decision rests on. `credit` supplies the score
-   *  adjective (good/great/fantastic, or "strong" when no score) and an optional
-   *  printed FICO number. */
-  basis: (pr: PronounSet, scores: string, credit: CreditPhrase) => string;
+  /** Second paragraph — what the decision rests on. `credit` supplies the adjective and
+   *  the optional inline score clause; `two` selects singular/plural agreement. */
+  basis: (name: string, pr: PronounSet, credit: CreditClause, two: boolean) => string;
   /** Third paragraph — readiness / remaining steps. Drops the appraisal from the
    *  remaining items when the borrower has an appraisal waiver. */
-  readiness: (name: string, appraisalWaiver: boolean) => string;
+  readiness: (name: string, pr: PronounSet, appraisalWaiver: boolean) => string;
   /** Tail of the validity sentence ("… and is <validityTail>"), so each level's
    *  remaining conditions match what has actually been done. Omits the appraisal
    *  condition when an appraisal waiver applies. */
@@ -114,53 +119,52 @@ interface KindWording {
 }
 
 const KIND_WORDING: Record<LetterKind, KindWording> = {
-  // Standard pre-approval: credit reviewed and income/assets documented, but the file
-  // has NOT yet been submitted to an underwriter — full underwriting is still ahead.
+  // Standard pre-approval: credit reviewed and income/assets documented; the file still
+  // goes to a final underwriter review before closing.
   preapproval: {
     noun: 'Pre-Approval',
     nounLower: 'pre-approval',
-    verb: 'pre-approved',
-    basis: (pr, scores, credit) =>
-      `This pre-approval is supported by ${pr.poss} ${credit.adjective}credit history and ${scores}${credit.display}. ${pr.subjCap} ${pr.have} provided income and asset documentation verifying sufficient income and assets needed for this transaction.`,
-    readiness: (name, waived) =>
+    verb: 'income and credit pre-approved',
+    basis: (name, pr, credit, two) =>
+      `${name}'s pre-approval is supported by ${pr.poss} ${credit.adjective}credit history${credit.scoreClause}. In addition, ${name} ${two ? 'have' : 'has'} provided all necessary documents to verify ${pr.poss} income and assets needed for this transaction.`,
+    readiness: (name, _pr, waived) =>
       waived
-        ? `Based on this, ${name} can close in a timely manner once the file is submitted to underwriting, along with a fully executed sales contract and an acceptable title insurance commitment.`
-        : `Based on this, ${name} can close in a timely manner once the file is submitted to underwriting, including a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+        ? `Based on this, ${name} can close in a timely manner pending final underwriter review, including a fully executed sales contract and an acceptable title insurance commitment.`
+        : `Based on this, ${name} can close in a timely manner pending final underwriter review including a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
     validityTail: (waived) =>
       waived
         ? 'subject to clear title and final underwriting approval.'
         : 'subject to a satisfactory appraisal, clear title, and final underwriting approval.',
   },
-  // Pre-underwritten: the file HAS been reviewed and approved by a mortgage underwriter.
-  // What remains are the property-side items and the underwriter's stated conditions —
-  // not another underwriting pass, so the wording must not imply one.
+  // Pre-underwritten: the file HAS been reviewed and verified by a mortgage underwriter;
+  // what remains is a final underwriter review plus the property-side items.
   preunderwritten: {
-    noun: 'Underwritten Pre-Approval',
-    nounLower: 'underwritten pre-approval',
-    verb: 'fully underwritten and conditionally approved',
-    basis: (pr, scores, credit) =>
-      `This approval reflects a complete underwriting review of ${pr.poss} credit, income, and asset documentation by a mortgage underwriter, who has verified ${pr.poss} ${credit.adjective}${scores}${credit.display} and ability to repay. ${pr.subjCap} ${pr.have} met the requirements for this financing, so the approval is subject only to the property-related items and standard closing conditions — not to a further review of income, assets, or credit.`,
-    readiness: (name, waived) =>
+    noun: 'Pre-Underwritten Approval',
+    nounLower: 'pre-underwritten pre-approval',
+    verb: 'fully pre-underwritten and pre-approved',
+    basis: (name, pr, credit, two) =>
+      `${name}'s pre-underwritten pre-approval is supported by ${pr.poss} ${credit.adjective}credit history${credit.scoreClause}. In addition, ${name} ${two ? 'have' : 'has'} provided all necessary documents to verify ${pr.poss} income and assets needed for this transaction, which have been reviewed and verified by a mortgage underwriter.`,
+    readiness: (name, pr, waived) =>
       waived
-        ? `Because the file has already been underwritten, ${name} can close quickly — the remaining items are a fully executed sales contract and an acceptable title insurance commitment.`
-        : `Because the file has already been underwritten, ${name} can close quickly — the remaining items are a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+        ? `Because ${name}'s file has been pre-underwritten, ${pr.subj} can close in a very timely manner pending a final underwriter review of ${pr.poss} file, including a fully executed sales contract and an acceptable title insurance commitment.`
+        : `Because ${name}'s file has been pre-underwritten, ${pr.subj} can close in a very timely manner pending a final underwriter review of ${pr.poss} file including a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
     validityTail: (waived) =>
       waived
         ? 'subject to clear title and satisfaction of the remaining underwriting conditions.'
         : 'subject to a satisfactory appraisal, clear title, and satisfaction of the remaining underwriting conditions.',
   },
-  // Pre-qualified: based on information the borrower stated but that has NOT been
-  // verified, and the file has not been underwritten. Everything is still ahead.
+  // Pre-qualified: based on a credit review plus income/asset figures the borrower stated
+  // but that have NOT been verified with documentation.
   prequalified: {
     noun: 'Pre-Qualification',
-    nounLower: 'pre-qualification',
-    verb: 'pre-qualified',
-    basis: (pr, scores, credit) =>
-      `This pre-qualification is based on ${pr.poss} stated income, assets, and ${credit.adjective}${scores}${credit.display}, which have not yet been verified with documentation or reviewed by an underwriter.`,
-    readiness: (name, waived) =>
+    nounLower: 'credit pre-qualification',
+    verb: 'credit pre-qualified',
+    basis: (name, pr, credit, two) =>
+      `${name}'s credit pre-qualification is based on a review of ${pr.poss} ${credit.adjective}credit history${credit.scoreClause} and income and asset figures provided by the ${two ? 'buyers' : 'buyer'}.`,
+    readiness: (name, _pr, waived) =>
       waived
-        ? `Based on the information provided, this financing looks like a strong fit for ${name}. Moving to a full pre-approval requires verification of income and assets and an underwriting review, followed by a fully executed sales contract and an acceptable title insurance commitment.`
-        : `Based on the information provided, this financing looks like a strong fit for ${name}. Moving to a full pre-approval requires verification of income and assets and an underwriting review, followed by a satisfactory appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
+        ? `Based on the information provided, ${name} can close in a timely manner pending receipt and review of income and asset documentation to verify all income and assets needed for the purchase, as well as a fully executed sales contract and an acceptable title insurance commitment.`
+        : `Based on the information provided, ${name} can close in a timely manner pending receipt and review of income and asset documentation to verify all income and assets needed for the purchase, as well as a compliant appraisal, a fully executed sales contract, and an acceptable title insurance commitment.`,
     validityTail: (waived) =>
       waived
         ? "subject to verification of the borrower's income, assets, and credit, clear title, and full underwriting approval."
@@ -208,18 +212,26 @@ interface BodyOpts {
   appraisalWaiver?: boolean;
 }
 
-/** Build the credit descriptor + optional printed number from the body options. The
- *  adjective token carries its own trailing space so it can be dropped in front of the
- *  credit noun. With a score it's the FICO band word (good/great/fantastic); without one
- *  it falls back to the kind's prior wording — "strong" for a pre-approval, none for the
- *  underwritten and pre-qualified letters (which never described credit as "strong"). */
-function creditPhraseFrom(opts: BodyOpts): CreditPhrase {
+/** Build the credit adjective + optional inline score clause from the body options. The
+ *  adjective token carries its own trailing space so it can be dropped in front of
+ *  "credit history". With a score it's the band word (acceptable/good/excellent/
+ *  exceptional); without one it falls back to "strong" for a pre-approval, none for the
+ *  underwritten and pre-qualified letters. The score number is woven in only when the
+ *  "show score" toggle is on AND the score is above the "acceptable" band (≤680 scores
+ *  are described but never printed). */
+function creditClauseFrom(opts: BodyOpts, two: boolean): CreditClause {
   const raw = opts.creditScore == null ? '' : String(opts.creditScore).trim();
   const kind = opts.kind || 'preapproval';
-  const word = raw ? creditAdjective(raw) : kind === 'preapproval' ? 'strong' : '';
+  const n = parseInt(raw, 10);
+  const hasScore = raw !== '' && Number.isFinite(n) && n > 0;
+  const word = hasScore ? creditAdjective(n) : kind === 'preapproval' ? 'strong' : '';
   const adjective = word ? `${word} ` : '';
-  const display = raw && opts.showCreditScore ? ` (FICO ${raw})` : '';
-  return { adjective, display };
+  // Scores of 680 or below (the "acceptable" band) are described but never printed.
+  const acceptable = hasScore && n <= 680;
+  const showNumber = hasScore && !!opts.showCreditScore && !acceptable;
+  const noun = two ? 'credit scores' : 'credit score';
+  const scoreClause = showNumber ? ` and ${noun} of ${n}` : '';
+  return { adjective, scoreClause };
 }
 
 export function resolveTemplate(id: string, scenario: Scenario, opts: BodyOpts = {}): ResolvedTemplate {
@@ -238,8 +250,8 @@ function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: stri
   const price = fmt(scenario.homePrice || 0);
   const loan = fmt(calc.baseLoan);
   const pr = pronounSet(opts.pronoun || 'they', two);
-  const scores = two ? 'credit scores' : 'credit score';
   const w = KIND_WORDING[opts.kind || 'preapproval'] || KIND_WORDING.preapproval;
+  const credit = creditClauseFrom(opts, two);
 
   // Mid-sentence the financing type reads as a common noun ("conventional financing"),
   // so lowercase the first letter — but leave acronyms (FHA, VA, USDA) fully uppercase.
@@ -251,9 +263,9 @@ function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: stri
   const p1 = isRefi
     ? `${name} ${isAre} ${w.verb} to refinance the property located at ${property} with a loan amount of ${loan} using ${fin} financing${tail}.${waiverSentence}`
     : `${name} ${isAre} ${w.verb} for the purchase of the home located at ${property} at a purchase price of ${price} using ${fin} financing${tail}.${waiverSentence}`;
-  const p2 = w.basis(pr, scores, creditPhraseFrom(opts));
-  const p3 = w.readiness(name, waived);
-  const p4 = `Please contact me with any questions regarding this ${w.nounLower}.`;
+  const p2 = w.basis(name, pr, credit, two);
+  const p3 = w.readiness(name, pr, waived);
+  const p4 = `Please contact me with any questions regarding ${name}'s income and credit pre-approval.`;
   return [p1, p2, p3, p4];
 }
 
