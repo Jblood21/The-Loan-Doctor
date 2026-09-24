@@ -20,6 +20,20 @@ export const FOOTER_H = 104;
  *     title, date, reLine, subjectAddress, salutation, paragraphs, terms,
  *     validity, closing, officer, lender, agentAck }
  */
+/** Draw the Equal Housing Lender mark (a house with an equals sign) at (x, y), scaled to
+ *  width `w`. `house` fills the house; `cut` draws the equals sign as a cut-out. Returns
+ *  the symbol's height so callers can place a caption beneath it. */
+function drawEqualHousing(doc, x, y, w, house, cut) {
+  const u = w / 40;
+  doc.save();
+  doc.moveTo(x + 20 * u, y + 2 * u).lineTo(x + 2 * u, y + 15 * u).lineTo(x + 38 * u, y + 15 * u).closePath().fill(house);
+  doc.rect(x + 7 * u, y + 15 * u, 26 * u, 20 * u).fill(house);
+  doc.rect(x + 12 * u, y + 20 * u, 16 * u, 3.4 * u).fill(cut);
+  doc.rect(x + 12 * u, y + 27 * u, 16 * u, 3.4 * u).fill(cut);
+  doc.restore();
+  return 35 * u;
+}
+
 export function drawLetter(doc, d) {
   const { classic, showHeadshot, headshotSource, logoSource, signatureBuf } = d;
   const lender = d.lender || {};
@@ -61,6 +75,11 @@ export function drawLetter(doc, d) {
       if (lender.address) center(lender.address, '#3a4a3a');
       if (phoneEmail) center(phoneEmail, '#3a4a3a');
       center(nmlsLine, GOLD, 'Helvetica-Bold');
+      // Equal Housing Lender mark, right of the centered contact block.
+      const ehX = RIGHT - 28;
+      const ehY = top + 12;
+      const ehH = drawEqualHousing(doc, ehX, ehY, 22, GREEN, '#ffffff');
+      doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(5.2).text('EQUAL HOUSING\nLENDER', ehX - 22, ehY + ehH + 2, { width: 66, align: 'center', lineGap: 0.5 });
     } else {
       const bandY = PAGE_H - FOOTER_H;
       doc.rect(0, bandY, PAGE_W, FOOTER_H).fill(GREEN);
@@ -90,6 +109,11 @@ export function drawLetter(doc, d) {
       if (lender.address) line(lender.address, '#dfeae0');
       if (phoneEmail) line(phoneEmail, '#dfeae0');
       line(nmlsLine, GOLD, 'Helvetica-Bold', 11);
+      // Equal Housing Lender mark at the right of the navy band (white house, navy cut-out).
+      const ehX = RIGHT - 26;
+      const ehY = bandY + 26;
+      const ehH = drawEqualHousing(doc, ehX, ehY, 22, '#ffffff', GREEN);
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(5.2).text('EQUAL HOUSING\nLENDER', ehX - 22, ehY + ehH + 2, { width: 66, align: 'center', lineGap: 0.5 });
     }
 
     doc.restore();
