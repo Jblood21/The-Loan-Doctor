@@ -9,11 +9,17 @@ const NAVY = '#13355f';
 const STEEL = '#5f7fa8';
 const INK = '#1b2733';
 const MUTED = '#5b6b7b';
+// Surface tints used for cards, bands, and zebra rows.
+const HERO_BG = '#eef3fb'; // headline KPI card
+const BAND_BG = '#e9eff7'; // section header band
+const PANEL_BG = '#f6f8fb'; // assumptions grid
+const ZEBRA_BG = '#f4f7fb'; // alternating table rows
+const HAIRLINE = '#e7ecf2'; // row dividers
 const LEFT = 56;
 const RIGHT = 556;
 const PAGE_W = 612;
 const PAGE_H = 792;
-const BOTTOM = 726; // content stops here; footer sits below
+const BOTTOM = 720; // content stops here; footer sits below
 const CONT_TOP = 60; // top of continuation pages
 
 // PDFKit's built-in fonts use WinAnsi encoding, which lacks a few symbols the
@@ -129,13 +135,16 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
     .filter(Boolean)
     .join('   ·   ');
 
+  let pageNo = 1;
   function drawFooter() {
     const savedY = doc.y;
     const savedBottom = doc.page.margins.bottom;
     doc.page.margins.bottom = 0; // footer sits in the bottom margin; don't let it paginate
     doc.save();
-    const top = PAGE_H - 46;
+    const top = PAGE_H - 52;
+    // Two-tone rule to match the header accent.
     doc.moveTo(LEFT, top).lineTo(RIGHT, top).lineWidth(1).strokeColor('#d4dae3').stroke();
+    doc.moveTo(LEFT, top).lineTo(LEFT + 70, top).lineWidth(2).strokeColor(NAVY).stroke();
     let ty = top + 8;
     const center = (text, color, font, size) => {
       if (!text) return;
@@ -144,6 +153,7 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
     };
     center(phoneEmail, NAVY, 'Helvetica-Bold', 9.5);
     center(nmlsLine, STEEL, 'Helvetica', 8.5);
+    center(`Page ${pageNo}`, '#9aa7b5', 'Helvetica', 8);
     doc.restore();
     doc.page.margins.bottom = savedBottom;
     doc.y = savedY;
@@ -162,9 +172,10 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
   // Date sits top-right, aligned with the logo.
   doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(dateStr, LEFT, y + 2, { width: contentW, align: 'right', lineBreak: false });
 
-  const titleY = y + (logoBuf ? 50 : 6);
-  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(20).text('Loan Analysis Report', LEFT, titleY, { lineBreak: false });
-  y = titleY + 26;
+  const titleY = y + (logoBuf ? 50 : 4);
+  doc.fillColor(STEEL).font('Helvetica-Bold').fontSize(8.5).text('MORTGAGE ANALYSIS', LEFT, titleY, { characterSpacing: 1.4, lineBreak: false });
+  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(21).text('Loan Analysis Report', LEFT, titleY + 12, { lineBreak: false });
+  y = titleY + 12 + 28;
 
   const by = [officer.name, officer.title].filter(Boolean).join(', ');
   const primary = preparedFor ? `Prepared for ${preparedFor}` : by || lender.name || '';
@@ -177,12 +188,15 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
     doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(secondary, LEFT, y, { width: contentW, lineBreak: false });
     y += 15;
   }
-  y += 4;
-  doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(1.5).strokeColor(NAVY).stroke();
-  y += 22;
+  y += 5;
+  // Two-tone divider: a full light rule with a short navy accent on the left.
+  doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(1.5).strokeColor('#d4dae3').stroke();
+  doc.moveTo(LEFT, y).lineTo(LEFT + 96, y).lineWidth(2.5).strokeColor(NAVY).stroke();
+  y += 24;
 
   drawFooter();
   doc.on('pageAdded', () => {
+    pageNo += 1;
     y = CONT_TOP;
     drawFooter();
   });
@@ -192,37 +206,45 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
   };
 
   sections.forEach((sec, idx) => {
-    if (idx > 0) y += 6;
-    // --- Section header: light navy-tint band with navy title ---
-    ensure(28 + (sec.headline ? 48 : 0));
+    if (idx > 0) y += 12;
+    // --- Section header: navy-tint band with a rounded left accent + navy title ---
+    const bandH = 26;
+    // Keep the band with at least the first block below it on the same page.
+    ensure(bandH + 20 + (sec.headline ? 56 : 0));
     doc.save();
-    doc.roundedRect(LEFT, y, contentW, 25, 4).fill('#eef2f8');
-    doc.rect(LEFT, y, 3.5, 25).fill(NAVY); // left accent
+    doc.roundedRect(LEFT, y, contentW, bandH, 5).fill(BAND_BG);
+    doc.roundedRect(LEFT, y + 4, 3.5, bandH - 8, 1.75).fill(NAVY); // left accent
     doc.restore();
-    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(12).text(sec.title, LEFT + 14, y + 7.5, { lineBreak: false });
-    if (sec.subtitle) {
-      doc.fillColor(STEEL).font('Helvetica').fontSize(8.5).text(sec.subtitle, LEFT + 14, y + 9, {
-        width: contentW - 28,
-        align: 'right',
-        lineBreak: false,
-      });
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(12.5).text(sec.title, LEFT + 15, y + 7.5, { lineBreak: false });
+    // Only show the band subtitle when it adds something the headline sub doesn't repeat.
+    const bandSub = sec.subtitle && sec.subtitle !== (sec.headline && sec.headline.sub) ? sec.subtitle : '';
+    if (bandSub) {
+      doc.fillColor(STEEL).font('Helvetica').fontSize(8.5).text(bandSub, LEFT + 15, y + 9.5, { width: contentW - 30, align: 'right', lineBreak: false });
     }
-    y += 25 + 14;
+    y += bandH + 14;
 
-    // --- Headline stat ---
+    // --- Headline KPI card ---
     if (sec.headline && (sec.headline.value || sec.headline.label)) {
-      ensure(48);
-      if (sec.headline.label) {
-        doc.fillColor('#8a99ab').font('Helvetica-Bold').fontSize(8).text(sec.headline.label.toUpperCase(), LEFT, y, { characterSpacing: 0.6, lineBreak: false });
-        y += 12;
+      const hasLabel = !!sec.headline.label;
+      const hasSub = !!sec.headline.sub;
+      const cardH = 12 + (hasLabel ? 12 : 0) + 26 + (hasSub ? 13 : 0) + 2;
+      ensure(cardH + 4);
+      const top = y;
+      doc.save();
+      doc.roundedRect(LEFT, top, contentW, cardH, 6).fill(HERO_BG);
+      doc.roundedRect(LEFT, top + 5, 3.5, cardH - 10, 1.75).fill(STEEL);
+      doc.restore();
+      let hy = top + 12;
+      if (hasLabel) {
+        doc.fillColor('#7d8ea3').font('Helvetica-Bold').fontSize(8).text(sec.headline.label.toUpperCase(), LEFT + 16, hy, { characterSpacing: 0.8, lineBreak: false });
+        hy += 12;
       }
-      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(20).text(sec.headline.value, LEFT, y, { lineBreak: false });
-      y += 24;
-      if (sec.headline.sub) {
-        doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(sec.headline.sub, LEFT, y, { width: contentW, lineBreak: false });
-        y += 13;
+      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(22).text(sec.headline.value, LEFT + 16, hy, { lineBreak: false });
+      hy += 26;
+      if (hasSub) {
+        doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(sec.headline.sub, LEFT + 16, hy, { width: contentW - 32, lineBreak: false });
       }
-      y += 8;
+      y = top + cardH + 14;
     }
 
     // --- Assumptions panel (two-column key/value grid) ---
@@ -233,16 +255,13 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
       const cellH = 15;
       const padTop = 10;
       const padBot = 10;
-      const labelY = y;
-      doc.fillColor('#9aa7b5').font('Helvetica-Bold').fontSize(7.5).text('ASSUMPTIONS', LEFT, labelY, { characterSpacing: 0.8, lineBreak: false });
+      doc.fillColor('#9aa7b5').font('Helvetica-Bold').fontSize(7.5).text('ASSUMPTIONS', LEFT, y, { characterSpacing: 0.8, lineBreak: false });
       y += 12;
-      const boxTop = y;
       const boxH = padTop + nRows * cellH + padBot - 4;
       ensure(boxH + 4);
-      // re-anchor if a page break happened
-      const bTop = y > boxTop ? y : boxTop;
+      const bTop = y;
       doc.save();
-      doc.roundedRect(LEFT, bTop, contentW, boxH, 5).fill('#f6f8fb');
+      doc.roundedRect(LEFT, bTop, contentW, boxH, 5).fill(PANEL_BG);
       doc.restore();
       sec.inputs.forEach((inp, i) => {
         const col = i % 2;
@@ -253,39 +272,60 @@ export function renderReport(doc, { preparedFor, officer, lender, logoBuf, secti
         doc.fillColor(MUTED).font('Helvetica').fontSize(8.8).text(inp.label, cellLeft, cy, { width: (cellRight - cellLeft) * 0.62, lineBreak: false });
         doc.fillColor(INK).font('Helvetica-Bold').fontSize(8.8).text(inp.value, cellLeft, cy, { width: cellRight - cellLeft, align: 'right', lineBreak: false });
       });
-      y = bTop + boxH + 12;
+      y = bTop + boxH + 14;
     }
 
     // --- Multi-column comparison table (e.g. Rate Buydown) ---
     if (sec.table) {
       const tcols = sec.table.columns;
       const nC = Math.max(1, tcols.length);
-      const labelColW = contentW * 0.34;
+      const labelColW = contentW * 0.32;
       const cW = (contentW - labelColW) / nC;
       const cX = (i) => LEFT + labelColW + i * cW;
-      ensure(20);
-      tcols.forEach((c, i) => doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(8.5).text(c, cX(i) + 2, y + 3, { width: cW - 4, align: 'center', lineBreak: false }));
-      y += 17;
-      doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(0.8).strokeColor('#c9d4e2').stroke();
-      y += 2;
-      sec.table.rows.forEach((r) => {
-        ensure(17);
+      const headH = 22;
+      ensure(headH + 20);
+      // Header row: solid navy bar with white column labels.
+      doc.save();
+      doc.roundedRect(LEFT, y, contentW, headH, 4).fill(NAVY);
+      doc.restore();
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(8.5);
+      tcols.forEach((c, i) => doc.text(c, cX(i) + 2, y + 7, { width: cW - 4, align: 'center', lineBreak: false }));
+      y += headH;
+      sec.table.rows.forEach((r, ri) => {
+        const rowH = 19;
+        ensure(rowH);
         const rowY = y;
-        doc.fillColor('#33414f').font('Helvetica').fontSize(9).text(r.label, LEFT, rowY + 4, { width: labelColW - 6, lineBreak: false });
-        r.cells.forEach((cell, i) => doc.fillColor(INK).font('Helvetica-Bold').fontSize(9).text(cell, cX(i) + 2, rowY + 4, { width: cW - 4, align: 'center', lineBreak: false }));
-        y = rowY + 17;
-        doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(0.5).strokeColor('#eaeef3').stroke();
+        if (ri % 2 === 1) {
+          doc.save();
+          doc.rect(LEFT, rowY, contentW, rowH).fill(ZEBRA_BG);
+          doc.restore();
+        }
+        doc.fillColor(INK).font('Helvetica-Bold').fontSize(9).text(r.label, LEFT + 10, rowY + 5, { width: labelColW - 14, lineBreak: false });
+        r.cells.forEach((cell, i) =>
+          doc.fillColor('#33414f').font('Helvetica').fontSize(9).text(cell, cX(i) + 2, rowY + 5, { width: cW - 4, align: 'center', lineBreak: false }),
+        );
+        y = rowY + rowH;
       });
+      // Close the table with a hairline.
+      doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(0.5).strokeColor('#d9e0ea').stroke();
     } else {
-      // --- Result rows ---
+      // --- Result rows (the last "total"-style row gets a framed emphasis) ---
       sec.rows.forEach((row, i) => {
-        ensure(20);
+        const isTotal = i === sec.rows.length - 1 && sec.rows.length > 1 && /total|net|payment|savings|proceeds/i.test(row.label);
+        const rowH = isTotal ? 24 : 21;
+        ensure(rowH);
         const rowY = y;
-        doc.fillColor('#33414f').font('Helvetica').fontSize(10.5).text(row.label, LEFT, rowY + 4, { width: contentW * 0.62, lineBreak: false });
-        doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10.5).text(row.value, LEFT, rowY + 4, { width: contentW, align: 'right', lineBreak: false });
-        y = rowY + 20;
-        if (i < sec.rows.length - 1) {
-          doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(0.5).strokeColor('#eaeef3').stroke();
+        if (isTotal) {
+          doc.save();
+          doc.roundedRect(LEFT, rowY, contentW, rowH, 4).fill(HERO_BG);
+          doc.restore();
+        }
+        const pad = isTotal ? 12 : 0;
+        doc.fillColor(isTotal ? NAVY : '#33414f').font(isTotal ? 'Helvetica-Bold' : 'Helvetica').fontSize(isTotal ? 11 : 10.5).text(row.label, LEFT + pad, rowY + (isTotal ? 6 : 4), { width: contentW * 0.6, lineBreak: false });
+        doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(isTotal ? 12 : 10.5).text(row.value, LEFT, rowY + (isTotal ? 6 : 4), { width: contentW - pad, align: 'right', lineBreak: false });
+        y = rowY + rowH;
+        if (!isTotal && i < sec.rows.length - 1) {
+          doc.moveTo(LEFT, y).lineTo(RIGHT, y).lineWidth(0.5).strokeColor(HAIRLINE).stroke();
         }
       });
     }
