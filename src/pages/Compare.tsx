@@ -12,13 +12,13 @@ import { ClosingCostsEditor, cloneFees } from '@/components/ClosingCostsEditor';
 import { SavedScenariosModal } from '@/components/SavedScenariosModal';
 import { useScenarios, MAX_SCENARIOS } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
-import { computeScenario, defaultClosingCosts } from '@/lib/finance';
+import { computeScenario, defaultClosingCosts, temporaryBuydown, TEMP_BUYDOWN_STRUCTURES } from '@/lib/finance';
 import { buildComparisonModel } from '@/lib/comparisonModel';
 import { RATES_AS_OF } from '@/lib/loanProgramRules';
 import { DonutChart, PAYMENT_COLORS } from '@/components/charts/DonutChart';
 import { api, ApiError } from '@/lib/api';
 import { fmt, fmt2, pct } from '@/lib/format';
-import type { ClosingCostItem, LoanProgram, LoanType, TransactionType } from '@/types';
+import type { ClosingCostItem, LoanProgram, LoanType, Scenario, TransactionType } from '@/types';
 
 const LOAN_TYPES: { value: LoanType; label: string }[] = [
   { value: 'conventional', label: 'Conventional' },
@@ -44,6 +44,12 @@ function compactPrice(n: number): string {
   const v = Math.round(n || 0);
   return v >= 1000 && v % 1000 === 0 ? `$${v / 1000}K` : fmt(v);
 }
+
+// Temporary-buydown structures offered on the Compare screen (None + the common ones).
+const BUYDOWN_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'None' },
+  ...Object.entries(TEMP_BUYDOWN_STRUCTURES).map(([value, s]) => ({ value, label: s.label })),
+];
 
 const CREDIT_BANDS = [
   { value: '800', label: '800–850 · Exceptional' },
@@ -73,6 +79,16 @@ export default function Compare() {
 
   const r = computeScenario(current);
   const priceLabel = current.transaction === 'refinance' ? 'Home Value' : 'Purchase Price';
+
+  // Temporary buydown (per scenario): the rate is reduced for the first N years, then
+  // snaps back to the note rate. Escrow (taxes / insurance / HOA / MI) is unchanged, so
+  // the total during a buydown year = that year's P&I + escrow.
+  const buydownReductions = current.tempBuydown ? TEMP_BUYDOWN_STRUCTURES[current.tempBuydown]?.reductions : null;
+  const buydown =
+    buydownReductions && r.baseLoan > 0 && (current.rate || 0) > 0
+      ? temporaryBuydown(r.baseLoan, current.rate || 0, parseInt(current.term, 10) || 30, buydownReductions)
+      : null;
+  const escrowMonthly = r.totalMonthly - r.pi; // taxes + insurance + HOA + MI
 
   // Taxes & insurance: auto (% of value) by default, or a manual $/mo the user types.
   // Toggling to manual seeds the field with the current auto estimate so nothing jumps.
@@ -292,12 +308,17 @@ export default function Compare() {
       const isRefi = s.transaction === 'refinance';
       const dn = Math.round(s.homePrice > 0 ? ((s.downPayment || 0) / s.homePrice) * 100 : s.downPct || 0);
       const mi = c.mi.applies ? `${c.mi.label} ${fmt2(c.mi.monthly)}` : 'no MI';
+      const red = s.tempBuydown ? TEMP_BUYDOWN_STRUCTURES[s.tempBuydown]?.reductions : null;
+      const bd = red && c.baseLoan > 0 && (s.rate || 0) > 0 ? temporaryBuydown(c.baseLoan, s.rate || 0, parseInt(s.term, 10) || 30, red) : null;
+      const bdText = bd
+        ? ` Temporary ${s.tempBuydown} buydown: year-1 P&I ${fmt2(bd.schedule[0].monthly)}/mo at ${bd.schedule[0].rate}%, seller/lender subsidy ${fmt(bd.subsidyCost)}.`
+        : '';
       return (
         `Scenario "${s.name || `Scenario ${i + 1}`}": ${c.typeLabel} ${isRefi ? 'refinance' : 'purchase'}, ` +
         `${isRefi ? 'home value' : 'price'} ${fmt(s.homePrice || 0)}, loan ${fmt(c.baseLoan)}, ${dn}% down (${fmt(s.downPayment || 0)}), ` +
         `rate ${s.rate || 0}%, ${s.term}-yr. Monthly — P&I ${fmt2(c.pi)}, taxes ${fmt2(c.taxes)}, insurance ${fmt2(c.insurance)}` +
         `${c.hoa > 0 ? `, HOA ${fmt2(c.hoa)}` : ''}, ${mi}, total ${fmt2(c.totalMonthly)}/mo. APR ${pct(c.apr, 3)}. ` +
-        `Cash to close ${fmt(c.cashToClose)}. Total interest over the loan ${fmt(c.totalInterest)}.`
+        `Cash to close ${fmt(c.cashToClose)}. Total interest over the loan ${fmt(c.totalInterest)}.${bdText}`
       );
     });
     return `${borrowerName ? `Borrower: ${borrowerName}.\n` : ''}${lines.join('\n')}`;
@@ -622,6 +643,30 @@ export default function Compare() {
             <SectionLabel>RATE BUYDOWN &amp; CREDITS</SectionLabel>
             <Badge tone="neutral">optional</Badge>
           </div>
+
+          {/* Temporary buydown — reduces the rate for the first N years, then returns to
+              the note rate. Typically funded by a seller or lender credit. */}
+          <div className="mt-4">
+            <label className="mb-[7px] block text-[12.5px] font-semibold text-text-soft">Temporary Buydown</label>
+            <PillGroup
+              variant="blue"
+              options={BUYDOWN_OPTIONS}
+              value={current.tempBuydown ?? ''}
+              onChange={(v) => patch({ tempBuydown: v as Scenario['tempBuydown'] })}
+            />
+            {buydown ? (
+              <div className="mt-2 text-[12px] leading-[1.5] text-text-dim">
+                First year at <span className="font-semibold text-text-soft">{buydown.schedule[0].rate}%</span> —{' '}
+                <span className="font-semibold text-text-soft">{fmt2(buydown.schedule[0].monthly)}/mo</span> P&amp;I. Seller/lender funds{' '}
+                <span className="font-semibold text-text-soft">{fmt(buydown.subsidyCost)}</span>.
+              </div>
+            ) : (
+              <div className="mt-1.5 text-[11.5px] text-text-dim">
+                e.g. <span className="font-semibold">2-1</span>: rate −2% year 1, −1% year 2, then the note rate. Funded by a seller/lender credit.
+              </div>
+            )}
+          </div>
+
           {/* Lender / discount points — a cost the borrower pays, or a lender credit. */}
           <div className="mt-4">
             <label className="mb-[7px] block text-[12.5px] font-semibold text-text-soft">Lender Points</label>
@@ -758,6 +803,41 @@ export default function Compare() {
               formatValue={fmt}
             />
           </Card>
+
+          {buydown && (
+            <Card className="p-5">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <span className="text-[13px] font-bold text-text-softer">Temporary Buydown · {current.tempBuydown}</span>
+                <span className="rounded-full bg-[rgba(56,189,248,0.14)] px-2 py-0.5 text-[11px] font-semibold text-[#38bdf8]">Seller/lender funded</span>
+              </div>
+              <div className="flex flex-col gap-px">
+                {buydown.schedule.map((yr) => (
+                  <div key={yr.year} className="flex items-center justify-between border-b border-[rgba(140,165,195,0.08)] py-2">
+                    <span className="text-[13px] text-text-soft">Year {yr.year} · {yr.rate}%</span>
+                    <span className="num text-[13.5px] text-text-primary">
+                      {fmt2(yr.monthly + escrowMonthly)}
+                      <span className="text-text-dim">/mo</span>
+                    </span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-[13px] text-text-soft">Year {buydown.schedule.length + 1}+ · {current.rate}% (note)</span>
+                  <span className="num text-[13.5px] text-text-primary">
+                    {fmt2(r.totalMonthly)}
+                    <span className="text-text-dim">/mo</span>
+                  </span>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between rounded-[10px] bg-[rgba(56,189,248,0.08)] px-3 py-2.5">
+                <span className="text-[12.5px] font-semibold text-text-soft">Buydown cost (funds the subsidy)</span>
+                <span className="num text-[14px] font-semibold text-[#38bdf8]">{fmt(buydown.subsidyCost)}</span>
+              </div>
+              <div className="mt-2 text-[11px] leading-[1.5] text-text-dim">
+                Payments include estimated taxes, insurance{r.hoa > 0 ? ', HOA' : ''}
+                {r.mi.applies ? ', and MI' : ''}. The subsidy is typically paid by the seller or lender at closing; the note rate and loan terms are unchanged.
+              </div>
+            </Card>
+          )}
 
           <Card className="p-5">
             <div className="mb-3.5 flex items-center justify-between">
