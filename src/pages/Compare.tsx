@@ -276,7 +276,12 @@ export default function Compare() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `home-financing-comparison${borrowerName ? '-' + borrowerName.split(' ').pop() : ''}.pdf`;
+      // Filename: (Address, Borrower names, Year) — blank parts are dropped.
+      const addrPart = resolvedAddress && resolvedAddress !== 'TBD' ? resolvedAddress : '';
+      const fileParts = [addrPart, borrowerName.trim(), String(new Date().getFullYear())]
+        .map((p) => p.replace(/[\\/:*?"<>|\r\n]+/g, '').replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+      a.download = `${fileParts.join(' - ') || 'home-financing-comparison'}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -765,6 +770,14 @@ export default function Compare() {
               {fmt2(r.totalMonthly)}
             </div>
             <div className="text-[13px] text-text-muted">{r.subline}</div>
+            {buydown && (
+              <div className="mt-2.5 rounded-[9px] bg-[rgba(56,189,248,0.12)] px-3 py-2 text-[12.5px] leading-[1.4]">
+                <span className="font-semibold text-text-soft">
+                  First-year payment ({current.tempBuydown} buydown): {fmt2(buydown.schedule[0].monthly + escrowMonthly)}/mo
+                </span>
+                <span className="text-text-dim"> — then {fmt2(r.totalMonthly)}/mo at the note rate.</span>
+              </div>
+            )}
             <div className="mt-5 flex flex-col gap-px">
               {[
                 { label: 'Principal & Interest', value: fmt2(r.pi), color: 'text-text-primary' },
