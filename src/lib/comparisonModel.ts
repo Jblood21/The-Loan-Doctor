@@ -11,9 +11,25 @@
 // notes and (in a later phase) the dynamic PDF both render from this one model.
 
 import type { LoanType, Scenario } from '@/types';
-import { computeScenario, type ScenarioResult } from './finance';
+import { computeScenario, temporaryBuydown, TEMP_BUYDOWN_STRUCTURES, type ScenarioResult } from './finance';
 import { FHA, VA, USDA } from './loanProgramRules';
 import { fmt, fmt2, pct } from './format';
+
+/** The buydown reduction schedule for a scenario, or null when no buydown applies. */
+function buydownReductions(s: Scenario): number[] | null {
+  const key = s.tempBuydown;
+  return key && TEMP_BUYDOWN_STRUCTURES[key] ? TEMP_BUYDOWN_STRUCTURES[key].reductions : null;
+}
+
+/** The total first-year payment (reduced P&I + escrow) for a scenario with a temporary
+ *  buydown; null when the scenario has none. */
+function buydownYear1Total(s: Scenario, c: ScenarioResult): number | null {
+  const reductions = buydownReductions(s);
+  if (!reductions || c.baseLoan <= 0 || (s.rate || 0) <= 0) return null;
+  const bd = temporaryBuydown(c.baseLoan, s.rate || 0, parseInt(String(s.term), 10) || 30, reductions);
+  const escrow = c.totalMonthly - c.pi; // taxes + insurance + HOA + MI (unchanged by the buydown)
+  return bd.schedule[0].monthly + escrow;
+}
 
 export interface ComparisonColumn {
   name: string;
@@ -77,6 +93,12 @@ function cellValue(key: string, s: Scenario, c: ScenarioResult): string {
       return c.hoa > 0 ? fmt2(c.hoa) : 'NA';
     case 'totalMonthly':
       return fmt2(c.totalMonthly);
+    case 'buydownYear1': {
+      // A scenario with a buydown shows its reduced first-year total; one without shows
+      // its normal payment, so the row compares like-for-like across columns.
+      const y1 = buydownYear1Total(s, c);
+      return fmt2(y1 == null ? c.totalMonthly : y1);
+    }
     case 'cashToClose':
       return fmt(c.cashToClose);
     default:
@@ -96,6 +118,7 @@ export function buildComparisonModel(scenarios: Scenario[]): ComparisonModel {
   const anyUsda = has('usda');
   const anyConvPmi = results.some(({ s, c }) => isConv(s.loanType) && c.mi.applies && c.mi.monthly > 0);
   const anyHoa = results.some(({ c }) => c.hoa > 0);
+  const anyBuydown = results.some(({ s }) => buydownReductions(s) != null);
   const allRefi = results.length > 0 && results.every(({ s }) => s.transaction === 'refinance');
 
   // Build the dynamic row set: shared rows always, program-specific rows only when
@@ -122,6 +145,7 @@ export function buildComparisonModel(scenarios: Scenario[]): ComparisonModel {
   rows.push({ key: 'insurance', label: 'Homeowners Insurance' });
   if (anyHoa) rows.push({ key: 'hoa', label: 'HOA Dues' });
   rows.push({ key: 'totalMonthly', label: 'Estimated Monthly Payment' });
+  if (anyBuydown) rows.push({ key: 'buydownYear1', label: 'First-Year Payment (Buydown)' });
   rows.push({ key: 'cashToClose', label: 'Estimated Cash to Close' });
 
   const columns: ComparisonColumn[] = results.map(({ s, c }) => {
@@ -138,6 +162,11 @@ export function buildComparisonModel(scenarios: Scenario[]): ComparisonModel {
   if (anyUsda) notes.push(...USDA.programNotes);
   if (anyConvPmi) {
     notes.push('Conventional PMI applies when the down payment is under 20%; it can be cancelled at 80% LTV (auto at 78%) of the original value.');
+  }
+  if (anyBuydown) {
+    notes.push(
+      'A temporary buydown lowers the interest rate for the first year(s), then returns to the note rate — the "First-Year Payment" reflects the reduced rate. The buydown does not change the loan amount, note rate, or long-term payment, and its cost is typically funded by a seller or lender credit.',
+    );
   }
 
   return {

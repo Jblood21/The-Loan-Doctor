@@ -128,7 +128,7 @@ export function renderComparisonPdf(doc, d) {
       drawTableHeader();
     }
   };
-  const tableRows = model.rows.filter((r) => r.key !== 'price' && r.key !== 'totalMonthly' && r.key !== 'cashToClose');
+  const tableRows = model.rows.filter((r) => r.key !== 'price' && r.key !== 'totalMonthly' && r.key !== 'buydownYear1' && r.key !== 'cashToClose');
   let z = 0;
   tableRows.forEach((row) => {
     ensureTable(rowH);
@@ -156,6 +156,18 @@ export function renderComparisonPdf(doc, d) {
   doc.fillColor(GO).font('Helvetica-Bold').fontSize(dense ? 7 : 8).text('ESTIMATED MONTHLY PAYMENT', LEFT, y + 11, { width: labelW, align: 'center', lineBreak: false });
   columns.forEach((c, i) => centerCol(c.cells.totalMonthly, i, y + 7, { font: 'Helvetica-Bold', size: 13, color: GO }));
   y += emH + 14;
+
+  // First-year payment with a temporary buydown (only when a scenario uses one).
+  if (model.rows.some((row) => row.key === 'buydownYear1')) {
+    const byH = 26;
+    ensureTable(byH);
+    doc.save();
+    doc.rect(LEFT, y, RIGHT - LEFT, byH).fill('#eef4fb'); // light blue to distinguish the temporary payment
+    doc.restore();
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(dense ? 6.5 : 7.5).text('1ST-YEAR PAYMENT (BUYDOWN)', LEFT, y + 10, { width: labelW, align: 'center', lineBreak: false });
+    columns.forEach((c, i) => centerCol(c.cells.buydownYear1 || c.cells.totalMonthly, i, y + 6, { font: 'Helvetica-Bold', size: 12, color: NAVY }));
+    y += byH + 14;
+  }
 
   // ---- Closing Costs (same table format as the monthly comparison) ----
   ensureFlow(22 + headH + rowH);
@@ -338,9 +350,13 @@ router.post('/pdf', requireAuth, (req, res) => {
   doc.on('data', (c) => chunks.push(c));
   doc.on('end', () => {
     if (res.headersSent) return;
-    const safeLast = (borrowerName.trim().split(/\s+/).pop() || '').replace(/[^A-Za-z0-9_-]/g, '');
+    // Filename: (Address, Borrower names, Year) — blank parts are dropped.
+    const cleanPart = (v) => String(v || '').replace(/[\\/:*?"<>|\r\n]+/g, '').replace(/\s+/g, ' ').trim();
+    const addrPart = propertyAddress && propertyAddress.toUpperCase() !== 'TBD' ? cleanPart(propertyAddress) : '';
+    const fnParts = [addrPart, cleanPart(borrowerName), String(new Date().getFullYear())].filter(Boolean);
+    const fname = (fnParts.join(' - ') || 'home-financing-comparison').slice(0, 180);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="home-financing-comparison${safeLast ? '-' + safeLast : ''}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}.pdf"`);
     res.end(Buffer.concat(chunks));
   });
   doc.on('error', () => {
