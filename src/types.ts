@@ -45,6 +45,9 @@ export interface Scenario {
   lenderCredit: number;
   sellerCredit: number;
   otherCredits: number;
+  /** Temporary buydown structure applied to this scenario (e.g. '2-1'). Absent/'' = none.
+   *  Reduces the rate for the first N years, then returns to the note rate. */
+  tempBuydown?: '' | '1-0' | '1-1' | '2-1' | '3-2-1';
   /** Lender/discount points on the loan, in points (% of loan amount). 0/undefined = none. */
   lenderPoints?: number;
   /** Whether the points are a cost the borrower pays (discount points) or a credit the
