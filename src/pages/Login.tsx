@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/Logo';
+import { MountainScape } from '@/components/MountainScape';
 import { Button } from '@/components/ui/Button';
 import { TextField, Label } from '@/components/ui/TextField';
 import { useAuth } from '@/context/AuthContext';
@@ -56,27 +57,12 @@ export default function Login() {
       <div
         className="relative hidden flex-[1.05] flex-col justify-between overflow-hidden bg-login-panel p-[56px] pb-12 lg:flex"
       >
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 18% 22%, rgba(47,100,156,.16), transparent 42%),radial-gradient(circle at 82% 78%, rgba(99,140,187,.14), transparent 45%)',
-          }}
-        />
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(47,100,156,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(47,100,156,.06) 1px,transparent 1px)',
-            backgroundSize: '46px 46px',
-            maskImage: 'linear-gradient(to bottom right, black, transparent 80%)',
-            WebkitMaskImage: 'linear-gradient(to bottom right, black, transparent 80%)',
-          }}
-        />
-        <div className="relative">
+        {/* Decorative sunset mountain range built from the accent palette. */}
+        <MountainScape opacity={0.92} />
+        <div className="relative z-10">
           <Logo size={42} wordmark={23} glow />
         </div>
-        <div className="relative">
+        <div className="relative z-10">
           <div className="max-w-[480px] font-display text-[46px] font-bold leading-[1.08] tracking-[-1.5px]">
             Every loan scenario, side by side in seconds.
           </div>
@@ -93,7 +79,7 @@ export default function Login() {
             ))}
           </div>
         </div>
-        <div className="relative text-[12.5px] text-text-dim2">
+        <div className="relative z-10 text-[12.5px] font-medium text-[#eef3f8]">
           Equal Housing Lender · For licensed mortgage professionals
         </div>
       </div>
