@@ -36,7 +36,7 @@ export function AppShell() {
           <div className="flex min-h-screen">
             {/* Faint, blurred sunset mountains across the app canvas — a brand
                 backdrop that sits behind content (−z) and never catches clicks. */}
-            <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 h-[82vh]">
+            <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 h-[96vh]">
               <MountainScape opacity={0.3} blur={4} />
             </div>
             <Sidebar />
