@@ -1,4 +1,4 @@
-// Light/dark theme manager for Loanbasecamp.
+// Light/dark theme manager for Basecamp.
 //
 // Three choices: 'light', 'dark', or 'system' (follow the OS). The choice is
 // stored per-device in localStorage. A tiny inline script in index.html applies

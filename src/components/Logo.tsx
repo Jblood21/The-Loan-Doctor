@@ -1,4 +1,4 @@
-// Loanbasecamp brand mark — a flat mountain tile + two-tone wordmark.
+// Basecamp brand mark — a flat mountain tile + two-tone wordmark.
 
 interface LogoProps {
   /** tile size in px */
@@ -36,7 +36,7 @@ export function Logo({ size = 34, wordmark = 19, glow = false }: LogoProps) {
       <LogoMark size={size} glow={glow} />
       {wordmark > 0 && (
         <span className="font-display font-bold tracking-[-0.4px] text-ink" style={{ fontSize: wordmark }}>
-          Loan<span className="text-brand">basecamp</span>
+          Base<span className="text-brand">camp</span>
         </span>
       )}
     </div>

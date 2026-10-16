@@ -1,4 +1,4 @@
-// Shared domain types for Loanbasecamp
+// Shared domain types for Basecamp
 
 export type TransactionType = 'purchase' | 'refinance';
 export type LoanType = 'conventional' | 'fha' | 'va' | 'usda' | 'arm';

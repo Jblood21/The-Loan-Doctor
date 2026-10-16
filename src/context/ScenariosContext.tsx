@@ -127,10 +127,10 @@ export function ScenariosProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         const normalized = normalizeList(s);
         setBank(normalized);
-        // Open the first few saved scenarios into the comparison; the rest live in the
-        // Saved Scenarios popup. A brand-new user starts with one blank scenario.
-        const working = normalized.length ? normalized.slice(0, MAX_SCENARIOS) : [seededBlank('Scenario 1')];
-        setScenarios(working);
+        // The page always opens with a single fresh scenario. Saved scenarios stay
+        // in the bank and are opened on demand from the Saved Scenarios popup — so
+        // the comparison never auto-fills with (and duplicates) past saves.
+        setScenarios([seededBlank('Scenario 1')]);
         setActive(0);
         setLoaded(true);
         setDirty(false);

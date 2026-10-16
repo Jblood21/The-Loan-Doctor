@@ -1,4 +1,4 @@
-// Thin API client for the Loanbasecamp backend.
+// Thin API client for the Basecamp backend.
 //
 // In development the Vite dev server proxies /api to the Express backend, so
 // API_BASE can stay empty. In production set VITE_API_BASE to the API origin.

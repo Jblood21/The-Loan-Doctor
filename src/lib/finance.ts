@@ -1,4 +1,4 @@
-// Loanbasecamp finance engine — real mortgage math.
+// Basecamp finance engine — real mortgage math.
 //
 // Replaces the prototype's placeholder figures with proper formulas:
 //   • Principal & Interest (standard amortization)
