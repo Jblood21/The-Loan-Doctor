@@ -6,17 +6,19 @@
 interface MountainScapeProps {
   /** overall opacity of the illustration (0–1) */
   opacity?: number;
+  /** gaussian blur in px — use a few px for a soft, distant backdrop */
+  blur?: number;
   className?: string;
 }
 
-export function MountainScape({ opacity = 1, className = '' }: MountainScapeProps) {
+export function MountainScape({ opacity = 1, blur = 0, className = '' }: MountainScapeProps) {
   return (
     <svg
       aria-hidden="true"
       className={`pointer-events-none absolute inset-x-0 bottom-0 h-full w-full ${className}`}
       viewBox="0 0 1440 520"
       preserveAspectRatio="xMidYMax slice"
-      style={{ opacity }}
+      style={{ opacity, filter: blur ? `blur(${blur}px)` : undefined }}
     >
       <defs>
         {/* Soft sun glow at the horizon (gold). */}
