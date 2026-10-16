@@ -135,7 +135,7 @@ export function SettingsDrawer() {
 
         <div className="p-6">
           <div className="mb-[22px] flex items-center gap-[14px] rounded-xl border border-border bg-elevated px-4 py-[14px]">
-            <div className="flex h-11 w-11 items-center justify-center rounded-[11px] bg-brand-gradient text-[16px] font-bold text-app">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[11px] bg-brand text-[16px] font-bold text-on-brand">
               {initials(name)}
             </div>
             <div>
@@ -306,7 +306,7 @@ export function SettingsDrawer() {
           <div className="mb-4">
             <div className="mb-1 text-[14px] font-bold text-text-primary">Desktop App</div>
             <div className="mb-[14px] text-[12.5px] text-text-muted">
-              Install LoanDr. as a desktop app — it opens in its own window with a taskbar/dock icon, no browser tabs.
+              Install Loanbasecamp as a desktop app — it opens in its own window with a taskbar/dock icon, no browser tabs.
             </div>
             {installed ? (
               <div className="rounded-[10px] border border-[rgba(52,211,153,0.28)] bg-[rgba(52,211,153,0.1)] px-3.5 py-2.5 text-[13px] font-semibold text-good">
@@ -336,7 +336,7 @@ export function SettingsDrawer() {
                 <div className="rounded-[10px] border border-border-input bg-input px-3.5 py-2.5 text-[12px] leading-[1.6] text-text-soft">
                   <div className="mb-1 font-semibold text-text-primary">Install manually</div>
                   <div>
-                    <strong>Chrome / Edge:</strong> click the install icon (a monitor with a ↓) at the right of the address bar, or the ⋮ menu → “Install LoanDr…”.
+                    <strong>Chrome / Edge:</strong> click the install icon (a monitor with a ↓) at the right of the address bar, or the ⋮ menu → “Install Loanbasecamp…”.
                   </div>
                   <div className="mt-1">
                     <strong>Safari (Mac):</strong> File → “Add to Dock”.

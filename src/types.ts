@@ -1,4 +1,4 @@
-// Shared domain types for LoanDr.
+// Shared domain types for Loanbasecamp
 
 export type TransactionType = 'purchase' | 'refinance';
 export type LoanType = 'conventional' | 'fha' | 'va' | 'usda' | 'arm';

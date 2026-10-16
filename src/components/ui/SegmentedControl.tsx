@@ -38,7 +38,7 @@ export function SegmentedControl<T extends string>({
             type="button"
             onClick={() => onChange(opt.value)}
             className={`cursor-pointer border-none font-semibold transition-all ${base} ${
-              active ? 'bg-brand-gradient text-app' : 'bg-transparent text-text-soft'
+              active ? 'bg-brand text-on-brand' : 'bg-transparent text-text-soft'
             }`}
           >
             {opt.label}

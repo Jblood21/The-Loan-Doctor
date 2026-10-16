@@ -82,7 +82,7 @@ function LetterShare({ token, share }: { token: string; share: ShareView }) {
           href={publicSharePdfUrl(token)}
           target="_blank"
           rel="noopener"
-          className="inline-flex h-[46px] items-center justify-center rounded-xl bg-brand-gradient px-6 text-[15px] font-semibold text-app transition-opacity hover:opacity-90"
+          className="inline-flex h-[46px] items-center justify-center rounded-xl bg-brand px-6 text-[15px] font-semibold text-on-brand transition-opacity hover:opacity-90"
         >
           Download the letter (PDF)
         </a>

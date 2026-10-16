@@ -24,7 +24,7 @@ const W = 520; // viewBox width; scales to container via width:100%
  * the series, so no legend box. Faint gridlines, an emphasized endpoint, and a
  * crosshair + tooltip on hover.
  */
-export function AreaChart({ points, height = 200, color = '#0f9e8f', formatY = (v) => String(Math.round(v)), formatX = (v) => String(v), yLabel }: Props) {
+export function AreaChart({ points, height = 200, color = 'var(--chart-1)', formatY = (v) => String(Math.round(v)), formatX = (v) => String(v), yLabel }: Props) {
   const gid = useId().replace(/:/g, '');
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
@@ -107,7 +107,7 @@ export function AreaChart({ points, height = 200, color = '#0f9e8f', formatY = (
         {hp && (
           <g>
             <line x1={sx(hp.x)} y1={PAD.top} x2={sx(hp.x)} y2={PAD.top + innerH} stroke={color} strokeWidth="1" opacity="0.5" />
-            <circle cx={sx(hp.x)} cy={sy(hp.y)} r="4" fill={color} stroke="var(--chart-surface, #101d2c)" strokeWidth="2" />
+            <circle cx={sx(hp.x)} cy={sy(hp.y)} r="4" fill={color} stroke="var(--surface)" strokeWidth="2" />
           </g>
         )}
       </svg>

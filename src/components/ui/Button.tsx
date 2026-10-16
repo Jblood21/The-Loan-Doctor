@@ -16,13 +16,10 @@ const sizes: Record<Size, string> = {
 };
 
 const variants: Record<Variant, string> = {
-  primary:
-    'bg-brand-gradient text-app font-bold hover:brightness-105 active:translate-y-px border-none',
-  secondary:
-    'bg-elevated text-text-softer font-semibold border border-border-input hover:border-brand-blue',
-  ghost: 'bg-transparent text-text-soft font-medium hover:bg-[rgba(140,165,195,0.07)] border-none',
-  danger:
-    'bg-[rgba(248,113,113,0.12)] text-danger font-semibold border border-[rgba(248,113,113,0.3)] hover:bg-[rgba(248,113,113,0.2)]',
+  primary: 'bg-brand text-on-brand font-semibold hover:bg-brand-hover active:bg-brand-pressed border-none',
+  secondary: 'bg-surface text-brand font-semibold border border-brand hover:bg-surface-tint',
+  ghost: 'bg-transparent text-ink-muted font-medium hover:bg-[var(--surface-tint)] border-none',
+  danger: 'bg-surface text-danger font-semibold border border-danger hover:bg-danger-tint',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(

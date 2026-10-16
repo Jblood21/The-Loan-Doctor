@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { Logo } from './Logo';
+import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
 import { useUI } from '@/context/UIContext';
 
@@ -98,6 +99,7 @@ export function Sidebar() {
         )}
 
         <div className="mt-auto flex flex-col gap-[3px] border-t border-border pt-4">
+          <ThemeToggle />
           <button
             onClick={() => {
               closeNav();
