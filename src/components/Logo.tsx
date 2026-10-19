@@ -1,6 +1,7 @@
-// Loan Base Camp brand lockup. LogoMark is the icon-only tile (used on the splash);
-// Logo is the full "Loan Base Camp" badge image (corner pixels made transparent so
-// it blends on any background).
+// Loan Base Camp brand lockup — genuine vector artwork from the brand package.
+// LogoMark is the icon-only mountain mark (used on the splash and tight spots);
+// Logo is the full "Loan Base Camp" badge lockup. Both are the supplied SVGs,
+// rendered as-is (no redraw / recolor / stretch) per the brand guidelines.
 
 interface LogoProps {
   /** base size in px; the lockup renders at ~1.2x this height */
@@ -12,9 +13,10 @@ interface LogoProps {
 }
 
 export function LogoMark({ size = 34, glow = false }: Omit<LogoProps, 'wordmark'>) {
+  // The mountain mark sits on the brand's white panel so it reads in both themes.
   return (
     <div
-      className="flex items-center justify-center bg-brand"
+      className="flex items-center justify-center bg-white"
       style={{
         width: size,
         height: size,
@@ -22,10 +24,14 @@ export function LogoMark({ size = 34, glow = false }: Omit<LogoProps, 'wordmark'
         boxShadow: glow ? 'var(--shadow-card)' : undefined,
       }}
     >
-      <svg width={size * 0.58} height={size * 0.58} viewBox="0 0 24 24" fill="var(--on-brand)" aria-hidden="true">
-        <path d="M3 19.5 10.6 6 15 13.4 12.2 19.5Z" />
-        <path d="M11.4 19.5 15.8 11.3 21 19.5Z" opacity="0.85" />
-      </svg>
+      <img
+        src="/brand/mountain-icon.svg"
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="select-none"
+        style={{ width: size * 0.74, height: size * 0.74 }}
+      />
     </div>
   );
 }
@@ -33,7 +39,7 @@ export function LogoMark({ size = 34, glow = false }: Omit<LogoProps, 'wordmark'
 export function Logo({ size = 34, glow = false }: LogoProps) {
   return (
     <img
-      src="/brand/logo-lockup.png"
+      src="/brand/loan-base-camp.svg"
       alt="Loan Base Camp"
       draggable={false}
       className="block w-auto select-none"
