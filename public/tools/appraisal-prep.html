@@ -856,7 +856,7 @@ function renderHeader(){
     ${cfg.phone?`<a href="tel:${esc(cfg.phone.replace(/[^0-9+]/g,""))}">${esc(cfg.phone)}</a>`:""}
   </nav>`;
   const L=lender();
-  $("#ftr").innerHTML=`<p>This is general information about the new appraisal form (UAD 3.6) that Fannie Mae and Freddie Mac require starting November 2, 2026. It is not an appraisal, an inspection, or legal or lending advice. The appraiser checks everything and makes their own decisions. Your answers stay on this device unless you choose to send them.</p>
+  $("#ftr").innerHTML=`<p>This is general info about the new appraisal form (UAD 3.6), which Fannie Mae and Freddie Mac require starting November 2, 2026. It isn't an appraisal, an inspection, or legal or lending advice. The appraiser checks everything and makes the final call. Your answers stay on this device unless you send them.</p>
   ${hasAgent()?`<p>Provided by ${esc([cfg.name,cfg.brokerage].filter(Boolean).join(", "))}${cfg.lic?`, license ${esc(cfg.lic)}`:""}${cfg.email?`, ${esc(cfg.email)}`:""}.</p>`:""}
   ${L&&L.name?`<p>Financing questions: ${esc(L.name)}${L.nmls?`, NMLS #${esc(L.nmls)}`:""}${L.phone?`, ${esc(L.phone)}`:""}${L.email?`, ${esc(L.email)}`:""}. Pre-qualification is not a loan commitment.</p>`:""}`;
 }
@@ -870,19 +870,19 @@ function renderHome(){
   $("#v-home").innerHTML=`
   <div class="hero">
     <h1>Get Ready for the <span class="accent">New Appraisal Form</span></h1>
-    <p>Starting November 2, appraisers use a new form for most conventional home loans, and it asks about every kitchen, bathroom and problem in more detail. Answer a few questions and you get a summary the appraiser can use.</p>
+    <p>On November 2, the appraisal form changes for most conventional home loans. The new one asks more about each kitchen, bath and problem. Answer a few quick questions, and we'll build a summary the appraiser can use.</p>
   </div>
   <div class="paths">
     <div class="card path">
       <div class="icon">${ICON.home}</div>
       <h3>I'm Selling or Refinancing</h3>
-      <p>Tell us about your updates, square footage and repairs, and you get a summary for the appraiser plus a to-do list for before the visit.</p>
+      <p>Tell us about your updates, square footage and repairs. You'll get a summary for the appraiser, plus a short to-do list for before the visit.</p>
       <div><button class="btn" data-go="seller" data-step="0">${store.get("apt:seller",null)&&S.seller.prop.addr?"Continue my summary":"Prepare my home"}</button></div>
     </div>
     <div class="card path">
       <div class="icon">${ICON.walk}</div>
       <h3>I'm Buying</h3>
-      <p>Use a checklist built around what the appraiser will look at while you tour, then compare homes and get questions to ask each seller.</p>
+      <p>Tour with a checklist built around what the appraiser checks. Then compare homes side by side, with questions to ask each seller.</p>
       <div><button class="btn sec" data-go="buyer" data-bv="list">Start a walkthrough</button></div>
     </div>
   </div>
@@ -891,19 +891,19 @@ function renderHome(){
 
 /* ---------- what is changing ---------- */
 const CHANGES=[
- ["Every Kitchen and Bathroom Gets Its Own Notes","The appraiser writes down when each kitchen and bathroom was last updated and what shape it is in, so dig out receipts, permits and photos for any remodel."],
- ["Every Problem Gets Written Down","Anything wrong with the home goes in the report, big or small, and safety and structural problems usually have to be fixed before the loan can close, so fix what you can before the visit."],
- ["Basement Space Is Counted on Its Own","A finished basement is listed apart from the rest of the house, even with a walkout door, and a room with a ceiling under 7 feet doesn't count as regular living space, so the appraiser's square footage may not match the listing."],
- ["Expect More Photos","The appraiser photographs every kitchen, every problem and any recent updates, so the visit can run longer. Leave every room open and the utilities on."],
- ["Tell Your Lender About Any Rental","If any part of the home is rented or could be, tell your lender when the appraisal is ordered, because that information now goes in the main report."],
- ["A Home in Poor Condition Still Can't Be Financed As Is","If a home needs safety or structural repairs, a conventional loan usually won't close until they're done. The new report shows the home's condition today and again as it would be after the repairs, so ask your lender how required repairs would be handled before you make or accept an offer."],
- ["The Date the Report Is Turned In Decides the Form","Any appraisal turned in on or after November 2 uses the new form, even if the visit was in October, so allow a few extra days if your contract is written in late October or November. FHA, VA and USDA loans are not on this schedule yet."]
+ ["Every Kitchen and Bathroom Gets Its Own Notes","The appraiser notes when each kitchen and bath was last updated, and the shape it's in. Dig out receipts, permits and photos for any remodel."],
+ ["Every Problem Gets Written Down","Anything wrong with the home goes in the report, big or small. Safety and structural problems usually have to be fixed before the loan can close. Fix what you can before the visit."],
+ ["Basement Space Is Counted on Its Own","A finished basement is listed on its own, even with a walkout door. A room with a ceiling under 7 feet doesn't count as regular living space. So the appraiser's square footage may not match the listing."],
+ ["Expect More Photos","The appraiser photographs every kitchen, every problem and any recent update, so the visit can run longer. Leave every room open and the utilities on."],
+ ["Tell Your Lender About Any Rental","Is any part of the home rented, or could it be? Tell your lender when the appraisal is ordered. That detail now goes in the main report."],
+ ["A Home in Poor Condition Still Can't Be Financed As Is","If a home needs safety or structural repairs, a conventional loan usually won't close until they're done. The new report shows the home's condition now, and again as it would be after the repairs. Ask your lender how required repairs would be handled before you make or accept an offer."],
+ ["The Date the Report Is Turned In Decides the Form","Any appraisal turned in on or after November 2 uses the new form, even if the visit was in October. Allow a few extra days if your contract lands in late October or November. FHA, VA and USDA loans aren't on this schedule yet."]
 ];
 function renderChanges(){
   $("#v-changes").innerHTML=`
-  <div class="hero"><h1>What's Changing, and <span class="accent">What It Means</span></h1><p>A new form is replacing several appraisal forms for conventional loans, and here is what that means for you.</p></div>
+  <div class="hero"><h1>What's Changing, and <span class="accent">What It Means</span></h1><p>One new form is replacing several older appraisal forms for conventional loans. Here's what that means for you.</p></div>
   <div class="chg">${CHANGES.map(c=>`<div class="card"><h3>${c[0]}</h3><p style="margin:0">${c[1]}</p></div>`).join("")}</div>
-  <div class="card flat same"><h3>Value Still Comes From Comparable Sales</h3><p>The appraiser still compares your home to similar homes that sold nearby, but the report now records your updates, repairs and problems in more detail, so the value can reflect what the home really has and what it needs.</p></div>
+  <div class="card flat same"><h3>Value Still Comes From Comparable Sales</h3><p>The appraiser still compares your home to similar ones sold nearby. But the report now records your updates, repairs and problems in more detail. So the value can reflect what the home really has, and what it needs.</p></div>
   <div class="card tight" style="margin-top:16px"><h4>Sources</h4><p style="margin:8px 0 0;font-size:14px"><a href="https://sf.freddiemac.com/faqs/uad-and-forms-redesign" target="_blank" rel="noopener">Freddie Mac: UAD and forms redesign FAQ</a><br><a href="https://singlefamily.fanniemae.com/originating-underwriting/appraisers/appraiser-update-june-2025" target="_blank" rel="noopener">Fannie Mae: Appraiser Update, June 2025</a></p></div>
   <div class="row" style="margin-top:24px"><button class="btn" data-go="seller" data-step="0">Prepare my home</button><button class="btn sec" data-go="buyer" data-bv="list">Start a walkthrough</button></div>`;
 }
@@ -924,14 +924,14 @@ function renderAgent(keep){
   const f=(key,label,o={})=>`<div class="fld ${o.cls||""}"><label class="lbl" for="a_${key}">${label}${o.opt?'<span class="tag">optional</span>':""}</label>${o.hint?`<div class="hint">${o.hint}</div>`:""}<input class="jd-input" id="a_${key}" data-a="${key}" type="${o.type||"text"}" autocomplete="off" value="${esc(A[key]||"")}"></div>`;
   const link=(()=>{const b=A._base||baseLink();const q=agentParams(A);return b?b+(q?"?"+q:""):""})();
   $("#v-agent").innerHTML=`
-  <div class="hero"><h1>Set Up <span class="accent">Your Link</span></h1><p>Add your details once and you get a link to send clients or post on your site, and your name and contact details show on the page and on the summary they download.</p></div>
+  <div class="hero"><h1>Set Up <span class="accent">Your Link</span></h1><p>Add your details once. You'll get a link to send clients or post on your site. Your name and contact info show on the page and on the summary they download.</p></div>
   <div class="card panel">
     <div class="sub">Your details</div>
     <div class="grid2">${f("name","Your name")}${f("brokerage","Brokerage")}${f("phone","Phone")}${f("email","Email",{type:"email"})}${f("lic","License number",{opt:1})}${f("site","Website",{opt:1})}</div>
     <div class="sub">Where client emails go</div>
     <div class="grid2">${f("leads","Send client emails to",{hint:"Defaults to your email above.",opt:1,cls:"full"})}</div>
     <div class="sub">Financing contact</div>
-    <p style="font-size:14px">Clients who ask about pre-qualification reach this contact, which is set to Alan Blood by default, and you can swap in your own lender or turn financing offers off.</p>
+    <p style="font-size:14px">Clients who ask about pre-qualification reach this contact. It's set to Alan Blood by default. Swap in your own lender, or turn financing offers off.</p>
     <div class="grid2">${f("lname","Lender name",{opt:1})}${f("lnmls","NMLS number",{opt:1})}${f("lemail","Lender email",{opt:1,type:"email"})}${f("lphone","Lender phone",{opt:1})}</div>
     <div class="checklist" style="margin-top:12px"><label><input type="checkbox" id="a_nofin" ${A.nofin?"checked":""}><span>Hide financing offers from my clients</span></label></div>
     <div class="sub">Your link</div>
@@ -960,7 +960,7 @@ document.addEventListener("click",e=>{
   if(id==="a_copy"){const v=$("#a_link").value;if(!v){toast("Add your details first");return}copyText(v,"Link copied")}
   if(id==="a_msg"){const v=$("#a_link").value;if(!v){toast("Add your details first");return}
     const nm=(agentDraft.name||"").trim();
-    copyText(`Hi, the appraisal form changes on November 2. This free tool walks you through what the appraiser will look for and ends with a PDF summary you can hand to the appraiser. It takes about 15 minutes: ${v}${nm?`\n\n${nm}`:""}`,"Message copied")}
+    copyText(`Hi! The appraisal form changes on November 2. This free tool walks you through what the appraiser looks for, then builds a PDF summary you can hand them. It takes about 15 minutes: ${v}${nm?`\n\n${nm}`:""}`,"Message copied")}
   if(id==="a_prev"){const c=Object.assign({},agentDraft);delete c._base;cfg=c;store.set("apt:cfg",cfg);toast("Saved on this device");show("home")}
 });
 
@@ -1032,7 +1032,7 @@ function stepHome(){
       ${T("seller.prop.garage","Garage or carport spaces",{ph:"2 attached",opt:1})}
       ${["town","condo"].includes(s.prop.type)?N("seller.prop.hoa","HOA dues per month",{opt:1}):""}
     </div>
-    ${pre1978()?`<div class="callout warn"><p style="margin:0">Your home was built before 1978, so peeling or chipping paint can be written up as a problem, and a later step asks about it.</p></div>`:""}
+    ${pre1978()?`<div class="callout warn"><p style="margin:0">Your home was built before 1978. Peeling or chipping paint can be written up as a problem, so a later step asks about it.</p></div>`:""}
     <div>
       ${Seg("seller.rental.any","Is any part of the home rented, or could it be?",YN,{re:1,hint:"The new form includes rental income, so the appraiser needs the numbers during the visit."})}
       ${rent?`<div style="margin-top:16px">${s.rental.rows.map((r,i)=>`<div class="item"><div class="item-h"><h4>Unit ${i+1}</h4><button class="linkbtn" data-act="rm" data-arr="seller.rental.rows" data-i="${i}">Remove</button></div>
@@ -1044,7 +1044,7 @@ function stepHome(){
 function stepSqft(){
   const q=S.seller.sqft,ns=num(q.ns_ag)+num(q.ns_bg);
   return `<h2>Square Footage</h2>
-  <div class="callout"><p style="margin:0">Finished space counts as living area only if the ceiling is at least 7 feet high. In a room with a sloped ceiling, at least half the floor needs 7 feet, and nothing under 5 feet counts. Rooms that don't meet that, or that you can only reach through unfinished space, get listed separately. Anything partly or fully below ground is basement space, even with a walkout.</p></div>
+  <div class="callout"><p style="margin:0">Finished space only counts as living area if the ceiling is at least 7 feet high. With a sloped ceiling, at least half the floor needs 7 feet, and nothing under 5 feet counts. Rooms that don't meet that — or that you reach only through unfinished space — are listed separately. Anything partly or fully below ground is basement space, even with a walkout.</p></div>
   <div class="stack">
     <div class="grid2">
       ${N("seller.sqft.ag_fin","Finished, above ground (sq ft)",{ph:"1,850",hint:"Living space on levels at or above ground."})}
@@ -1121,13 +1121,13 @@ function stepDefects(){
     <div><div class="lbl">Anything else</div>${s.issues.map((r,i)=>`<div class="item"><div class="item-h"><h4>Problem ${i+1}</h4><button class="linkbtn" data-act="rm" data-arr="seller.issues" data-i="${i}">Remove</button></div>
       <div class="grid2">${Sel(`seller.issues.${i}.sec`,"Where on the property?",SECS)}${T(`seller.issues.${i}.feature`,"What is it?",{ph:"Garage door opener"})}${T(`seller.issues.${i}.loc`,"Which room or spot?")}${Seg(`seller.issues.${i}.sound`,"Is it a safety or structural risk?",YNU)}${TA(`seller.issues.${i}.desc`,"Describe it",{cls:"full"})}${Seg(`seller.issues.${i}.status`,"Status",FIXSTAT,{cls:"full"})}</div></div>`).join("")}
       <div style="margin-top:12px"><button class="btn sec sm" data-act="add" data-arr="seller.issues">Add another problem</button></div></div>`:""}
-    ${s.hasDefects==="no"?`<div class="callout ok"><p style="margin:0">The summary will say you know of no problems, and the appraiser will still inspect and write up whatever they find.</p></div>`:""}
+    ${s.hasDefects==="no"?`<div class="callout ok"><p style="margin:0">The summary will say you know of no problems. The appraiser will still inspect and write up whatever they find.</p></div>`:""}
   </div>`;
 }
 function stepFeatures(){
   const s=S.seller,adu=(s.outb||[]).includes("Guest house or ADU");
   return `<h2>Updates and Extras</h2>
-  <p style="font-size:15px">List work from the last 10 years or anything you finished after you bought the home, since appraisers ask for dates and records.</p>
+  <p style="font-size:15px">List work from the last 10 years, plus anything you finished after you bought the home. Appraisers ask for dates and records.</p>
   ${s.improvements.map((r,i)=>`<div class="item"><div class="item-h"><h4>Work ${i+1}</h4><button class="linkbtn" data-act="rm" data-arr="seller.improvements" data-i="${i}">Remove</button></div>
     <div class="grid2">${T(`seller.improvements.${i}.what`,"What was done",{ph:"Finished the basement",cls:"full"})}${N(`seller.improvements.${i}.year`,"Year")}${N(`seller.improvements.${i}.cost`,"Approximate cost",{opt:1})}${Seg(`seller.improvements.${i}.permit`,"Permit pulled?",YNU)}${Seg(`seller.improvements.${i}.docs`,"Records you have",[["receipts","Receipts"],["photos","Photos"],["both","Both"],["none","None"]])}</div></div>`).join("")}
   <div style="margin-top:12px"><button class="btn sec sm" data-act="add" data-arr="seller.improvements">Add work you have done</button></div>
@@ -1167,7 +1167,7 @@ function stepReview(){
   const addr=[s.prop.addr,s.prop.city,s.prop.state,s.prop.zip].filter(Boolean).join(", ");
   const nq=Object.values(s.quick).filter(x=>x&&x.on).length+s.issues.length;
   const share=canShareFiles();
-  return `<h2>Review and Download</h2><p class="intro">Check the summary, then download the PDF and hand it to the appraiser at the visit or send it with your lender's appraisal order.</p>
+  return `<h2>Review and Download</h2><p class="intro">Check the summary, then download the PDF. Hand it to the appraiser at the visit, or send it with your lender's appraisal order.</p>
   ${g.length?`<div class="callout warn"><h4>${g.length} ${g.length===1?"item is":"items are"} still blank</h4>${g.map(x=>`<div class="gap"><span>${x[1]}</span><button class="linkbtn red" data-go="seller" data-step="${x[0]}">Go</button></div>`).join("")}</div>`:`<div class="callout ok"><p style="margin:0">Nothing important is blank, but you can still go back and add detail.</p></div>`}
   <div class="rev">
     <div class="revrow"><span>Property</span><span>${esc(addr||"Not provided")}</span></div>
@@ -1188,7 +1188,7 @@ function stepReview(){
     ${share?`<button class="btn sec" id="shApp"><span class="spin"></span><span class="lbl2">Share summary</span></button>`:""}
   </div>
   <div class="row" style="margin-top:12px">${leadTo()?`<button class="linkbtn red" id="mailAgent">Email my agent about this summary</button>`:`<button class="linkbtn red" id="copySum">Copy a text summary</button>`}</div>
-  <p class="saved">Downloading doesn't send your answers anywhere, and if your agent is set up, the email button opens a message you can review and attach the PDF to yourself.</p>
+  <p class="saved">Downloading doesn't send your answers anywhere. If your agent is set up, the email button opens a message you can review — then attach the PDF yourself.</p>
   ${L?`<div class="fin"><div><h4>Planning your next purchase?</h4><p>Ask about pre-qualification now, so financing is ready when you find the next home.</p></div><button class="btn sec" id="mailLender">Ask ${esc(L.name||"my lender")}</button></div>`:""}
   <div class="row" style="margin-top:24px"><button class="linkbtn" id="clearSeller">${ui.confirm===1?"Tap again to erase my answers":"Clear my answers"}</button></div>`;
 }
@@ -1321,7 +1321,7 @@ function renderBuyer(){
 }
 function buyerList(){
   const hs=S.buyer.homes;
-  return `<div class="hero"><h1>Walk Every <span class="accent">Home</span></h1><p>Add each home you tour, and the checklist follows what the appraiser looks at so you can spot problems before they do.</p></div>
+  return `<div class="hero"><h1>Walk Every <span class="accent">Home</span></h1><p>Add each home you tour. The checklist follows what the appraiser looks at, so you can spot problems before they do.</p></div>
   <div class="card panel">
     <div class="fld"><label class="lbl" for="newHome">Address or nickname for the next home</label><div class="row" style="flex-wrap:nowrap"><input class="jd-input" id="newHome" placeholder="123 Maple St" autocomplete="off"><button class="btn" id="addHome" style="flex:none">Add home</button></div><div id="homeErr" class="err" role="alert"></div></div>
     ${hs.length?`<div class="sub" style="margin-top:32px">Your homes</div><div class="homes">${hs.map(h=>{const s=homeStats(h);return `<div class="home"><div><b>${esc(homeLabel(h))}</b><small>${s.done} of ${s.total} checked${s.risk.length?`, ${s.risk.length} could hold up financing`:""}</small></div><div class="row"><button class="btn sec sm" data-bopen="${h.id}">Open</button><button class="linkbtn" data-bdel="${h.id}">${ui.confirm===h.id?"Tap to delete":"Delete"}</button></div></div>`}).join("")}</div>
@@ -1361,7 +1361,7 @@ function buyerSummary(h){
   return `<div class="row" style="margin-bottom:12px"><button class="linkbtn" data-go="buyer" data-bv="home">Back to checklist</button></div>
   <h2>${esc(homeLabel(h))}</h2>
   <div class="sumcount"><div class="tot"><b class="p">${st.risk.length}</b><span>Could hold up financing</span></div><div class="tot"><b class="w">${st.watch.length}</b><span>To watch</span></div><div class="tot"><b class="g">${st.g}</b><span>Good</span></div><div class="tot"><b>${st.total-st.done}</b><span>Not checked</span></div></div>
-  ${st.risk.length?`<div class="sub">Could hold up financing</div><div class="callout warn"><p style="margin:0">The appraiser writes down safety and structural problems, and required repairs usually have to be finished before a conventional loan can close, so ask your lender how repairs would be handled before you write an offer.</p></div><ul class="list">${st.risk.map(r=>`<li>${esc(r.it.t)}${r.n?`<small>${esc(r.n)}</small>`:""}</li>`).join("")}</ul>`:`<div class="callout ok"><p style="margin:0">${st.done?"You flagged no problems on items that often lead to required repairs.":"Nothing is checked yet."}</p></div>`}
+  ${st.risk.length?`<div class="sub">Could hold up financing</div><div class="callout warn"><p style="margin:0">The appraiser writes down safety and structural problems. Required repairs usually have to be done before a conventional loan can close. Ask your lender how repairs would be handled before you write an offer.</p></div><ul class="list">${st.risk.map(r=>`<li>${esc(r.it.t)}${r.n?`<small>${esc(r.n)}</small>`:""}</li>`).join("")}</ul>`:`<div class="callout ok"><p style="margin:0">${st.done?"You flagged no problems on items that often lead to required repairs.":"Nothing is checked yet."}</p></div>`}
   ${st.watch.length?`<div class="sub">Watch list</div><ul class="list">${st.watch.map(r=>`<li>${esc(r.it.t)}${r.n?`<small>${esc(r.n)}</small>`:""}</li>`).join("")}</ul>`:""}
   <div class="sub">Questions to ask the seller</div><ul class="list">${qs.map(q=>`<li>${esc(q)}</li>`).join("")}</ul>
   <div class="row"><button class="btn" id="dlBuyer"><span class="spin"></span><span class="lbl2">Download summary (PDF)</span></button>${leadTo()?`<button class="btn sec" id="mailBuyer">Email my agent</button>`:`<button class="btn sec" id="copyBuyer">Copy a text summary</button>`}</div>
@@ -1480,9 +1480,9 @@ const nonEmpty=r=>r.slice(1).some(x=>x!==""&&x!=null);
 
 function pdfAppraiser(){
   const s=S.seller,p=s.prop,q=s.sqft,addr=addrOf();
-  const D=buildDoc({headL:"Property information for the appraiser",headR:addr,foot:"Provided by the property owner to help the appraiser complete the report. It is not an appraisal, inspection or opinion of value, and the appraiser verifies each item and reports independently.",foot2:hasAgent()?"Provided through: "+agentLine():""});
+  const D=buildDoc({headL:"Property information for the appraiser",headR:addr,foot:"Provided by the property owner to help the appraiser complete the report. It isn't an appraisal, inspection or opinion of value. The appraiser verifies each item and reports independently.",foot2:hasAgent()?"Provided through: "+agentLine():""});
   D.h1("Property information for the appraiser",addr+"   |   Prepared "+today());
-  D.box("Every item below is the owner's own statement, which the appraiser verifies on site, and the summary follows the layout of the new appraisal form (UAD 3.6).");
+  D.box("Every item below is the owner's own statement, which the appraiser verifies on site. The summary follows the layout of the new appraisal form (UAD 3.6).");
   D.h2("Property");
   D.kv([["Address",addr],["Owner",p.owner],["Property type",lab(TYPES,p.type)],["Year built",p.year],["Levels",p.levels],["Bedrooms",p.beds],["Full baths",p.fullBaths],["Half baths",p.halfBaths],["Garage or carport",p.garage],["Lot size",p.lot],["Purpose",({sale:"Sale",refi:"Refinance",other:"Other"})[p.reason]||""],["HOA dues per month",p.hoa?"$"+fmtN(p.hoa):""],["File or order number",s.meta.order],["Appraiser or AMC",s.meta.appraiser],["Inspection date",s.meta.inspect]].filter((r,i)=>i<10||r[1]));
   if(s.rental.any==="yes"){D.h2("Rental information");
@@ -1579,7 +1579,7 @@ function pdfBuyer(h){
     ["Roof age",h.facts.roofAge?h.facts.roofAge+" years":""],["Furnace or A/C age",h.facts.hvacAge?h.facts.hvacAge+" years":""],["Water heater age",h.facts.whAge?h.facts.whAge+" years":""],["Solar",({none:"None",owned:"Owned",financed:"Financed",leased:"Leased or PPA"})[h.facts.solar]||""],
     ["Finished space above ground",h.facts.agFin?fmtN(h.facts.agFin)+" sq ft":""],["Finished basement space",h.facts.bgFin?fmtN(h.facts.bgFin)+" sq ft":""],["Kitchen last updated",lab(WHEN,h.facts.kitchenWhen)],["Bathrooms last updated",lab(WHEN,h.facts.bathWhen)]],3);
   D.h2("Could hold up financing");
-  if(st.risk.length){D.box("The appraiser writes down safety and structural problems, and required repairs usually have to be finished before a conventional loan can close, so ask the lender how repairs would be handled before making an offer.",{fill:C_WARN});
+  if(st.risk.length){D.box("The appraiser writes down safety and structural problems. Required repairs usually have to be done before a conventional loan can close. Ask the lender how repairs would be handled before making an offer.",{fill:C_WARN});
     D.table([{h:"Item",w:.3},{h:"Section",w:.25},{h:"Notes",w:.45}],st.risk.map(r=>[r.it.t,r.it.sec,r.n]))}
   else D.p("No problems flagged on items that often lead to required repairs.");
   if(st.watch.length){D.h2("Watch list");D.table([{h:"Item",w:.3},{h:"Section",w:.25},{h:"Notes",w:.45}],st.watch.map(r=>[r.it.t,r.it.sec,r.n]))}
