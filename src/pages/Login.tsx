@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/Logo';
-import { MountainScape } from '@/components/MountainScape';
 import { Button } from '@/components/ui/Button';
 import { TextField, Label } from '@/components/ui/TextField';
 import { useAuth } from '@/context/AuthContext';
@@ -57,8 +56,14 @@ export default function Login() {
       <div
         className="relative hidden flex-[1.05] flex-col justify-between overflow-hidden bg-login-panel p-[56px] pb-12 lg:flex"
       >
-        {/* Decorative sunset mountain range built from the accent palette. */}
-        <MountainScape opacity={0.92} />
+        {/* Scenic brand backdrop — day landscape (light) / night scene (dark). */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: 'var(--app-scene)' }}
+        />
+        {/* Left-weighted scrim so the left-aligned copy stays readable. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: 'var(--login-scrim)' }} />
         <div className="relative z-10">
           <Logo size={42} wordmark={23} glow />
         </div>
@@ -79,7 +84,7 @@ export default function Login() {
             ))}
           </div>
         </div>
-        <div className="relative z-10 text-[12.5px] font-medium text-[#eef3f8]">
+        <div className="relative z-10 text-[12.5px] font-medium text-ink-muted">
           Equal Housing Lender · For licensed mortgage professionals
         </div>
       </div>
