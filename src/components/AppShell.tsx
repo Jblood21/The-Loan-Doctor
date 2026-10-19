@@ -37,8 +37,8 @@ export function AppShell() {
                 version (moon + stars) in dark. Sits behind content (−z), no clicks. */}
             <div
               aria-hidden
-              className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-bottom bg-no-repeat"
-              style={{ backgroundImage: 'var(--app-scene)' }}
+              className="pointer-events-none fixed -inset-8 -z-10 bg-cover bg-bottom bg-no-repeat"
+              style={{ backgroundImage: 'var(--app-scene)', filter: 'blur(12px)' }}
             />
             {/* Soft scrim so cards and text stay readable over the scenery. */}
             <div
