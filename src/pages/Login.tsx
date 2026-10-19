@@ -65,7 +65,7 @@ export default function Login() {
         {/* Left-weighted scrim so the left-aligned copy stays readable. */}
         <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: 'var(--login-scrim)' }} />
         <div className="relative z-10">
-          <Logo size={66} glow />
+          <Logo size={50} glow />
         </div>
         <div className="relative z-10">
           <div className="max-w-[480px] font-display text-[46px] font-bold leading-[1.08] tracking-[-1.5px]">
