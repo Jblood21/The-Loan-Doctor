@@ -3,7 +3,6 @@ import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { SettingsDrawer } from './SettingsDrawer';
 import { Logo } from './Logo';
-import { MountainScape } from './MountainScape';
 import { UIProvider, useUI } from '@/context/UIContext';
 import { SettingsProvider } from '@/context/SettingsContext';
 import { ScenariosProvider } from '@/context/ScenariosContext';
@@ -34,11 +33,19 @@ export function AppShell() {
         <ScenariosProvider>
           <ReportProvider>
           <div className="flex min-h-screen">
-            {/* Faint, blurred sunset mountains across the app canvas — a brand
-                backdrop that sits behind content (−z) and never catches clicks. */}
-            <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 h-[96vh]">
-              <MountainScape opacity={0.3} blur={4} />
-            </div>
+            {/* Scenic brand backdrop — the day landscape in light mode, a night
+                version (moon + stars) in dark. Sits behind content (−z), no clicks. */}
+            <div
+              aria-hidden
+              className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-bottom bg-no-repeat"
+              style={{ backgroundImage: 'var(--app-scene)' }}
+            />
+            {/* Soft scrim so cards and text stay readable over the scenery. */}
+            <div
+              aria-hidden
+              className="pointer-events-none fixed inset-0 -z-10"
+              style={{ background: 'var(--app-scene-scrim)' }}
+            />
             <Sidebar />
             <main className="max-h-screen min-w-0 flex-1 overflow-y-auto">
               <MobileTopBar />
