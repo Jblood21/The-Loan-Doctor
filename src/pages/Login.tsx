@@ -286,11 +286,6 @@ export default function Login() {
               </>
             )}
           </div>
-
-          <div className="mt-7 rounded-[11px] border border-border bg-surface-tint px-[15px] py-[13px] text-[12.5px] leading-[1.5] text-ink-muted">
-            <strong>Preview build</strong> — for evaluation and demonstration. Please don’t enter real borrower
-            personal or financial information.
-          </div>
         </form>
       </div>
     </div>
