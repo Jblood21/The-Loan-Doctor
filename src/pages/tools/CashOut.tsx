@@ -11,7 +11,7 @@ export default function CashOut({ open, onClose }: CalcProps) {
   const [debtBalance, setDebtBalance] = useState(35000);
   const [debtPayment, setDebtPayment] = useState(850);
   const [extraCash, setExtraCash] = useState(0);
-  const [newRate, setNewRate] = useState(6.5);
+  const [newRate, setNewRate] = useState(7.25);
   const [newTerm, setNewTerm] = useState(30);
 
   const set = (fn: (v: number) => void) => (v: string) => fn(v === '' ? 0 : parseFloat(v) || 0);

@@ -7,7 +7,7 @@ import { AreaChart } from '@/components/charts/AreaChart';
 
 export default function Amortization({ open, onClose }: CalcProps) {
   const [loan, setLoan] = useState(320000);
-  const [rate, setRate] = useState(6.5);
+  const [rate, setRate] = useState(7.25);
   const [term, setTerm] = useState('30');
 
   const set = (fn: (v: number) => void) => (v: string) => fn(v === '' ? 0 : parseFloat(v) || 0);

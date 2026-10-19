@@ -24,7 +24,7 @@ export default function Hecm() {
     mortgage: 0,
     otherDebts: 0,
     payout: 'lump',
-    rate: 6.5,
+    rate: 7.0,
   });
   const set = (field: keyof HecmInputs, raw: string) => {
     const v = raw === '' ? 0 : parseFloat(raw);

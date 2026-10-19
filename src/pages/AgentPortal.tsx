@@ -654,7 +654,7 @@ function MarketingView() {
 function OpenHouseFlyer() {
   const [address, setAddress] = useState('');
   const [priceStr, setPriceStr] = useState('500000');
-  const [rateStr, setRateStr] = useState('6.5');
+  const [rateStr, setRateStr] = useState('7.25');
   const [term, setTerm] = useState('30');
   const [taxStr, setTaxStr] = useState('1.25');
   const [insStr, setInsStr] = useState('0.35');
@@ -722,7 +722,7 @@ function BuyerAffordability() {
   const [income, setIncome] = useState('120000');
   const [debts, setDebts] = useState('600');
   const [down, setDown] = useState('40000');
-  const [rate, setRate] = useState('6.5');
+  const [rate, setRate] = useState('7.25');
   const [term, setTerm] = useState('30');
   const [dti, setDti] = useState('43');
   const [busy, setBusy] = useState(false);

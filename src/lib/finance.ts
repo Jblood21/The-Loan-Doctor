@@ -19,8 +19,8 @@ import { CONVENTIONAL, FHA, USDA, VA } from './loanProgramRules';
 export const DEFAULT_TAX_RATE = 1.25; // %/yr of home value
 export const DEFAULT_INSURANCE_RATE = 0.35; // %/yr of home value
 export const DEFAULT_CLOSING_RATE = 0.03; // 3% of loan, rough fallback estimate
-/** FHA national HECM max claim amount (2025 lending limit). */
-export const HECM_MAX_CLAIM = 1209750;
+/** FHA national HECM max claim amount (2026 lending limit). */
+export const HECM_MAX_CLAIM = 1249125;
 
 // ---------------------------------------------------------------------------
 // Closing costs — itemized base + custom fees
@@ -549,8 +549,8 @@ export function computeHecm(input: HecmComputeInput): HecmResult {
 // VA entitlement (bonus / second-tier)
 // ---------------------------------------------------------------------------
 
-/** 2025 baseline conforming loan limit (one-unit), used as the default county loan limit. */
-export const VA_BASELINE_LIMIT = 806500;
+/** 2026 baseline conforming loan limit (one-unit), used as the default county loan limit. */
+export const VA_BASELINE_LIMIT = 832750;
 export const VA_BASIC_ENTITLEMENT = 36000;
 
 export interface VaEntitlementInput {

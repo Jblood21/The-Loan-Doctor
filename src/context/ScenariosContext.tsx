@@ -50,7 +50,7 @@ export function blankScenario(name: string, fees?: ClosingCostItem[]): Scenario 
     homePrice: 300000,
     downPayment: 30000,
     downPct: 10,
-    rate: 6.5,
+    rate: 7.25,
     term: '30',
     credit: '700',
     lenderCredit: 0,
