@@ -30,15 +30,16 @@ export function LogoMark({ size = 34, glow = false }: Omit<LogoProps, 'wordmark'
   );
 }
 
-export function Logo({ size = 34, wordmark = 19, glow = false }: LogoProps) {
+// Full brand lockup — the "Loan Base Camp" badge image. `size` sets its height;
+// `wordmark` is accepted for call-site compatibility but the text is part of the art.
+export function Logo({ size = 34, glow = false }: LogoProps) {
   return (
-    <div className="flex items-center" style={{ gap: size * 0.32 }}>
-      <LogoMark size={size} glow={glow} />
-      {wordmark > 0 && (
-        <span className="font-display font-bold tracking-[-0.4px] text-ink" style={{ fontSize: wordmark }}>
-          Base<span className="text-brand">camp</span>
-        </span>
-      )}
-    </div>
+    <img
+      src="/brand/logo-lockup.png"
+      alt="Loan Base Camp"
+      draggable={false}
+      className="block w-auto select-none"
+      style={{ height: Math.round(size * 1.2), filter: glow ? 'drop-shadow(0 6px 16px rgba(0,0,0,.22))' : undefined }}
+    />
   );
 }
