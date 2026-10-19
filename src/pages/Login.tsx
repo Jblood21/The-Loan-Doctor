@@ -5,7 +5,7 @@ import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/Button';
 import { TextField, Label } from '@/components/ui/TextField';
 import { useAuth } from '@/context/AuthContext';
-import { ApiError } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 
 const STATS = [
   { value: '6', label: 'scenarios at once' },
@@ -16,7 +16,7 @@ const STATS = [
 export default function Login() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -26,13 +26,31 @@ export default function Login() {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [devLink, setDevLink] = useState('');
+
+  // Switch between sign-in / register / forgot-password, clearing transient messages.
+  const switchMode = (next: 'login' | 'register' | 'forgot') => {
+    setMode(next);
+    setError('');
+    setInfo('');
+    setResetSent(false);
+    setDevLink('');
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setInfo('');
     setSubmitting(true);
     const cleanEmail = email.trim();
     try {
+      if (mode === 'forgot') {
+        const res = await api.forgotPassword({ email: cleanEmail });
+        setResetSent(true);
+        setDevLink(res.devLink || '');
+        return;
+      }
       if (mode === 'login') {
         await login(cleanEmail, password, remember);
       } else {
@@ -93,12 +111,14 @@ export default function Login() {
       <div className="flex flex-1 items-center justify-center bg-surface p-6 sm:p-10 lg:flex-[.95]">
         <form onSubmit={onSubmit} className="w-full max-w-[380px] animate-lp-fade-slow">
           <h1 className="m-0 font-display text-[28px] font-semibold tracking-[-0.6px]">
-            {mode === 'login' ? 'Welcome back' : 'Create your account'}
+            {mode === 'login' ? 'Welcome back' : mode === 'register' ? 'Create your account' : 'Reset your password'}
           </h1>
           <p className="mb-[30px] mt-1.5 text-[14.5px] text-text-muted">
             {mode === 'login'
               ? 'Sign in to your loan officer workspace.'
-              : 'Start comparing loans in under a minute.'}
+              : mode === 'register'
+                ? 'Start comparing loans in under a minute.'
+                : 'Enter your email and we’ll send you a link to set a new password.'}
           </p>
 
           {mode === 'register' && (
@@ -135,29 +155,33 @@ export default function Login() {
             required
           />
 
-          <Label>Password</Label>
-          <div className="relative mb-3.5">
-            <TextField
-              size="lg"
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              className="!pr-[68px]"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              aria-pressed={showPassword}
-              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent px-1 text-[12.5px] font-semibold text-brand-blue-light"
-            >
-              {showPassword ? 'Hide' : 'Show'}
-            </button>
-          </div>
+          {mode !== 'forgot' && (
+            <>
+              <Label>Password</Label>
+              <div className="relative mb-3.5">
+                <TextField
+                  size="lg"
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  className="!pr-[68px]"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent px-1 text-[12.5px] font-semibold text-brand-blue-light"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </>
+          )}
 
           {mode === 'login' && (
             <div className="mb-[26px] flex items-center justify-between text-[13px]">
@@ -172,11 +196,26 @@ export default function Login() {
               </label>
               <button
                 type="button"
-                onClick={() => setInfo('Password resets aren’t self-serve yet — contact your administrator to reset it.')}
+                onClick={() => switchMode('forgot')}
                 className="cursor-pointer border-none bg-transparent text-brand-blue-light no-underline"
               >
                 Forgot password?
               </button>
+            </div>
+          )}
+
+          {mode === 'forgot' && resetSent && (
+            <div className="mb-4 rounded-[11px] border border-border bg-surface-tint px-[15px] py-3 text-[13px] leading-[1.55] text-ink">
+              If an account exists for that email, we’ve sent a link to reset your password. Check your inbox
+              (and spam folder).
+              {devLink && (
+                <div className="mt-2">
+                  <span className="text-text-muted">Dev link:</span>{' '}
+                  <a href={devLink} className="break-all font-semibold text-brand-blue-light underline">
+                    {devLink}
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
@@ -201,10 +240,14 @@ export default function Login() {
             {submitting
               ? mode === 'login'
                 ? 'Signing in…'
-                : 'Creating…'
+                : mode === 'register'
+                  ? 'Creating…'
+                  : 'Sending…'
               : mode === 'login'
                 ? 'Sign in'
-                : 'Create account'}
+                : mode === 'register'
+                  ? 'Create account'
+                  : 'Send reset link'}
           </Button>
 
           <div className="mt-[22px] text-center text-[13.5px] text-text-muted">
@@ -213,27 +256,32 @@ export default function Login() {
                 New here?{' '}
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode('register');
-                    setError('');
-                  }}
+                  onClick={() => switchMode('register')}
                   className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light"
                 >
                   Create an account
                 </button>
               </>
-            ) : (
+            ) : mode === 'register' ? (
               <>
                 Already have an account?{' '}
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode('login');
-                    setError('');
-                  }}
+                  onClick={() => switchMode('login')}
                   className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light"
                 >
                   Sign in
+                </button>
+              </>
+            ) : (
+              <>
+                Remembered it?{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light"
+                >
+                  Back to sign in
                 </button>
               </>
             )}

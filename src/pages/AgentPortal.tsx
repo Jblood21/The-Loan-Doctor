@@ -57,13 +57,24 @@ export default function AgentPortal() {
 
 /** Login / sign-up card for agents. */
 function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [devLink, setDevLink] = useState('');
+
+  // Switch between sign-in / register / forgot-password, clearing transient messages.
+  const switchMode = (next: 'login' | 'register' | 'forgot') => {
+    setMode(next);
+    setError('');
+    setResetSent(false);
+    setDevLink('');
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -71,11 +82,17 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
     setSubmitting(true);
     try {
       const cleanEmail = email.trim();
+      if (mode === 'forgot') {
+        const res = await agentApi.forgotPassword({ email: cleanEmail });
+        setResetSent(true);
+        setDevLink(res.devLink || '');
+        return;
+      }
       const res =
         mode === 'login'
           ? await agentApi.login({ email: cleanEmail, password })
           : await agentApi.register({ email: cleanEmail, password, name: name.trim(), phone: phone.trim() });
-      setAgentToken(res.token, true);
+      setAgentToken(res.token, remember);
       onAuthed(res.agent);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Can’t reach the server right now — please try again in a moment.');
@@ -92,7 +109,11 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
           <div>
             <h1 className="m-0 font-display text-[24px] font-semibold tracking-[-0.5px]">Real-Estate Agent Portal</h1>
             <p className="mt-1.5 text-[14px] text-text-muted">
-              {mode === 'login' ? 'Sign in to your assigned pre-approvals.' : 'Create your agent account to get started.'}
+              {mode === 'login'
+                ? 'Sign in to your assigned pre-approvals.'
+                : mode === 'register'
+                  ? 'Create your agent account to get started.'
+                  : 'Enter your email and we’ll send you a link to set a new password.'}
             </p>
           </div>
         </div>
@@ -116,17 +137,57 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
           onChange={(e) => setEmail(e.target.value)}
           required
         />
-        <Label>Password</Label>
-        <TextField
-          size="lg"
-          type="password"
-          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          className="mb-5"
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        {mode !== 'forgot' && (
+          <>
+            <Label>Password</Label>
+            <TextField
+              size="lg"
+              type="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              className="mb-4"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </>
+        )}
+
+        {mode === 'login' && (
+          <div className="mb-5 flex items-center justify-between text-[13px]">
+            <label className="flex cursor-pointer items-center gap-2 text-text-muted">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="h-[15px] w-[15px] accent-brand-teal"
+              />{' '}
+              Remember me
+            </label>
+            <button
+              type="button"
+              onClick={() => switchMode('forgot')}
+              className="cursor-pointer border-none bg-transparent font-medium text-brand-blue-light"
+            >
+              Forgot password?
+            </button>
+          </div>
+        )}
+
+        {mode === 'forgot' && resetSent && (
+          <div className="mb-4 rounded-[11px] border border-border bg-input/60 px-[15px] py-3 text-[13px] leading-[1.55] text-text-soft">
+            If an account exists for that email, we’ve sent a link to reset your password. Check your inbox
+            (and spam folder).
+            {devLink && (
+              <div className="mt-2">
+                <span className="text-text-muted">Dev link:</span>{' '}
+                <a href={devLink} className="break-all font-semibold text-brand-blue-light underline">
+                  {devLink}
+                </a>
+              </div>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded-[11px] border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] px-[15px] py-3 text-[13px] text-danger">
@@ -135,22 +196,29 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
         )}
 
         <Button type="submit" variant="primary" disabled={submitting} className="!h-[50px] w-full !rounded-xl !text-[15.5px]">
-          {submitting ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+          {submitting ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : 'Send reset link'}
         </Button>
 
         <div className="mt-5 text-center text-[13.5px] text-text-muted">
           {mode === 'login' ? (
             <>
               New here?{' '}
-              <button type="button" onClick={() => { setMode('register'); setError(''); }} className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light">
+              <button type="button" onClick={() => switchMode('register')} className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light">
                 Create an account
+              </button>
+            </>
+          ) : mode === 'register' ? (
+            <>
+              Already have an account?{' '}
+              <button type="button" onClick={() => switchMode('login')} className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light">
+                Sign in
               </button>
             </>
           ) : (
             <>
-              Already have an account?{' '}
-              <button type="button" onClick={() => { setMode('login'); setError(''); }} className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light">
-                Sign in
+              Remembered it?{' '}
+              <button type="button" onClick={() => switchMode('login')} className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light">
+                Back to sign in
               </button>
             </>
           )}

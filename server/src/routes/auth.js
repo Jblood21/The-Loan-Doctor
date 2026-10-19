@@ -2,9 +2,11 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { addUser, findUserByEmail, findUserById, publicUser, updateUser, normalizeEmail, bumpSessionEpoch } from '../store.js';
 import { requireAuth, signToken } from '../auth.js';
+import { requestPasswordReset, performPasswordReset } from '../passwordReset.js';
 
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const publicBaseUrl = (req) => process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
 
 // Registration is OPEN and FREE — anyone can create an account (no access code). Each
 // account's data (scenarios, borrowers, settings) is private to that user, so open
@@ -73,6 +75,18 @@ router.put('/password', requireAuth, (req, res) => {
   // current session stays signed in with the new epoch.
   bumpSessionEpoch(user.id);
   res.json({ ok: true, token: signToken(findUserById(user.id)) });
+});
+
+// Self-serve password reset (no auth). forgot-password always returns ok so it can't
+// be used to probe which emails are registered; the token arrives only by email.
+router.post('/forgot-password', async (req, res) => {
+  const out = await requestPasswordReset({ kind: 'user', email: req.body?.email, baseUrl: publicBaseUrl(req) });
+  res.json(out);
+});
+router.post('/reset-password', (req, res) => {
+  const r = performPasswordReset({ token: req.body?.token, newPassword: req.body?.newPassword });
+  if (!r.ok) return res.status(r.status || 400).json({ error: r.error });
+  res.json({ ok: true });
 });
 
 // Server-side logout — invalidates this user's outstanding tokens everywhere.

@@ -18,6 +18,7 @@ import {
   findLetterShareForAssignment,
 } from '../store.js';
 import { requireAgent, signAgentToken } from '../auth.js';
+import { requestPasswordReset, performPasswordReset } from '../passwordReset.js';
 import { streamLetterPdf } from '../lib/letterPdfRender.js';
 import { assignmentLetterPayload, cappedPrice } from '../lib/assignmentLetter.js';
 import { publicAssignment } from './preapproval.js';
@@ -55,6 +56,18 @@ router.post('/auth/login', (req, res) => {
 
 router.get('/auth/me', requireAgent, (req, res) => {
   res.json({ agent: publicAgent(req.agent) });
+});
+
+// Self-serve password reset for agents (mirrors the loan-officer flow).
+const publicBaseUrl = (req) => process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
+router.post('/auth/forgot-password', async (req, res) => {
+  const out = await requestPasswordReset({ kind: 'agent', email: req.body?.email, baseUrl: publicBaseUrl(req) });
+  res.json(out);
+});
+router.post('/auth/reset-password', (req, res) => {
+  const r = performPasswordReset({ token: req.body?.token, newPassword: req.body?.newPassword });
+  if (!r.ok) return res.status(r.status || 400).json({ error: r.error });
+  res.json({ ok: true });
 });
 
 // Agent profile — name, phone, brokerage, license, and an optional headshot (data URL),

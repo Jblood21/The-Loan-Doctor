@@ -92,7 +92,7 @@ export function dataDirInfo() {
   return { dir: DATA_DIR, persistent, explicit, onKnownMount };
 }
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, agents: [], assignments: [], agentShares: [], counters: { preApprovals: 0 } };
+const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, agents: [], assignments: [], agentShares: [], resetTokens: {}, counters: { preApprovals: 0 } };
 
 let db = structuredClone(EMPTY);
 
@@ -399,6 +399,26 @@ export function publicAgent(a) {
     status: a.status,
     createdAt: a.createdAt,
   };
+}
+
+// ---- password-reset tokens ---------------------------------------------
+// Stored keyed by the SHA-256 of the raw token (the raw token only ever lives in
+// the emailed link). Single-use and time-limited. kind is 'user' or 'agent'.
+export function createResetToken(kind, id, tokenHash, expiresAt) {
+  // prune expired tokens opportunistically
+  const now = Date.now();
+  for (const [h, r] of Object.entries(db.resetTokens)) if (!r || r.expiresAt < now) delete db.resetTokens[h];
+  db.resetTokens[tokenHash] = { kind, id, expiresAt };
+  persist();
+}
+/** Look up and remove a reset token; returns {kind, id} if valid and unexpired, else null. */
+export function consumeResetToken(tokenHash) {
+  const r = db.resetTokens[tokenHash];
+  if (!r) return null;
+  delete db.resetTokens[tokenHash];
+  persist();
+  if (r.expiresAt < Date.now()) return null;
+  return { kind: r.kind, id: r.id };
 }
 
 // ---- agent shares (public, token-gated buyer-facing links) --------------

@@ -13,6 +13,7 @@ import Agents from '@/pages/Agents';
 import SharedQuote from '@/pages/SharedQuote';
 import AgentPortal from '@/pages/AgentPortal';
 import AgentShare from '@/pages/AgentShare';
+import ResetPassword from '@/pages/ResetPassword';
 
 function Splash() {
   return (
@@ -48,6 +49,8 @@ function AppRoutes() {
       <Route path="/agent" element={<AgentPortal />} />
       {/* Public buyer-facing share links (pre-approval letter / affordability). */}
       <Route path="/s/:token" element={<AgentShare />} />
+      {/* Public self-serve password reset reached from the emailed link. */}
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/login" element={<LoginGate />} />
       <Route element={<RequireAuth />}>
         <Route path="/compare" element={<Compare />} />

@@ -54,6 +54,10 @@ export const agentApi = {
   me: () => agentRequest<{ agent: AgentUser }>('GET', '/auth/me'),
   updateProfile: (data: Partial<Pick<AgentUser, 'name' | 'phone' | 'brokerage' | 'license' | 'photo'>>) =>
     agentRequest<{ agent: AgentUser }>('PUT', '/auth/profile', data),
+  forgotPassword: (data: { email: string }) =>
+    agentRequest<{ ok: boolean; devLink?: string; emailConfigured?: boolean }>('POST', '/auth/forgot-password', data),
+  resetPassword: (data: { token: string; newPassword: string }) =>
+    agentRequest<{ ok: boolean }>('POST', '/auth/reset-password', data),
 
   listAssignments: () => agentRequest<{ assignments: Assignment[] }>('GET', '/assignments'),
   getAssignment: (id: string) => agentRequest<{ assignment: Assignment }>('GET', `/assignments/${id}`),

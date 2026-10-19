@@ -71,6 +71,10 @@ export const api = {
   updateProfile: (data: Partial<User>) => request<{ user: User }>('PUT', '/auth/profile', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     request<{ ok: boolean }>('PUT', '/auth/password', data),
+  forgotPassword: (data: { email: string }) =>
+    request<{ ok: boolean; devLink?: string; emailConfigured?: boolean }>('POST', '/auth/forgot-password', data),
+  resetPassword: (data: { token: string; newPassword: string }) =>
+    request<{ ok: boolean }>('POST', '/auth/reset-password', data),
 
   // settings
   getSettings: () => request<{ settings: Settings }>('GET', '/settings'),
