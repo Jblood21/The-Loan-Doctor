@@ -18,11 +18,28 @@ export function getStoredTheme(): Theme {
   return 'system';
 }
 
+/** Canvas colors, used for the installed app's title bar so it blends with the page. */
+const THEME_COLOR = { light: '#f5f3ea', dark: '#0d1824' } as const;
+
+/** Tint the browser/installed-app title bar to match the resolved theme. */
+function syncThemeColor(theme: Theme): void {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', THEME_COLOR[resolvedTheme(theme)]);
+}
+
 /** Apply a theme to <html> without persisting it. */
 export function applyTheme(theme: Theme): void {
   const root = document.documentElement;
   if (theme === 'system') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', theme);
+  syncThemeColor(theme);
+}
+
+// When following the OS, re-tint the title bar if the OS flips light/dark while open.
+if (typeof window !== 'undefined' && window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (getStoredTheme() === 'system') syncThemeColor('system');
+  });
 }
 
 /** Persist and apply a theme. */

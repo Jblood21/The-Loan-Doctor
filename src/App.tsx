@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { AppShell } from '@/components/AppShell';
 import { LogoMark } from '@/components/Logo';
@@ -14,6 +15,31 @@ import SharedQuote from '@/pages/SharedQuote';
 import AgentPortal from '@/pages/AgentPortal';
 import AgentShare from '@/pages/AgentShare';
 import ResetPassword from '@/pages/ResetPassword';
+
+/** Window/tab title per page, so several windows are easy to tell apart in the taskbar. */
+const PAGE_TITLES: [prefix: string, title: string][] = [
+  ['/compare', 'Compare Loans'],
+  ['/hecm', 'Reverse (HECM)'],
+  ['/pre-approval', 'Pre-Approval'],
+  ['/agents', 'Agents'],
+  ['/tools', 'Tools'],
+  ['/help', 'Help Center'],
+  ['/admin', 'Admin'],
+  ['/agent', 'Agent Portal'],
+  ['/login', 'Sign in'],
+  ['/reset-password', 'Reset password'],
+  ['/q/', 'Your loan quote'],
+  ['/s/', 'Shared with you'],
+];
+
+function RouteTitle() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const hit = PAGE_TITLES.find(([prefix]) => pathname === prefix.replace(/\/$/, '') || pathname.startsWith(prefix.endsWith('/') ? prefix : prefix + '/'));
+    document.title = hit ? `${hit[1]} · Basecamp` : 'Basecamp — Loan Officer Workspace';
+  }, [pathname]);
+  return null;
+}
 
 function Splash() {
   return (
@@ -70,6 +96,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
+      <RouteTitle />
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>

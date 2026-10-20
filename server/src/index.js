@@ -1,4 +1,4 @@
-// LoanDr. API server — Express + JSON store + JWT auth.
+// Basecamp API server — Express + JSON store + JWT auth.
 // In production it also serves the built frontend (single-service deploy).
 
 import 'dotenv/config';
@@ -125,7 +125,7 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
 seed();
 app.listen(PORT, () => {
   const isProd = process.env.NODE_ENV === 'production';
-  console.log(`\n  LoanDr. API → http://localhost:${PORT}`);
+  console.log(`\n  Basecamp API → http://localhost:${PORT}`);
   console.log(`  Health      → http://localhost:${PORT}/api/health`);
 
   // Storage durability — the #1 cause of "it forgot my login". Make it loud in the logs.

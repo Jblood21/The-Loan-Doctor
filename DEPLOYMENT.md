@@ -1,4 +1,4 @@
-# Putting LoanDr. on the web — step by step
+# Putting Basecamp on the web — step by step
 
 This guide gets you a **live link you can open in any browser**, with no software to
 install on your computer. The whole app (the website + its backend) runs as one service.

@@ -3,15 +3,51 @@
   "short_name": "Basecamp",
   "description": "Clear loan tools for loan officers and their agents.",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/compare",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
+  "lang": "en-US",
+  "dir": "ltr",
+  "categories": ["business", "finance", "productivity"],
   "background_color": "#f5f3ea",
-  "theme_color": "#2f649c",
+  "theme_color": "#f5f3ea",
+  "launch_handler": { "client_mode": "focus-existing" },
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Compare Loans",
+      "short_name": "Compare",
+      "description": "Model and compare loan scenarios",
+      "url": "/compare",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Pre-Approval Letter",
+      "short_name": "Pre-Approval",
+      "description": "Build or reissue a pre-approval letter",
+      "url": "/pre-approval",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Tools",
+      "short_name": "Tools",
+      "description": "Calculators and Appraisal Prep",
+      "url": "/tools",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Agents",
+      "short_name": "Agents",
+      "description": "Agent assignments and sign-up link",
+      "url": "/agents",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }

@@ -4,6 +4,7 @@ import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/Button';
 import { TextField, Label } from '@/components/ui/TextField';
 import { agentApi, getAgentToken, setAgentToken } from '@/lib/agentApi';
+import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { ApiError } from '@/lib/api';
 import { fmt } from '@/lib/format';
 import { monthlyPayment } from '@/lib/finance';
@@ -20,6 +21,21 @@ import type { AgentUser, Assignment } from '@/types';
 export default function AgentPortal() {
   const [agent, setAgent] = useState<AgentUser | null>(null);
   const [booting, setBooting] = useState(true);
+
+  // Make "install this app" from the portal install the AGENT app ("Basecamp Agent",
+  // opening at /agent) instead of the loan-officer one. Restored when leaving the page.
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    const appleTitle = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
+    const prevHref = link?.getAttribute('href') ?? null;
+    const prevTitle = appleTitle?.getAttribute('content') ?? null;
+    link?.setAttribute('href', '/agent.webmanifest');
+    appleTitle?.setAttribute('content', 'Basecamp Agent');
+    return () => {
+      if (link && prevHref) link.setAttribute('href', prevHref);
+      if (appleTitle && prevTitle) appleTitle.setAttribute('content', prevTitle);
+    };
+  }, []);
 
   // Restore an existing agent session on mount.
   useEffect(() => {
@@ -234,6 +250,7 @@ type AgentTab = 'preapprovals' | 'tools' | 'marketing';
 function AgentDashboard({ agent, onSignOut, onAgentUpdate }: { agent: AgentUser; onSignOut: () => void; onAgentUpdate: (a: AgentUser) => void }) {
   const [tab, setTab] = useState<AgentTab>('preapprovals');
   const [profileOpen, setProfileOpen] = useState(false);
+  const { canInstall, installed, promptInstall } = useInstallPrompt();
   const navBtn = (key: AgentTab, label: string, soon = false) => (
     <button
       onClick={() => setTab(key)}
@@ -268,6 +285,9 @@ function AgentDashboard({ agent, onSignOut, onAgentUpdate }: { agent: AgentUser;
           >
             {agent.name || agent.email}
           </button>
+          {canInstall && !installed && (
+            <Button variant="secondary" size="sm" onClick={() => { promptInstall(); }}>Install app</Button>
+          )}
           <Button variant="ghost" size="sm" onClick={onSignOut}>Sign out</Button>
         </div>
       </header>

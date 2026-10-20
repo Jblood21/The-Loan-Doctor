@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 // The (non-standard, Chromium-only) event fired when the app is installable.
 interface BeforeInstallPromptEvent extends Event {
@@ -16,6 +16,34 @@ export function isStandalone(): boolean {
   );
 }
 
+// The browser fires `beforeinstallprompt` once per page load, usually before any component
+// that wants it has mounted. Capture it here at module level so every consumer (sidebar,
+// agent header, Settings) sees the same event no matter when it mounts.
+let deferred: BeforeInstallPromptEvent | null = null;
+let installed = isStandalone();
+const listeners = new Set<() => void>();
+const notify = () => listeners.forEach((l) => l());
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); // keep the event so our own button can trigger it
+    deferred = e as BeforeInstallPromptEvent;
+    notify();
+  });
+  window.addEventListener('appinstalled', () => {
+    installed = true;
+    deferred = null;
+    notify();
+  });
+}
+
+const subscribe = (cb: () => void) => {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+};
+
 /**
  * Exposes the browser's "install this app" capability.
  * - `installed`: already running as an installed app.
@@ -25,34 +53,19 @@ export function isStandalone(): boolean {
  * falls back to per-browser instructions.
  */
 export function useInstallPrompt() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(isStandalone());
-
-  useEffect(() => {
-    const onBeforeInstall = (e: Event) => {
-      e.preventDefault(); // keep the event so we can trigger it from our own button
-      setDeferred(e as BeforeInstallPromptEvent);
-    };
-    const onInstalled = () => {
-      setInstalled(true);
-      setDeferred(null);
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
-  }, []);
+  const event = useSyncExternalStore(subscribe, () => deferred);
+  const isInstalled = useSyncExternalStore(subscribe, () => installed);
 
   const promptInstall = async (): Promise<'accepted' | 'dismissed' | 'unavailable'> => {
     if (!deferred) return 'unavailable';
-    await deferred.prompt();
-    const { outcome } = await deferred.userChoice;
-    setDeferred(null);
-    if (outcome === 'accepted') setInstalled(true);
+    const e = deferred;
+    await e.prompt();
+    const { outcome } = await e.userChoice;
+    deferred = null; // a prompt event can only be used once
+    if (outcome === 'accepted') installed = true;
+    notify();
     return outcome;
   };
 
-  return { canInstall: !!deferred, installed, promptInstall };
+  return { canInstall: !!event, installed: isInstalled, promptInstall };
 }

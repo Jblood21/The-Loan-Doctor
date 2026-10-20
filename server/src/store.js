@@ -1,4 +1,4 @@
-// Simple JSON-file persistence for LoanDr.
+// Simple JSON-file persistence for Basecamp.
 //
 // Zero native dependencies — the whole store lives in server/data/db.json so the
 // app runs anywhere Node runs. Swap this module for Postgres/SQLite in production
@@ -566,7 +566,7 @@ export function seed() {
     role: 'admin',
     updatePassword: hasAdminPassword, // only overwrite when explicitly configured
     name: 'Owner Admin',
-    company: process.env.OWNER_COMPANY || 'LoanDr.',
+    company: process.env.OWNER_COMPANY || 'Basecamp',
     nmls: '000001',
     status: 'Active',
   });

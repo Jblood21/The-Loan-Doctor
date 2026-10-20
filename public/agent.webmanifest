@@ -1,0 +1,23 @@
+{
+  "name": "Basecamp — Real-Estate Agent Portal",
+  "short_name": "Basecamp Agent",
+  "description": "Your assigned pre-approvals, calculators and co-branded materials.",
+  "id": "/agent",
+  "start_url": "/agent",
+  "scope": "/agent",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "lang": "en-US",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "background_color": "#f5f3ea",
+  "theme_color": "#f5f3ea",
+  "launch_handler": { "client_mode": "focus-existing" },
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
