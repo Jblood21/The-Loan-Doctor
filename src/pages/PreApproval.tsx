@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/Button';
 import { SignaturePad } from '@/components/SignaturePad';
 import { useScenarios, blankScenario } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
-import { useUI } from '@/context/UIContext';
 import { api, ApiError } from '@/lib/api';
 import { computeScenario } from '@/lib/finance';
 import {
@@ -32,7 +31,7 @@ import { rankBorrowers } from '@/lib/borrowerSearch';
 import { parseMismo } from '@/lib/mismo';
 import type { MismoResult } from '@/lib/mismo';
 import { groupByBorrower, diffRecords } from '@/lib/preApprovalHistory';
-import type { AgentContact, PreApprovalRecord, PreApprovalState, Scenario } from '@/types';
+import type { PreApprovalRecord, PreApprovalState, Scenario } from '@/types';
 import { losBorrowerToScenario } from '@/lib/losBorrower';
 
 // Summit Home Loans brand palette (navy + steel accent).
@@ -124,7 +123,6 @@ export default function PreApproval() {
   // Pre-Approval draws from the same saved bank of scenarios as Compare.
   const { bank } = useScenarios();
   const { settings, save: saveSettings, saving: savingSettings } = useSettings();
-  const { openSettings } = useUI();
   const [pa, setPa] = useState<PreApprovalState>({
     source: 'scenario',
     scenarioIdx: 0,
@@ -144,12 +142,14 @@ export default function PreApproval() {
   const [webhookError, setWebhookError] = useState('');
   const [copied, setCopied] = useState(false);
   const [includeAgent, setIncludeAgent] = useState(true);
-  const [selectedAgentId, setSelectedAgentId] = useState('');
   // Co-brand by pulling the agent's own account by email (so their details aren't re-typed).
   const [agentEmail, setAgentEmail] = useState('');
   const [pulledAgent, setPulledAgent] = useState<LetterAgent | null>(null);
   const [agentLookupBusy, setAgentLookupBusy] = useState(false);
   const [agentLookupMsg, setAgentLookupMsg] = useState('');
+  // One-off manual entry for an agent who hasn't signed up (not saved anywhere).
+  const [showManual, setShowManual] = useState(false);
+  const [manualAgent, setManualAgent] = useState({ name: '', brokerage: '', phone: '' });
   const [imported, setImported] = useState<MismoResult | null>(null);
   const [importError, setImportError] = useState('');
   const [dragging, setDragging] = useState(false);
@@ -221,18 +221,13 @@ export default function PreApproval() {
   };
   const today = new Date();
   // Saved agent contacts, and the one selected to co-brand this letter. Defaults to the
-  // first saved agent (or the legacy single agent) so existing behavior is preserved.
-  const agentContacts = settings.agents ?? [];
-  const legacyAgent: AgentContact | null = settings.agentName?.trim()
-    ? { id: '__legacy__', name: settings.agentName, brokerage: settings.brokerage, phone: settings.agentPhone }
-    : null;
-  const allAgents = agentContacts.length ? agentContacts : legacyAgent ? [legacyAgent] : [];
-  const selectedAgent = allAgents.find((a) => a.id === selectedAgentId) || allAgents[0] || null;
-  // The agent pulled from their account (by email) wins; otherwise fall back to a saved contact.
+  // The agent pulled from their account (by email) wins; otherwise a one-off manual entry
+  // for an agent who hasn't signed up (not saved anywhere — just this letter).
+  const hasManual = manualAgent.name.trim().length > 0;
   const effectiveAgent: LetterAgent | null = pulledAgent
     ? pulledAgent
-    : selectedAgent
-      ? { name: selectedAgent.name, brokerage: selectedAgent.brokerage, phone: selectedAgent.phone, email: selectedAgent.email }
+    : hasManual
+      ? { name: manualAgent.name.trim(), brokerage: manualAgent.brokerage.trim(), phone: manualAgent.phone.trim() }
       : null;
   const hasAgent = !!effectiveAgent;
 
@@ -1406,18 +1401,38 @@ export default function PreApproval() {
 
               {agentLookupMsg && <div className="mt-2 text-[11.5px] text-warn-text">{agentLookupMsg}</div>}
 
-              {!pulledAgent && allAgents.length > 0 && (
-                <div className="mt-2.5">
-                  <div className="mb-1 text-[11px] text-text-dim">Or pick a saved contact:</div>
-                  <Select
-                    value={selectedAgent ? selectedAgent.id : ''}
-                    onChange={(e) => setSelectedAgentId(e.target.value)}
-                    options={allAgents.map((a) => ({
-                      value: a.id,
-                      label: [a.name, a.brokerage].filter(Boolean).join(' · ') || a.name,
-                    }))}
-                  />
-                </div>
+              {/* One-off manual entry for an agent who hasn't signed up — not saved anywhere. */}
+              {!pulledAgent && (
+                showManual ? (
+                  <div className="mt-2.5 grid grid-cols-2 gap-2">
+                    <TextField
+                      className="col-span-2 !h-[40px] !text-[13.5px]"
+                      placeholder="Agent name"
+                      value={manualAgent.name}
+                      onChange={(e) => setManualAgent((m) => ({ ...m, name: e.target.value }))}
+                    />
+                    <TextField
+                      className="!h-[40px] !text-[13.5px]"
+                      placeholder="Brokerage"
+                      value={manualAgent.brokerage}
+                      onChange={(e) => setManualAgent((m) => ({ ...m, brokerage: e.target.value }))}
+                    />
+                    <TextField
+                      className="!h-[40px] !text-[13.5px]"
+                      placeholder="Phone"
+                      value={manualAgent.phone}
+                      onChange={(e) => setManualAgent((m) => ({ ...m, phone: e.target.value }))}
+                    />
+                    <div className="col-span-2 text-[11px] text-text-dim">Just for this letter — not saved to Settings.</div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowManual(true)}
+                    className="mt-2 cursor-pointer border-none bg-transparent p-0 text-[11.5px] font-semibold text-brand-blue-light underline"
+                  >
+                    Agent hasn't signed up? Add their details manually
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -1506,26 +1521,17 @@ export default function PreApproval() {
             <p className="mb-4 text-[12.5px] leading-[1.55] text-text-muted">
               The agent signs in at <span className="font-semibold text-text-soft">{`${window.location.origin}/agent`}</span> and can update the property address (and the price, if you allow it). The loan terms and branding stay locked.
             </p>
-            {includeAgent && selectedAgent && (
+            {includeAgent && effectiveAgent && (
               <div className="mb-4 rounded-[10px] border border-border-input bg-input/60 px-3.5 py-2.5 text-[12.5px] leading-[1.55]">
                 <div>
-                  <span className="font-semibold text-text-soft">{selectedAgent.name}</span>
-                  {selectedAgent.brokerage ? <span className="text-text-muted"> · {selectedAgent.brokerage}</span> : null}
+                  <span className="font-semibold text-text-soft">{effectiveAgent.name}</span>
+                  {effectiveAgent.brokerage ? <span className="text-text-muted"> · {effectiveAgent.brokerage}</span> : null}
                 </div>
                 <div className="mt-0.5 text-[11.5px] text-text-muted">
-                  {selectedAgent.email ? (
+                  {effectiveAgent.email ? (
                     <>This is the agent acknowledged on the letter — their email is filled in below.</>
                   ) : (
-                    <>
-                      Acknowledged on the letter. Add their email in{' '}
-                      <button
-                        onClick={() => { setAssignOpen(false); openSettings(); }}
-                        className="cursor-pointer border-none bg-transparent p-0 font-semibold text-brand-blue-light underline"
-                      >
-                        Settings
-                      </button>{' '}
-                      to auto-fill it here next time.
-                    </>
+                    <>Acknowledged on the letter. Enter their email below to assign the editable copy.</>
                   )}
                 </div>
               </div>

@@ -538,12 +538,11 @@ function MiniField({ label, value, onChange, prefix, suffix, type = 'number', pl
   );
 }
 
-/** Edit the agent's co-branding profile (name, phone, brokerage, license, photo). */
+/** Edit the agent's co-branding profile (name, phone, brokerage, photo). */
 function ProfileModal({ open, onClose, agent, onSaved }: { open: boolean; onClose: () => void; agent: AgentUser; onSaved: (a: AgentUser) => void }) {
   const [name, setName] = useState(agent.name);
   const [phone, setPhone] = useState(agent.phone);
   const [brokerage, setBrokerage] = useState(agent.brokerage || '');
-  const [license, setLicense] = useState(agent.license || '');
   const [photo, setPhoto] = useState(agent.photo || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -553,7 +552,6 @@ function ProfileModal({ open, onClose, agent, onSaved }: { open: boolean; onClos
       setName(agent.name);
       setPhone(agent.phone);
       setBrokerage(agent.brokerage || '');
-      setLicense(agent.license || '');
       setPhoto(agent.photo || '');
       setMsg('');
     }
@@ -572,7 +570,7 @@ function ProfileModal({ open, onClose, agent, onSaved }: { open: boolean; onClos
     setSaving(true);
     setMsg('');
     try {
-      const { agent: a } = await agentApi.updateProfile({ name: name.trim(), phone: phone.trim(), brokerage: brokerage.trim(), license: license.trim(), photo });
+      const { agent: a } = await agentApi.updateProfile({ name: name.trim(), phone: phone.trim(), brokerage: brokerage.trim(), photo });
       onSaved(a);
       onClose();
     } catch (err) {
@@ -599,8 +597,7 @@ function ProfileModal({ open, onClose, agent, onSaved }: { open: boolean; onClos
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2"><Label>Name</Label><TextField value={name} onChange={(e) => setName(e.target.value)} /></div>
         <div><Label>Phone</Label><TextField value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" /></div>
-        <div><Label>License #</Label><TextField value={license} onChange={(e) => setLicense(e.target.value)} placeholder="DRE / license #" /></div>
-        <div className="sm:col-span-2"><Label>Brokerage</Label><TextField value={brokerage} onChange={(e) => setBrokerage(e.target.value)} placeholder="ABC Realty" /></div>
+        <div><Label>Brokerage</Label><TextField value={brokerage} onChange={(e) => setBrokerage(e.target.value)} placeholder="ABC Realty" /></div>
       </div>
       {msg && <div className="mt-3 text-[12.5px] text-danger">{msg}</div>}
       <div className="mt-5 flex justify-end gap-2.5">
