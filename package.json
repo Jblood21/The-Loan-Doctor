@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "LoanDr. — loan officer comparison workspace (React + TS frontend)",
+  "description": "Basecamp — loan officer comparison workspace (React + TS frontend)",
   "scripts": {
     "dev": "concurrently -n web,api -c cyan,magenta \"vite\" \"npm --prefix server run dev\"",
     "dev:web": "vite",

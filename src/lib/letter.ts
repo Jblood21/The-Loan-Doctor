@@ -288,6 +288,9 @@ export interface LetterAgent {
   name: string;
   brokerage: string;
   phone: string;
+  /** Co-brand contact + headshot, pulled from the agent's own portal account. */
+  email?: string;
+  photo?: string;
 }
 
 export interface PreApprovalLetter {
@@ -365,14 +368,10 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
   const exp = new Date(now.getTime() + expDays * 86_400_000);
   const validity = `This ${w.nounLower} is valid through ${longDate(exp)} and is ${w.validityTail(!!opts.appraisalWaiver)}`;
 
-  // The selected agent (from the saved contacts) wins; otherwise fall back to the legacy
-  // single agent fields on settings.
+  // The agent to co-brand comes from the Pre-Approval page (pulled from the agent's account
+  // by email, or a one-off manual entry). No separate saved-contacts list.
   const chosenAgent: LetterAgent | null =
-    opts.agent && opts.agent.name && opts.agent.name.trim()
-      ? opts.agent
-      : settings.agentName && settings.agentName.trim()
-        ? { name: settings.agentName, brokerage: settings.brokerage, phone: settings.agentPhone }
-        : null;
+    opts.agent && opts.agent.name && opts.agent.name.trim() ? opts.agent : null;
   const includeAgent = opts.includeAgent && !!chosenAgent;
   const agent: LetterAgent | null = includeAgent ? chosenAgent : null;
   // A professional acknowledgment of the borrower's real-estate agent (shown near the
@@ -381,7 +380,8 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
     includeAgent && agent && agent.name
       ? andify(
           [agent.name, agent.brokerage].filter((v) => v && v.trim()).join(', ') +
-            (agent.phone && agent.phone.trim() ? ` · ${agent.phone.trim()}` : ''),
+            (agent.phone && agent.phone.trim() ? ` · ${agent.phone.trim()}` : '') +
+            (agent.email && agent.email.trim() ? ` · ${agent.email.trim()}` : ''),
         )
       : '';
 

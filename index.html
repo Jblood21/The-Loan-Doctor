@@ -3,22 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="LoanDr. — the loan comparison workspace built for loan officers." />
-    <title>LoanDr. — Loan Officer Workspace</title>
+    <meta name="description" content="Basecamp — clear loan tools for loan officers and their agents." />
+    <title>Basecamp — Loan Officer Workspace</title>
+    <!-- Title-bar color for the installed desktop app; kept in sync with the theme below. -->
+    <meta name="theme-color" content="#f5f3ea" />
+    <!-- Apply the saved theme before first paint to avoid a flash. 'system' (or
+         unset) leaves it to the prefers-color-scheme media query in CSS. -->
+    <script>
+      try {
+        var t = localStorage.getItem('lbc-theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        // Tint the title bar of the installed app to match, before first paint.
+        var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', dark ? '#0d1824' : '#f5f3ea');
+      } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- Installable desktop/mobile app (PWA) -->
-    <meta name="theme-color" content="#13355f" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="LoanDr." />
+    <meta name="apple-mobile-web-app-title" content="Basecamp" />
   </head>
   <body>
     <div id="root"></div>

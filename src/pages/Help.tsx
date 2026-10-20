@@ -14,7 +14,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'How is mortgage insurance calculated?',
-    a: 'LoanDr. estimates PMI/MIP from loan type, LTV, and credit score using standard national rate cards: conventional PMI, FHA upfront + annual MIP, VA funding fee, and USDA guarantee fees. Exact lender factors can be wired into your backend.',
+    a: 'Basecamp estimates PMI/MIP from loan type, LTV, and credit score using standard national rate cards: conventional PMI, FHA upfront + annual MIP, VA funding fee, and USDA guarantee fees. Exact lender factors can be wired into your backend.',
   },
   {
     q: 'Where do I set my branding?',
@@ -40,7 +40,7 @@ export default function Help() {
 
   return (
     <div className="max-w-[760px] animate-lp-fade">
-      <PageHeader title="Help Center" subtitle="Guides, FAQs, and support for LoanDr." />
+      <PageHeader title="Help Center" subtitle="Guides, FAQs, and support for Basecamp" />
 
       <TextField
         size="lg"
@@ -83,7 +83,7 @@ export default function Help() {
           variant="primary"
           className="!h-11 whitespace-nowrap !px-[22px]"
           onClick={() => {
-            window.location.href = 'mailto:support@loandr.app?subject=LoanDr%20Support';
+            window.location.href = 'mailto:support@loandr.app?subject=Basecamp%20Support';
           }}
         >
           Contact Support

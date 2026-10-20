@@ -1,4 +1,4 @@
-# LoanDr. — Loan Officer Workspace
+# Basecamp — Loan Officer Workspace
 
 A web app for mortgage loan officers (MLOs): model and compare up to six loan
 scenarios side by side, run a reverse‑mortgage (HECM) estimate, generate a branded
@@ -142,6 +142,25 @@ npm run preview    # serves the built app locally
 ```
 
 ---
+
+## Desktop app (installable)
+
+Basecamp installs as a desktop app (Chrome / Edge / Brave: the **Install app** button in the
+sidebar or Settings; Safari: File → Add to Dock). It is a PWA, so there is nothing separate to
+build or ship — every deploy updates installed copies automatically.
+
+- `public/manifest.webmanifest` — name, icons, and right-click shortcuts (Compare Loans,
+  Pre-Approval, Tools, Agents). `public/agent.webmanifest` is swapped in on `/agent`, so an agent
+  who installs gets **Basecamp Agent**, which opens their portal.
+- `public/sw.js` — network-first (never serves a stale app); shows `public/offline.html` when
+  the connection drops.
+- Icons: `icon-192/512.png` (rounded tile), `icon-maskable-192/512.png` (full-bleed, for OS
+  masks) and `apple-touch-icon.png`, all drawn from the supplied mountain mark.
+- The window title follows the page (`Compare Loans · Basecamp`) and the title bar color follows
+  light/dark mode.
+
+An already-installed copy picks up a new name or icon the next time the browser refreshes its
+manifest (usually within a day); uninstalling and reinstalling updates it immediately.
 
 ## A note on the financial math
 

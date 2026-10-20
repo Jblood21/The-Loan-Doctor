@@ -12,10 +12,10 @@ const STRUCTURE_OPTIONS = Object.entries(TEMP_BUYDOWN_STRUCTURES).map(([value, s
 
 export default function Buydown({ open, onClose }: CalcProps) {
   const [loan, setLoan] = useState(320000);
-  const [noteRate, setNoteRate] = useState(6.5);
+  const [noteRate, setNoteRate] = useState(7.25);
   const [term, setTerm] = useState('30');
   const [holdYears, setHoldYears] = useState(7);
-  const [boughtRate, setBoughtRate] = useState(6.0);
+  const [boughtRate, setBoughtRate] = useState(6.75);
   const [points, setPoints] = useState(2);
   const [structure, setStructure] = useState('2-1');
   const [whoPays, setWhoPays] = useState('seller');

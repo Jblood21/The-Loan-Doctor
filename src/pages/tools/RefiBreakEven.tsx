@@ -6,9 +6,9 @@ import { CalcField, Headline, ResultPanel, Row, type CalcProps } from './_shared
 
 export default function RefiBreakEven({ open, onClose }: CalcProps) {
   const [balance, setBalance] = useState(320000);
-  const [curRate, setCurRate] = useState(7.25);
+  const [curRate, setCurRate] = useState(7.75);
   const [curRemaining, setCurRemaining] = useState(28);
-  const [newRate, setNewRate] = useState(6.0);
+  const [newRate, setNewRate] = useState(7.25);
   const [newTerm, setNewTerm] = useState(30);
   const [costs, setCosts] = useState(6500);
 

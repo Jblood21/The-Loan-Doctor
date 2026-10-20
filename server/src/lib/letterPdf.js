@@ -181,8 +181,30 @@ export function drawLetter(doc, d) {
   gap(14, true);
 
   if (d.agentAck) {
-    block(measure(`Real Estate Agent: ${d.agentAck}`, 'Helvetica-Bold', 11.5), (y) => {
-      doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(11.5).text('Real Estate Agent: ', LEFT, y, { continued: true });
+    // Co-brand the buyer's agent: an optional headshot (pulled from their account) to the
+    // left of the acknowledgment line, which carries their name, brokerage and contact.
+    const agentPhoto = d.agent && d.agent.photoSource;
+    const PR = 20; // agent photo radius
+    const aTextX = agentPhoto ? LEFT + PR * 2 + 12 : LEFT;
+    const aTextW = RIGHT - aTextX;
+    const aTextH = measure(`Real Estate Agent: ${d.agentAck}`, 'Helvetica', 11.5, { width: aTextW });
+    const aH = agentPhoto ? Math.max(aTextH, PR * 2) : aTextH;
+    block(aH, (y) => {
+      if (agentPhoto) {
+        try {
+          const cx = LEFT + PR;
+          const cy = y + PR;
+          doc.save();
+          doc.circle(cx, cy, PR).clip();
+          doc.image(d.agent.photoSource, cx - PR, cy - PR, { cover: [PR * 2, PR * 2], align: 'center', valign: 'top' });
+          doc.restore();
+          doc.circle(cx, cy, PR).lineWidth(1.5).strokeColor(GOLD).stroke();
+        } catch {
+          /* photo optional */
+        }
+      }
+      const ty = agentPhoto ? y + Math.max(0, (aH - aTextH) / 2) : y;
+      doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(11.5).text('Real Estate Agent: ', aTextX, ty, { width: aTextW, continued: true });
       doc.fillColor('#1b2733').font('Helvetica').fontSize(11.5).text(d.agentAck);
     });
     gap(14, true);

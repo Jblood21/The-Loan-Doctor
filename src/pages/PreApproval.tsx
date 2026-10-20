@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/Button';
 import { SignaturePad } from '@/components/SignaturePad';
 import { useScenarios, blankScenario } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
-import { useUI } from '@/context/UIContext';
 import { api, ApiError } from '@/lib/api';
 import { computeScenario } from '@/lib/finance';
 import {
@@ -26,13 +25,13 @@ import {
   SALUTATION_PRESETS,
   CLOSING_PRESETS,
 } from '@/lib/letter';
-import type { LetterKind, PronounChoice } from '@/lib/letter';
+import type { LetterKind, PronounChoice, LetterAgent } from '@/lib/letter';
 import { fmt, longDateWeekday } from '@/lib/format';
 import { rankBorrowers } from '@/lib/borrowerSearch';
 import { parseMismo } from '@/lib/mismo';
 import type { MismoResult } from '@/lib/mismo';
 import { groupByBorrower, diffRecords } from '@/lib/preApprovalHistory';
-import type { AgentContact, PreApprovalRecord, PreApprovalState, Scenario } from '@/types';
+import type { PreApprovalRecord, PreApprovalState, Scenario } from '@/types';
 import { losBorrowerToScenario } from '@/lib/losBorrower';
 
 // Summit Home Loans brand palette (navy + steel accent).
@@ -124,7 +123,6 @@ export default function PreApproval() {
   // Pre-Approval draws from the same saved bank of scenarios as Compare.
   const { bank } = useScenarios();
   const { settings, save: saveSettings, saving: savingSettings } = useSettings();
-  const { openSettings } = useUI();
   const [pa, setPa] = useState<PreApprovalState>({
     source: 'scenario',
     scenarioIdx: 0,
@@ -144,7 +142,14 @@ export default function PreApproval() {
   const [webhookError, setWebhookError] = useState('');
   const [copied, setCopied] = useState(false);
   const [includeAgent, setIncludeAgent] = useState(true);
-  const [selectedAgentId, setSelectedAgentId] = useState('');
+  // Co-brand by pulling the agent's own account by email (so their details aren't re-typed).
+  const [agentEmail, setAgentEmail] = useState('');
+  const [pulledAgent, setPulledAgent] = useState<LetterAgent | null>(null);
+  const [agentLookupBusy, setAgentLookupBusy] = useState(false);
+  const [agentLookupMsg, setAgentLookupMsg] = useState('');
+  // One-off manual entry for an agent who hasn't signed up (not saved anywhere).
+  const [showManual, setShowManual] = useState(false);
+  const [manualAgent, setManualAgent] = useState({ name: '', brokerage: '', phone: '' });
   const [imported, setImported] = useState<MismoResult | null>(null);
   const [importError, setImportError] = useState('');
   const [dragging, setDragging] = useState(false);
@@ -216,14 +221,15 @@ export default function PreApproval() {
   };
   const today = new Date();
   // Saved agent contacts, and the one selected to co-brand this letter. Defaults to the
-  // first saved agent (or the legacy single agent) so existing behavior is preserved.
-  const agentContacts = settings.agents ?? [];
-  const legacyAgent: AgentContact | null = settings.agentName?.trim()
-    ? { id: '__legacy__', name: settings.agentName, brokerage: settings.brokerage, phone: settings.agentPhone }
-    : null;
-  const allAgents = agentContacts.length ? agentContacts : legacyAgent ? [legacyAgent] : [];
-  const selectedAgent = allAgents.find((a) => a.id === selectedAgentId) || allAgents[0] || null;
-  const hasAgent = !!selectedAgent;
+  // The agent pulled from their account (by email) wins; otherwise a one-off manual entry
+  // for an agent who hasn't signed up (not saved anywhere — just this letter).
+  const hasManual = manualAgent.name.trim().length > 0;
+  const effectiveAgent: LetterAgent | null = pulledAgent
+    ? pulledAgent
+    : hasManual
+      ? { name: manualAgent.name.trim(), brokerage: manualAgent.brokerage.trim(), phone: manualAgent.phone.trim() }
+      : null;
+  const hasAgent = !!effectiveAgent;
 
   // Program template + editable body.
   const [templateId, setTemplateId] = useState('auto');
@@ -336,7 +342,9 @@ export default function PreApproval() {
     borrowerName: pa.borrowerName,
     propertyAddress: pa.propertyAddress,
     includeAgent,
-    agent: selectedAgent ? { name: selectedAgent.name, brokerage: selectedAgent.brokerage, phone: selectedAgent.phone } : null,
+    agent: effectiveAgent
+      ? { name: effectiveAgent.name, brokerage: effectiveAgent.brokerage, phone: effectiveAgent.phone, email: effectiveAgent.email, photo: effectiveAgent.photo }
+      : null,
     now: today,
     templateId,
     kind: letterKind,
@@ -569,9 +577,44 @@ export default function PreApproval() {
       website: settings.website,
     },
     agentAck: letter.agentAck,
+    agent: letter.agent,
     logo: settings.logoDataUrl || undefined,
     headshot: settings.headshotDataUrl || undefined,
   });
+
+  // Pull a signed-up agent's co-brand details from their account by email, so the LO never
+  // re-types the name/brokerage/phone/photo the agent already entered.
+  const lookupAgent = async () => {
+    const email = agentEmail.trim();
+    if (!email) {
+      setPulledAgent(null);
+      setAgentLookupMsg('');
+      return;
+    }
+    setAgentLookupBusy(true);
+    setAgentLookupMsg('');
+    try {
+      const res = await api.agentLookup(email);
+      if (res.found && res.agent) {
+        setPulledAgent({
+          name: res.agent.name,
+          brokerage: res.agent.brokerage,
+          phone: res.agent.phone,
+          email: res.agent.email,
+          photo: res.agent.photo,
+        });
+        setIncludeAgent(true);
+      } else {
+        setPulledAgent(null);
+        setAgentLookupMsg('No agent account for that email yet. Share your agent link so they can sign up — or pick a saved contact below.');
+      }
+    } catch {
+      setPulledAgent(null);
+      setAgentLookupMsg('Could not look up that email. Try again in a moment.');
+    } finally {
+      setAgentLookupBusy(false);
+    }
+  };
 
   const openAssign = () => {
     setAssignMsg(null);
@@ -579,8 +622,9 @@ export default function PreApproval() {
     setAssignAllowPrice(false);
     // Tie the portal assignment to the agent already acknowledged on the letter, so the
     // agent is chosen once (in Letter options) instead of re-typed here. If that agent
-    // has a saved email, it pre-fills; otherwise the field stays open to type one in.
-    if (includeAgent && selectedAgent?.email) setAssignEmail(selectedAgent.email);
+    // has a known email, it pre-fills; otherwise the field stays open to type one in.
+    const email = agentEmail.trim() || (includeAgent ? effectiveAgent?.email : '') || '';
+    if (email) setAssignEmail(email);
     setAssignOpen(true);
   };
 
@@ -654,11 +698,21 @@ export default function PreApproval() {
           </div>
         </div>
         {letter.agentAck && (
-          <div className="mt-3.5 flex text-[13px]">
-            <span className="flex-shrink-0 font-semibold" style={{ color: GREEN }}>
-              Real Estate Agent:&nbsp;
-            </span>
-            <span className="min-w-0">{letter.agentAck}</span>
+          <div className="mt-3.5 flex items-center gap-2.5 text-[13px]">
+            {letter.agent?.photo && (
+              <img
+                src={letter.agent.photo}
+                alt=""
+                className="h-9 w-9 flex-shrink-0 rounded-full border object-cover"
+                style={{ borderColor: GOLD }}
+              />
+            )}
+            <div className="min-w-0">
+              <span className="font-semibold" style={{ color: GREEN }}>
+                Real Estate Agent:&nbsp;
+              </span>
+              <span className="min-w-0">{letter.agentAck}</span>
+            </div>
           </div>
         )}
       </div>
@@ -1296,18 +1350,9 @@ export default function PreApproval() {
             <div className="rounded-[10px] border border-border-input bg-input px-3.5 py-2.5">
               <div className="flex items-center justify-between">
                 <div className="pr-3">
-                  <div className="text-[13px] font-semibold text-text-label">Acknowledge real-estate agent</div>
+                  <div className="text-[13px] font-semibold text-text-label">Co-brand real-estate agent</div>
                   <div className="text-[11.5px] text-text-muted">
-                    {hasAgent ? (
-                      <>Names the agent near the top of the letter</>
-                    ) : (
-                      <>
-                        No agents saved.{' '}
-                        <button onClick={openSettings} className="cursor-pointer border-none bg-transparent p-0 text-brand-blue-light underline">
-                          Add one in Settings
-                        </button>
-                      </>
-                    )}
+                    Enter the agent's email to pull their name, brokerage, phone and photo from their account — nothing to re-type.
                   </div>
                 </div>
                 <button
@@ -1320,17 +1365,74 @@ export default function PreApproval() {
                   <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${includeAgent && hasAgent ? 'left-[22px]' : 'left-0.5'}`} />
                 </button>
               </div>
-              {hasAgent && includeAgent && allAgents.length > 0 && (
-                <div className="mt-2.5">
-                  <Select
-                    value={selectedAgent ? selectedAgent.id : ''}
-                    onChange={(e) => setSelectedAgentId(e.target.value)}
-                    options={allAgents.map((a) => ({
-                      value: a.id,
-                      label: [a.name, a.brokerage].filter(Boolean).join(' · ') || a.name,
-                    }))}
-                  />
+
+              <div className="mt-2.5 flex gap-2">
+                <TextField
+                  type="email"
+                  className="flex-1"
+                  placeholder="agent@brokerage.com"
+                  value={agentEmail}
+                  onChange={(e) => { setAgentEmail(e.target.value); setAgentLookupMsg(''); }}
+                  onBlur={lookupAgent}
+                />
+                <Button variant="secondary" size="sm" className="!h-[42px] flex-shrink-0" onClick={lookupAgent} disabled={agentLookupBusy || !agentEmail.trim()}>
+                  {agentLookupBusy ? '…' : 'Pull info'}
+                </Button>
+              </div>
+
+              {pulledAgent && (
+                <div className="mt-2.5 flex items-center gap-3 rounded-[10px] border border-[rgba(45,212,191,0.28)] bg-[rgba(45,212,191,0.07)] p-2.5">
+                  {pulledAgent.photo ? (
+                    <img src={pulledAgent.photo} alt="" className="h-10 w-10 flex-shrink-0 rounded-full border object-cover" style={{ borderColor: GOLD }} />
+                  ) : (
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-border-input bg-input text-[10px] text-text-dim">No photo</div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-semibold text-text-heading">{pulledAgent.name || 'Agent'}</div>
+                    <div className="truncate text-[12px] text-text-muted">
+                      {[pulledAgent.brokerage, pulledAgent.phone].filter(Boolean).join(' · ') || 'Pulled from their agent account'}
+                    </div>
+                  </div>
+                  <button onClick={() => { setPulledAgent(null); setAgentEmail(''); }} className="flex-shrink-0 cursor-pointer border-none bg-transparent text-[12px] font-semibold text-text-dim hover:text-danger">
+                    Clear
+                  </button>
                 </div>
+              )}
+
+              {agentLookupMsg && <div className="mt-2 text-[11.5px] text-warn-text">{agentLookupMsg}</div>}
+
+              {/* One-off manual entry for an agent who hasn't signed up — not saved anywhere. */}
+              {!pulledAgent && (
+                showManual ? (
+                  <div className="mt-2.5 grid grid-cols-2 gap-2">
+                    <TextField
+                      className="col-span-2 !h-[40px] !text-[13.5px]"
+                      placeholder="Agent name"
+                      value={manualAgent.name}
+                      onChange={(e) => setManualAgent((m) => ({ ...m, name: e.target.value }))}
+                    />
+                    <TextField
+                      className="!h-[40px] !text-[13.5px]"
+                      placeholder="Brokerage"
+                      value={manualAgent.brokerage}
+                      onChange={(e) => setManualAgent((m) => ({ ...m, brokerage: e.target.value }))}
+                    />
+                    <TextField
+                      className="!h-[40px] !text-[13.5px]"
+                      placeholder="Phone"
+                      value={manualAgent.phone}
+                      onChange={(e) => setManualAgent((m) => ({ ...m, phone: e.target.value }))}
+                    />
+                    <div className="col-span-2 text-[11px] text-text-dim">Just for this letter — not saved to Settings.</div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowManual(true)}
+                    className="mt-2 cursor-pointer border-none bg-transparent p-0 text-[11.5px] font-semibold text-brand-blue-light underline"
+                  >
+                    Agent hasn't signed up? Add their details manually
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -1419,26 +1521,17 @@ export default function PreApproval() {
             <p className="mb-4 text-[12.5px] leading-[1.55] text-text-muted">
               The agent signs in at <span className="font-semibold text-text-soft">{`${window.location.origin}/agent`}</span> and can update the property address (and the price, if you allow it). The loan terms and branding stay locked.
             </p>
-            {includeAgent && selectedAgent && (
+            {includeAgent && effectiveAgent && (
               <div className="mb-4 rounded-[10px] border border-border-input bg-input/60 px-3.5 py-2.5 text-[12.5px] leading-[1.55]">
                 <div>
-                  <span className="font-semibold text-text-soft">{selectedAgent.name}</span>
-                  {selectedAgent.brokerage ? <span className="text-text-muted"> · {selectedAgent.brokerage}</span> : null}
+                  <span className="font-semibold text-text-soft">{effectiveAgent.name}</span>
+                  {effectiveAgent.brokerage ? <span className="text-text-muted"> · {effectiveAgent.brokerage}</span> : null}
                 </div>
                 <div className="mt-0.5 text-[11.5px] text-text-muted">
-                  {selectedAgent.email ? (
+                  {effectiveAgent.email ? (
                     <>This is the agent acknowledged on the letter — their email is filled in below.</>
                   ) : (
-                    <>
-                      Acknowledged on the letter. Add their email in{' '}
-                      <button
-                        onClick={() => { setAssignOpen(false); openSettings(); }}
-                        className="cursor-pointer border-none bg-transparent p-0 font-semibold text-brand-blue-light underline"
-                      >
-                        Settings
-                      </button>{' '}
-                      to auto-fill it here next time.
-                    </>
+                    <>Acknowledged on the letter. Enter their email below to assign the editable copy.</>
                   )}
                 </div>
               </div>

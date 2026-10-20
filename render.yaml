@@ -1,4 +1,4 @@
-# Render.com Blueprint — deploys LoanDr. as ONE free web service
+# Render.com Blueprint — deploys Basecamp as ONE free web service
 # (Express API + the built React frontend served from the same origin).
 #
 # To use: push this repo to GitHub, then on render.com choose

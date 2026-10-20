@@ -17,12 +17,12 @@
 // per-insurer estimate range that changes frequently.
 
 /** Human-facing "rates as of" stamp. Bump when any figure below is re-verified. */
-export const RATES_AS_OF = 'March 2023 (FHA MIP) · 2025 program year';
+export const RATES_AS_OF = 'March 2023 (FHA MIP) · 2026 program year';
 
-/** 2025 baseline conforming loan limit (one unit). The FHA high-balance MIP break
+/** 2026 baseline conforming loan limit (one unit). The FHA high-balance MIP break
  *  tracks this figure; it mirrors the VA baseline limit used in finance.ts. Update
  *  annually with the FHFA limit. */
-export const CONFORMING_LOAN_LIMIT = 806500;
+export const CONFORMING_LOAN_LIMIT = 832750;
 
 export interface ProgramMeta {
   /** Short label for the program. */
@@ -41,7 +41,7 @@ export interface ProgramMeta {
 export const CONVENTIONAL = {
   meta: {
     label: 'Conventional',
-    asOf: '2025',
+    asOf: '2026',
     sources: ['Fannie Mae', 'Freddie Mac', 'CFPB (HPA)', 'Private MI rate cards (MGIC/Radian/Essent/Arch/Enact/National MI)'],
     notes: [
       'PMI applies only when the down payment is under 20% (LTV > 80%).',
@@ -83,7 +83,7 @@ export const FHA = {
       'FHA loans require mortgage insurance: an upfront premium (UFMIP) plus an ongoing annual MIP.',
       'UFMIP is financed into the loan by default.',
       'Annual MIP factors were set by HUD ML 2023-05 (effective March 20, 2023) and change by Mortgagee Letter.',
-      'KNOWN STALE: highBalanceThreshold (726200) is the 2023 conforming baseline. It should track the current FHFA conforming loan limit (~806,500 for 2025). VERIFY against HUD 4000.1 / the latest ML before relying on the high-balance factors.',
+      'highBalanceThreshold tracks the FHFA conforming loan limit (2026: $832,750); the higher high-balance annual MIP applies to base loans above it. Re-verify annually against HUD 4000.1 / the latest Mortgagee Letter.',
       'MIP duration: term > 15 yr with LTV > 90% at origination → life of loan; otherwise ~11 years.',
     ],
   } as ProgramMeta,
@@ -96,7 +96,7 @@ export const FHA = {
   upfrontMipPct: 1.75,
 
   /** Base-loan threshold above which the higher "high-balance" annual MIP applies —
-   *  the baseline conforming limit for the year (2025: $806,500). */
+   *  the baseline conforming limit for the year (2026: $832,750). */
   highBalanceThreshold: CONFORMING_LOAN_LIMIT,
 
   /** Annual MIP (%) grid, selected by term length, high-balance, and LTV break. */
@@ -166,7 +166,7 @@ export const VA = {
 export const USDA = {
   meta: {
     label: 'USDA',
-    asOf: 'Federal fiscal year 2025 (Oct 2024 – Sep 2025)',
+    asOf: 'Federal fiscal year 2026 (Oct 2025 – Sep 2026)',
     sources: ['USDA Rural Development', 'CFPB'],
     notes: [
       'USDA Guaranteed loans have their own mortgage-insurance-like structure: an upfront guarantee fee (financed) plus an annual fee for the life of the loan.',

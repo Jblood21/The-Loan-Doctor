@@ -403,8 +403,8 @@ export default function Compare() {
                 onClick={() => select(i)}
                 className="-mb-px cursor-pointer whitespace-nowrap border-none bg-transparent px-[18px] py-[11px] text-[14px] font-semibold"
                 style={{
-                  borderBottom: `2px solid ${isActive ? '#2dd4bf' : 'transparent'}`,
-                  color: isActive ? '#fff' : '#8ba0b6',
+                  borderBottom: `2px solid ${isActive ? 'var(--brand)' : 'transparent'}`,
+                  color: isActive ? 'var(--ink)' : 'var(--ink-muted)',
                 }}
               >
                 {sc.name}
@@ -425,7 +425,7 @@ export default function Compare() {
           <button
             onClick={addScenario}
             title="Add scenario"
-            className="mb-2 flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-[9px] border border-dashed border-[#2f4663] bg-transparent text-[20px] leading-none text-[#7d96ae] transition-colors hover:border-brand-teal hover:text-brand-teal"
+            className="mb-2 flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-[9px] border border-dashed border-border-control bg-transparent text-[20px] leading-none text-ink-muted transition-colors hover:border-brand hover:text-brand"
           >
             +
           </button>

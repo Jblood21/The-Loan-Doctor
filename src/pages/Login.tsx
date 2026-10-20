@@ -5,7 +5,7 @@ import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/Button';
 import { TextField, Label } from '@/components/ui/TextField';
 import { useAuth } from '@/context/AuthContext';
-import { ApiError } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 
 const STATS = [
   { value: '6', label: 'scenarios at once' },
@@ -16,7 +16,7 @@ const STATS = [
 export default function Login() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -26,13 +26,31 @@ export default function Login() {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [devLink, setDevLink] = useState('');
+
+  // Switch between sign-in / register / forgot-password, clearing transient messages.
+  const switchMode = (next: 'login' | 'register' | 'forgot') => {
+    setMode(next);
+    setError('');
+    setInfo('');
+    setResetSent(false);
+    setDevLink('');
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setInfo('');
     setSubmitting(true);
     const cleanEmail = email.trim();
     try {
+      if (mode === 'forgot') {
+        const res = await api.forgotPassword({ email: cleanEmail });
+        setResetSent(true);
+        setDevLink(res.devLink || '');
+        return;
+      }
       if (mode === 'login') {
         await login(cleanEmail, password, remember);
       } else {
@@ -56,31 +74,22 @@ export default function Login() {
       <div
         className="relative hidden flex-[1.05] flex-col justify-between overflow-hidden bg-login-panel p-[56px] pb-12 lg:flex"
       >
+        {/* Scenic brand backdrop — day landscape (light) / night scene (dark). */}
         <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 18% 22%, rgba(47,128,237,.22), transparent 42%),radial-gradient(circle at 82% 78%, rgba(45,212,191,.16), transparent 45%)',
-          }}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: 'var(--app-scene)' }}
         />
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px)',
-            backgroundSize: '46px 46px',
-            maskImage: 'linear-gradient(to bottom right, black, transparent 80%)',
-            WebkitMaskImage: 'linear-gradient(to bottom right, black, transparent 80%)',
-          }}
-        />
-        <div className="relative">
-          <Logo size={42} wordmark={23} glow />
+        {/* Left-weighted scrim so the left-aligned copy stays readable. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: 'var(--login-scrim)' }} />
+        <div className="relative z-10">
+          <Logo size={50} glow />
         </div>
-        <div className="relative">
+        <div className="relative z-10">
           <div className="max-w-[480px] font-display text-[46px] font-bold leading-[1.08] tracking-[-1.5px]">
             Every loan scenario, side by side in seconds.
           </div>
-          <p className="mt-[22px] max-w-[430px] text-[16px] leading-[1.6] text-[#9db4cb]">
+          <p className="mt-[22px] max-w-[430px] text-[16px] leading-[1.6] text-ink-muted">
             The comparison workspace built for loan officers — model Conventional, FHA, VA, USDA, ARM and reverse
             mortgages, then hand your borrower a clean breakdown.
           </p>
@@ -88,26 +97,28 @@ export default function Login() {
             {STATS.map((s) => (
               <div key={s.label}>
                 <div className="num text-[26px] font-semibold text-brand-teal">{s.value}</div>
-                <div className="mt-0.5 text-[12.5px] text-[#7d96ae]">{s.label}</div>
+                <div className="mt-0.5 text-[12.5px] text-ink-muted">{s.label}</div>
               </div>
             ))}
           </div>
         </div>
-        <div className="relative text-[12.5px] text-text-dim2">
+        <div className="relative z-10 text-[12.5px] font-medium text-ink-muted">
           Equal Housing Lender · For licensed mortgage professionals
         </div>
       </div>
 
       {/* RIGHT — form */}
-      <div className="flex flex-1 items-center justify-center bg-[#091522] p-6 sm:p-10 lg:flex-[.95]">
+      <div className="flex flex-1 items-center justify-center bg-surface p-6 sm:p-10 lg:flex-[.95]">
         <form onSubmit={onSubmit} className="w-full max-w-[380px] animate-lp-fade-slow">
           <h1 className="m-0 font-display text-[28px] font-semibold tracking-[-0.6px]">
-            {mode === 'login' ? 'Welcome back' : 'Create your account'}
+            {mode === 'login' ? 'Welcome back' : mode === 'register' ? 'Create your account' : 'Reset your password'}
           </h1>
           <p className="mb-[30px] mt-1.5 text-[14.5px] text-text-muted">
             {mode === 'login'
               ? 'Sign in to your loan officer workspace.'
-              : 'Start comparing loans in under a minute.'}
+              : mode === 'register'
+                ? 'Start comparing loans in under a minute.'
+                : 'Enter your email and we’ll send you a link to set a new password.'}
           </p>
 
           {mode === 'register' && (
@@ -144,33 +155,37 @@ export default function Login() {
             required
           />
 
-          <Label>Password</Label>
-          <div className="relative mb-3.5">
-            <TextField
-              size="lg"
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              className="!pr-[68px]"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              aria-pressed={showPassword}
-              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent px-1 text-[12.5px] font-semibold text-brand-blue-light"
-            >
-              {showPassword ? 'Hide' : 'Show'}
-            </button>
-          </div>
+          {mode !== 'forgot' && (
+            <>
+              <Label>Password</Label>
+              <div className="relative mb-3.5">
+                <TextField
+                  size="lg"
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  className="!pr-[68px]"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent px-1 text-[12.5px] font-semibold text-brand-blue-light"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </>
+          )}
 
           {mode === 'login' && (
             <div className="mb-[26px] flex items-center justify-between text-[13px]">
-              <label className="flex cursor-pointer items-center gap-2 text-[#9db4cb]">
+              <label className="flex cursor-pointer items-center gap-2 text-ink-muted">
                 <input
                   type="checkbox"
                   checked={remember}
@@ -181,7 +196,7 @@ export default function Login() {
               </label>
               <button
                 type="button"
-                onClick={() => setInfo('Password resets aren’t self-serve yet — contact your administrator to reset it.')}
+                onClick={() => switchMode('forgot')}
                 className="cursor-pointer border-none bg-transparent text-brand-blue-light no-underline"
               >
                 Forgot password?
@@ -189,14 +204,29 @@ export default function Login() {
             </div>
           )}
 
+          {mode === 'forgot' && resetSent && (
+            <div className="mb-4 rounded-[11px] border border-border bg-surface-tint px-[15px] py-3 text-[13px] leading-[1.55] text-ink">
+              If an account exists for that email, we’ve sent a link to reset your password. Check your inbox
+              (and spam folder).
+              {devLink && (
+                <div className="mt-2">
+                  <span className="text-text-muted">Dev link:</span>{' '}
+                  <a href={devLink} className="break-all font-semibold text-brand-blue-light underline">
+                    {devLink}
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
           {info && (
-            <div className="mb-4 rounded-[11px] border border-[rgba(47,128,237,0.3)] bg-[rgba(47,128,237,0.1)] px-[15px] py-3 text-[13px] text-[#8fb4dd]">
+            <div className="mb-4 rounded-[11px] border border-border bg-surface-tint px-[15px] py-3 text-[13px] text-ink">
               {info}
             </div>
           )}
 
           {error && (
-            <div className="mb-4 rounded-[11px] border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] px-[15px] py-3 text-[13px] text-danger">
+            <div className="mb-4 rounded-[11px] border border-danger bg-danger-tint px-[15px] py-3 text-[13px] text-danger">
               {error}
             </div>
           )}
@@ -210,10 +240,14 @@ export default function Login() {
             {submitting
               ? mode === 'login'
                 ? 'Signing in…'
-                : 'Creating…'
+                : mode === 'register'
+                  ? 'Creating…'
+                  : 'Sending…'
               : mode === 'login'
                 ? 'Sign in'
-                : 'Create account'}
+                : mode === 'register'
+                  ? 'Create account'
+                  : 'Send reset link'}
           </Button>
 
           <div className="mt-[22px] text-center text-[13.5px] text-text-muted">
@@ -222,35 +256,35 @@ export default function Login() {
                 New here?{' '}
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode('register');
-                    setError('');
-                  }}
+                  onClick={() => switchMode('register')}
                   className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light"
                 >
                   Create an account
                 </button>
               </>
-            ) : (
+            ) : mode === 'register' ? (
               <>
                 Already have an account?{' '}
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode('login');
-                    setError('');
-                  }}
+                  onClick={() => switchMode('login')}
                   className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light"
                 >
                   Sign in
                 </button>
               </>
+            ) : (
+              <>
+                Remembered it?{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light"
+                >
+                  Back to sign in
+                </button>
+              </>
             )}
-          </div>
-
-          <div className="mt-7 rounded-[11px] border border-[rgba(47,128,237,0.2)] bg-[rgba(47,128,237,0.08)] px-[15px] py-[13px] text-[12.5px] leading-[1.5] text-[#8fb4dd]">
-            <strong>Preview build</strong> — for evaluation and demonstration. Please don’t enter real borrower
-            personal or financial information.
           </div>
         </form>
       </div>

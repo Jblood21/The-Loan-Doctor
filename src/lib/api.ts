@@ -1,4 +1,4 @@
-// Thin API client for the LoanDr. backend.
+// Thin API client for the Basecamp backend.
 //
 // In development the Vite dev server proxies /api to the Express backend, so
 // API_BASE can stay empty. In production set VITE_API_BASE to the API origin.
@@ -71,6 +71,10 @@ export const api = {
   updateProfile: (data: Partial<User>) => request<{ user: User }>('PUT', '/auth/profile', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     request<{ ok: boolean }>('PUT', '/auth/password', data),
+  forgotPassword: (data: { email: string }) =>
+    request<{ ok: boolean; devLink?: string; emailConfigured?: boolean }>('POST', '/auth/forgot-password', data),
+  resetPassword: (data: { token: string; newPassword: string }) =>
+    request<{ ok: boolean }>('POST', '/auth/reset-password', data),
 
   // settings
   getSettings: () => request<{ settings: Settings }>('GET', '/settings'),
@@ -111,6 +115,14 @@ export const api = {
   // pre-approval PDF — returns a Blob
   preApprovalPdf: (payload: unknown) => request<Blob>('POST', '/preapproval/pdf', payload),
   preApprovalHistory: () => request<{ history: PreApprovalRecord[] }>('GET', '/preapproval/history'),
+
+  // Look up a signed-up agent's co-brand profile by email, so a pre-approval can pull the
+  // agent's own details (name, brokerage, phone, photo) instead of the LO re-typing them.
+  agentLookup: (email: string) =>
+    request<{ found: boolean; agent?: { name: string; brokerage: string; phone: string; email: string; photo: string; license: string } }>(
+      'GET',
+      `/preapproval/agent-lookup?email=${encodeURIComponent(email)}`,
+    ),
 
   // agent assignments (loan-officer side): hand a pre-approval to an agent to edit
   listAssignments: () => request<{ assignments: Assignment[] }>('GET', '/preapproval/assignments'),

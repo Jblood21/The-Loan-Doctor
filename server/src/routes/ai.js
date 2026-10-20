@@ -10,7 +10,7 @@ const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5';
 
 // The assistant is deliberately narrow: it only helps a loan officer understand and
 // compare the mortgage scenarios they pass in. It has no tools and cannot act.
-const SYSTEM = `You are "LoanDr Assistant", a concise AI helper embedded in a mortgage loan officer's loan-comparison tool.
+const SYSTEM = `You are "Basecamp Assistant", a concise AI helper embedded in a mortgage loan officer's loan-comparison tool.
 Your only job is to help the officer understand and compare the mortgage loan scenarios they provide, and answer general mortgage questions relevant to those scenarios (monthly payment, interest rate, APR, PMI/MIP, taxes/insurance, cash to close, total interest, which option costs less, and the trade-offs between them).
 
 Rules:

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "LoanDr. backend — Express API with JSON file store, JWT auth, PDF generation",
+  "description": "Basecamp backend — Express API with JSON file store, JWT auth, PDF generation",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

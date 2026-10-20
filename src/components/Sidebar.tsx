@@ -9,11 +9,14 @@ import {
   Users,
   Settings as SettingsIcon,
   LogOut,
+  MonitorDown,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { Logo } from './Logo';
+import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
 import { useUI } from '@/context/UIContext';
+import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 
 interface NavItem {
   to: string;
@@ -48,6 +51,7 @@ function GroupLabel({ children }: { children: string }) {
 export function Sidebar() {
   const { logout, isAdmin } = useAuth();
   const { openSettings, navOpen, closeNav } = useUI();
+  const { canInstall, installed, promptInstall } = useInstallPrompt();
 
   return (
     <>
@@ -98,6 +102,18 @@ export function Sidebar() {
         )}
 
         <div className="mt-auto flex flex-col gap-[3px] border-t border-border pt-4">
+          {canInstall && !installed && (
+            <button
+              onClick={() => {
+                promptInstall();
+              }}
+              className="flex items-center gap-3 rounded-[9px] border-none bg-transparent px-3 py-[10px] text-left text-[14px] font-medium text-brand transition-colors hover:bg-[var(--surface-tint)]"
+            >
+              <MonitorDown size={18} />
+              Install app
+            </button>
+          )}
+          <ThemeToggle />
           <button
             onClick={() => {
               closeNav();

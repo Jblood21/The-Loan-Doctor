@@ -4,6 +4,7 @@ import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/Button';
 import { TextField, Label } from '@/components/ui/TextField';
 import { agentApi, getAgentToken, setAgentToken } from '@/lib/agentApi';
+import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { ApiError } from '@/lib/api';
 import { fmt } from '@/lib/format';
 import { monthlyPayment } from '@/lib/finance';
@@ -20,6 +21,21 @@ import type { AgentUser, Assignment } from '@/types';
 export default function AgentPortal() {
   const [agent, setAgent] = useState<AgentUser | null>(null);
   const [booting, setBooting] = useState(true);
+
+  // Make "install this app" from the portal install the AGENT app ("Basecamp Agent",
+  // opening at /agent) instead of the loan-officer one. Restored when leaving the page.
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    const appleTitle = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
+    const prevHref = link?.getAttribute('href') ?? null;
+    const prevTitle = appleTitle?.getAttribute('content') ?? null;
+    link?.setAttribute('href', '/agent.webmanifest');
+    appleTitle?.setAttribute('content', 'Basecamp Agent');
+    return () => {
+      if (link && prevHref) link.setAttribute('href', prevHref);
+      if (appleTitle && prevTitle) appleTitle.setAttribute('content', prevTitle);
+    };
+  }, []);
 
   // Restore an existing agent session on mount.
   useEffect(() => {
@@ -57,13 +73,24 @@ export default function AgentPortal() {
 
 /** Login / sign-up card for agents. */
 function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [devLink, setDevLink] = useState('');
+
+  // Switch between sign-in / register / forgot-password, clearing transient messages.
+  const switchMode = (next: 'login' | 'register' | 'forgot') => {
+    setMode(next);
+    setError('');
+    setResetSent(false);
+    setDevLink('');
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -71,11 +98,17 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
     setSubmitting(true);
     try {
       const cleanEmail = email.trim();
+      if (mode === 'forgot') {
+        const res = await agentApi.forgotPassword({ email: cleanEmail });
+        setResetSent(true);
+        setDevLink(res.devLink || '');
+        return;
+      }
       const res =
         mode === 'login'
           ? await agentApi.login({ email: cleanEmail, password })
           : await agentApi.register({ email: cleanEmail, password, name: name.trim(), phone: phone.trim() });
-      setAgentToken(res.token, true);
+      setAgentToken(res.token, remember);
       onAuthed(res.agent);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Can’t reach the server right now — please try again in a moment.');
@@ -92,7 +125,11 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
           <div>
             <h1 className="m-0 font-display text-[24px] font-semibold tracking-[-0.5px]">Real-Estate Agent Portal</h1>
             <p className="mt-1.5 text-[14px] text-text-muted">
-              {mode === 'login' ? 'Sign in to your assigned pre-approvals.' : 'Create your agent account to get started.'}
+              {mode === 'login'
+                ? 'Sign in to your assigned pre-approvals.'
+                : mode === 'register'
+                  ? 'Create your agent account to get started.'
+                  : 'Enter your email and we’ll send you a link to set a new password.'}
             </p>
           </div>
         </div>
@@ -116,17 +153,57 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
           onChange={(e) => setEmail(e.target.value)}
           required
         />
-        <Label>Password</Label>
-        <TextField
-          size="lg"
-          type="password"
-          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          className="mb-5"
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        {mode !== 'forgot' && (
+          <>
+            <Label>Password</Label>
+            <TextField
+              size="lg"
+              type="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              className="mb-4"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </>
+        )}
+
+        {mode === 'login' && (
+          <div className="mb-5 flex items-center justify-between text-[13px]">
+            <label className="flex cursor-pointer items-center gap-2 text-text-muted">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="h-[15px] w-[15px] accent-brand-teal"
+              />{' '}
+              Remember me
+            </label>
+            <button
+              type="button"
+              onClick={() => switchMode('forgot')}
+              className="cursor-pointer border-none bg-transparent font-medium text-brand-blue-light"
+            >
+              Forgot password?
+            </button>
+          </div>
+        )}
+
+        {mode === 'forgot' && resetSent && (
+          <div className="mb-4 rounded-[11px] border border-border bg-input/60 px-[15px] py-3 text-[13px] leading-[1.55] text-text-soft">
+            If an account exists for that email, we’ve sent a link to reset your password. Check your inbox
+            (and spam folder).
+            {devLink && (
+              <div className="mt-2">
+                <span className="text-text-muted">Dev link:</span>{' '}
+                <a href={devLink} className="break-all font-semibold text-brand-blue-light underline">
+                  {devLink}
+                </a>
+              </div>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded-[11px] border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] px-[15px] py-3 text-[13px] text-danger">
@@ -135,22 +212,29 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
         )}
 
         <Button type="submit" variant="primary" disabled={submitting} className="!h-[50px] w-full !rounded-xl !text-[15.5px]">
-          {submitting ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+          {submitting ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : 'Send reset link'}
         </Button>
 
         <div className="mt-5 text-center text-[13.5px] text-text-muted">
           {mode === 'login' ? (
             <>
               New here?{' '}
-              <button type="button" onClick={() => { setMode('register'); setError(''); }} className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light">
+              <button type="button" onClick={() => switchMode('register')} className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light">
                 Create an account
+              </button>
+            </>
+          ) : mode === 'register' ? (
+            <>
+              Already have an account?{' '}
+              <button type="button" onClick={() => switchMode('login')} className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light">
+                Sign in
               </button>
             </>
           ) : (
             <>
-              Already have an account?{' '}
-              <button type="button" onClick={() => { setMode('login'); setError(''); }} className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light">
-                Sign in
+              Remembered it?{' '}
+              <button type="button" onClick={() => switchMode('login')} className="cursor-pointer border-none bg-transparent font-semibold text-brand-blue-light">
+                Back to sign in
               </button>
             </>
           )}
@@ -166,6 +250,7 @@ type AgentTab = 'preapprovals' | 'tools' | 'marketing';
 function AgentDashboard({ agent, onSignOut, onAgentUpdate }: { agent: AgentUser; onSignOut: () => void; onAgentUpdate: (a: AgentUser) => void }) {
   const [tab, setTab] = useState<AgentTab>('preapprovals');
   const [profileOpen, setProfileOpen] = useState(false);
+  const { canInstall, installed, promptInstall } = useInstallPrompt();
   const navBtn = (key: AgentTab, label: string, soon = false) => (
     <button
       onClick={() => setTab(key)}
@@ -200,6 +285,9 @@ function AgentDashboard({ agent, onSignOut, onAgentUpdate }: { agent: AgentUser;
           >
             {agent.name || agent.email}
           </button>
+          {canInstall && !installed && (
+            <Button variant="secondary" size="sm" onClick={() => { promptInstall(); }}>Install app</Button>
+          )}
           <Button variant="ghost" size="sm" onClick={onSignOut}>Sign out</Button>
         </div>
       </header>
@@ -470,12 +558,11 @@ function MiniField({ label, value, onChange, prefix, suffix, type = 'number', pl
   );
 }
 
-/** Edit the agent's co-branding profile (name, phone, brokerage, license, photo). */
+/** Edit the agent's co-branding profile (name, phone, brokerage, photo). */
 function ProfileModal({ open, onClose, agent, onSaved }: { open: boolean; onClose: () => void; agent: AgentUser; onSaved: (a: AgentUser) => void }) {
   const [name, setName] = useState(agent.name);
   const [phone, setPhone] = useState(agent.phone);
   const [brokerage, setBrokerage] = useState(agent.brokerage || '');
-  const [license, setLicense] = useState(agent.license || '');
   const [photo, setPhoto] = useState(agent.photo || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -485,7 +572,6 @@ function ProfileModal({ open, onClose, agent, onSaved }: { open: boolean; onClos
       setName(agent.name);
       setPhone(agent.phone);
       setBrokerage(agent.brokerage || '');
-      setLicense(agent.license || '');
       setPhoto(agent.photo || '');
       setMsg('');
     }
@@ -504,7 +590,7 @@ function ProfileModal({ open, onClose, agent, onSaved }: { open: boolean; onClos
     setSaving(true);
     setMsg('');
     try {
-      const { agent: a } = await agentApi.updateProfile({ name: name.trim(), phone: phone.trim(), brokerage: brokerage.trim(), license: license.trim(), photo });
+      const { agent: a } = await agentApi.updateProfile({ name: name.trim(), phone: phone.trim(), brokerage: brokerage.trim(), photo });
       onSaved(a);
       onClose();
     } catch (err) {
@@ -531,8 +617,7 @@ function ProfileModal({ open, onClose, agent, onSaved }: { open: boolean; onClos
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2"><Label>Name</Label><TextField value={name} onChange={(e) => setName(e.target.value)} /></div>
         <div><Label>Phone</Label><TextField value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" /></div>
-        <div><Label>License #</Label><TextField value={license} onChange={(e) => setLicense(e.target.value)} placeholder="DRE / license #" /></div>
-        <div className="sm:col-span-2"><Label>Brokerage</Label><TextField value={brokerage} onChange={(e) => setBrokerage(e.target.value)} placeholder="ABC Realty" /></div>
+        <div><Label>Brokerage</Label><TextField value={brokerage} onChange={(e) => setBrokerage(e.target.value)} placeholder="ABC Realty" /></div>
       </div>
       {msg && <div className="mt-3 text-[12.5px] text-danger">{msg}</div>}
       <div className="mt-5 flex justify-end gap-2.5">
@@ -586,7 +671,7 @@ function MarketingView() {
 function OpenHouseFlyer() {
   const [address, setAddress] = useState('');
   const [priceStr, setPriceStr] = useState('500000');
-  const [rateStr, setRateStr] = useState('6.5');
+  const [rateStr, setRateStr] = useState('7.25');
   const [term, setTerm] = useState('30');
   const [taxStr, setTaxStr] = useState('1.25');
   const [insStr, setInsStr] = useState('0.35');
@@ -654,7 +739,7 @@ function BuyerAffordability() {
   const [income, setIncome] = useState('120000');
   const [debts, setDebts] = useState('600');
   const [down, setDown] = useState('40000');
-  const [rate, setRate] = useState('6.5');
+  const [rate, setRate] = useState('7.25');
   const [term, setTerm] = useState('30');
   const [dti, setDti] = useState('43');
   const [busy, setBusy] = useState(false);

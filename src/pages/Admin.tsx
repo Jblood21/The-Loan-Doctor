@@ -129,7 +129,7 @@ export default function Admin() {
                 >
                   <span className="flex items-center gap-2.5 font-semibold text-text-primary">
                     <span
-                      className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px] text-[12px] font-bold text-app"
+                      className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px] text-[12px] font-bold text-on-brand"
                       style={{ background: AVATAR_PALETTE[i % AVATAR_PALETTE.length] }}
                     >
                       {initials(u.name)}

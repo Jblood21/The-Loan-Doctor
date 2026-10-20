@@ -6,7 +6,7 @@ import { CalcField, CalcSelect, Headline, ResultPanel, Row, TERM_OPTIONS, type C
 
 export default function ExtraPayment({ open, onClose }: CalcProps) {
   const [loan, setLoan] = useState(320000);
-  const [rate, setRate] = useState(6.5);
+  const [rate, setRate] = useState(7.25);
   const [term, setTerm] = useState('30');
   const [extra, setExtra] = useState(200);
 

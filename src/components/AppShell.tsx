@@ -33,6 +33,19 @@ export function AppShell() {
         <ScenariosProvider>
           <ReportProvider>
           <div className="flex min-h-screen">
+            {/* Scenic brand backdrop — the day landscape in light mode, a night
+                version (moon + stars) in dark. Sits behind content (−z), no clicks. */}
+            <div
+              aria-hidden
+              className="pointer-events-none fixed -inset-8 -z-10 bg-cover bg-bottom bg-no-repeat"
+              style={{ backgroundImage: 'var(--app-scene)', filter: 'blur(12px)' }}
+            />
+            {/* Soft scrim so cards and text stay readable over the scenery. */}
+            <div
+              aria-hidden
+              className="pointer-events-none fixed inset-0 -z-10"
+              style={{ background: 'var(--app-scene-scrim)' }}
+            />
             <Sidebar />
             <main className="max-h-screen min-w-0 flex-1 overflow-y-auto">
               <MobileTopBar />

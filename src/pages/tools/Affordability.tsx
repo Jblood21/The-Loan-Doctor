@@ -8,7 +8,7 @@ export default function Affordability({ open, onClose }: CalcProps) {
   const [income, setIncome] = useState(120000);
   const [debts, setDebts] = useState(600);
   const [down, setDown] = useState(40000);
-  const [rate, setRate] = useState(6.5);
+  const [rate, setRate] = useState(7.25);
   const [term, setTerm] = useState('30');
   const [dti, setDti] = useState(43);
   const [taxRate, setTaxRate] = useState(1.25);

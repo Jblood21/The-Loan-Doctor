@@ -25,8 +25,173 @@
   src: url('/fonts/Sacramento.ttf') format('truetype');
 }
 
+/* ------------------------------------------------------------------ *
+ * Base Camp design tokens. Light is the default (:root); dark is applied
+ * either by the OS preference (unless the user forced light) or by an
+ * explicit data-theme="dark" on <html>. Every app color flows through
+ * these via the Tailwind color names in tailwind.config.js.
+ * ------------------------------------------------------------------ */
 :root {
+  color-scheme: light;
+  --app-scene: url('/brand/basecamp-day.webp');
+  --app-scene-scrim: linear-gradient(180deg, rgba(246, 244, 236, 0.74) 0%, rgba(246, 244, 236, 0.36) 34%, rgba(246, 244, 236, 0.14) 70%, rgba(246, 244, 236, 0.05) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(246, 244, 236, 0.92) 0%, rgba(246, 244, 236, 0.68) 38%, rgba(246, 244, 236, 0.22) 68%, rgba(246, 244, 236, 0) 100%);
+
+  --surface: #ffffff;
+  --surface-sunken: #f5f3ea;
+  --surface-tint: #e8eef5;
+  --surface-tint-strong: #dae4ef;
+  --border: #e2e0d6;
+  --border-control: #7b8593;
+
+  --ink: #1b2431;
+  --ink-muted: #4a5666;
+
+  --brand: #2f649c;
+  --brand-hover: #254473;
+  --brand-pressed: #1c3459;
+  --on-brand: #ffffff;
+
+  --accent-hot: #d4917e;
+  --on-accent-hot: #1b2431;
+
+  --success: #2b6e4f;
+  --success-tint: #e4f1ea;
+  --warning: #7a4a12;
+  --warning-tint: #fbeedd;
+  --danger: #b3261e;
+  --danger-tint: #fdeceb;
+
+  --disabled-bg: #e6e8e6;
+  --disabled-ink: #5d6571;
+
+  --focus-ring: #2f649c;
+  --ring-shadow: rgba(47, 100, 156, 0.35);
+
+  --ridge-light: #638cbb;
+  --glacier: #a2b3c0;
+  --sage: #bdc2bb;
+  --coral-deep: #c6796a;
+
+  --chart-1: #2f649c;
+  --chart-2: #b9604f;
+  --chart-3: #5f8a77;
+  --chart-4: #a8761c;
+
+  --shadow-card: 0 1px 2px rgba(27, 36, 49, 0.06), 0 1px 3px rgba(27, 36, 49, 0.09);
+  --shadow-raised: 0 12px 34px rgba(27, 36, 49, 0.14);
+  --scrollbar: rgba(27, 36, 49, 0.22);
+  --scrim: rgba(27, 36, 49, 0.42);
+}
+
+/* Dark values, shared by the OS-preference path and the explicit opt-in. */
+:root[data-theme='dark'] {
   color-scheme: dark;
+  --app-scene: url('/brand/basecamp-night.webp');
+  --app-scene-scrim: linear-gradient(180deg, rgba(8, 14, 26, 0.76) 0%, rgba(8, 14, 26, 0.38) 34%, rgba(8, 14, 26, 0.18) 70%, rgba(8, 14, 26, 0.07) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(8, 14, 26, 0.92) 0%, rgba(8, 14, 26, 0.7) 38%, rgba(8, 14, 26, 0.26) 68%, rgba(8, 14, 26, 0) 100%);
+
+  --surface: #16263a;
+  --surface-sunken: #0d1824;
+  --surface-tint: #1d3350;
+  --surface-tint-strong: #274a70;
+  --border: #28384b;
+  --border-control: #46586d;
+
+  --ink: #e9eff6;
+  --ink-muted: #9fb1c4;
+
+  --brand: #4e8cc8;
+  --brand-hover: #639ad4;
+  --brand-pressed: #3f79b0;
+  --on-brand: #ffffff;
+
+  --accent-hot: #d4917e;
+  --on-accent-hot: #1b2431;
+
+  --success: #57c48d;
+  --success-tint: #142a20;
+  --warning: #e0a44e;
+  --warning-tint: #2f2512;
+  --danger: #ef7a72;
+  --danger-tint: #2e1816;
+
+  --disabled-bg: #1b2a3a;
+  --disabled-ink: #6b7b8e;
+
+  --focus-ring: #5fa8f5;
+  --ring-shadow: rgba(95, 168, 245, 0.3);
+
+  --ridge-light: #638cbb;
+  --glacier: #a2b3c0;
+  --sage: #bdc2bb;
+  --coral-deep: #c6796a;
+
+  --chart-1: #5a93cf;
+  --chart-2: #cf7a68;
+  --chart-3: #74a88f;
+  --chart-4: #c59a3f;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-raised: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --scrollbar: rgba(140, 165, 195, 0.22);
+  --scrim: rgba(4, 9, 15, 0.6);
+}
+
+/* Follow the OS when the user hasn't forced light. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+  --app-scene: url('/brand/basecamp-night.webp');
+  --app-scene-scrim: linear-gradient(180deg, rgba(8, 14, 26, 0.76) 0%, rgba(8, 14, 26, 0.38) 34%, rgba(8, 14, 26, 0.18) 70%, rgba(8, 14, 26, 0.07) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(8, 14, 26, 0.92) 0%, rgba(8, 14, 26, 0.7) 38%, rgba(8, 14, 26, 0.26) 68%, rgba(8, 14, 26, 0) 100%);
+
+    --surface: #16263a;
+    --surface-sunken: #0d1824;
+    --surface-tint: #1d3350;
+    --surface-tint-strong: #274a70;
+    --border: #28384b;
+    --border-control: #46586d;
+
+    --ink: #e9eff6;
+    --ink-muted: #9fb1c4;
+
+    --brand: #4e8cc8;
+    --brand-hover: #639ad4;
+    --brand-pressed: #3f79b0;
+    --on-brand: #ffffff;
+
+    --accent-hot: #d4917e;
+    --on-accent-hot: #1b2431;
+
+    --success: #57c48d;
+    --success-tint: #142a20;
+    --warning: #e0a44e;
+    --warning-tint: #2f2512;
+    --danger: #ef7a72;
+    --danger-tint: #2e1816;
+
+    --disabled-bg: #1b2a3a;
+    --disabled-ink: #6b7b8e;
+
+    --focus-ring: #5fa8f5;
+    --ring-shadow: rgba(95, 168, 245, 0.3);
+
+    --ridge-light: #638cbb;
+    --glacier: #a2b3c0;
+    --sage: #bdc2bb;
+    --coral-deep: #c6796a;
+
+    --chart-1: #5a93cf;
+    --chart-2: #cf7a68;
+    --chart-3: #74a88f;
+    --chart-4: #c59a3f;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-raised: 0 16px 40px rgba(0, 0, 0, 0.5);
+    --scrollbar: rgba(140, 165, 195, 0.22);
+    --scrim: rgba(4, 9, 15, 0.6);
+  }
 }
 
 * {
@@ -42,11 +207,12 @@ body,
 }
 
 body {
-  background: #07111d;
-  color: #e9f1fa;
-  font-family: 'Manrope', system-ui, sans-serif;
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font-family: 'Figtree', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 input,
@@ -66,7 +232,7 @@ summary:focus-visible,
 [role='option']:focus-visible,
 [role='tab']:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid #5fa8f5;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 8px;
 }
@@ -86,17 +252,17 @@ input[type='number'] {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(140, 165, 195, 0.22);
+  background: var(--scrollbar);
   border-radius: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* tabular figures for all numbers (matches the design's .num) */
+/* tabular figures for all numbers — one family (Figtree) with tabular nums */
 .num {
-  font-family: 'Space Grotesk', monospace;
   font-feature-settings: 'tnum' 1;
+  font-variant-numeric: tabular-nums;
 }
 
 @layer components {
@@ -105,14 +271,14 @@ input[type='number'] {
     @apply h-[46px] w-full rounded-[10px] border border-border-input bg-input px-[14px] text-[15px] text-text-primary outline-none transition-shadow;
   }
   .field:focus {
-    border-color: #2f80ed;
-    box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.16);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--ring-shadow);
   }
   .field-lg {
     @apply h-12 rounded-[11px] px-4 text-[15px];
   }
   .field-lg:focus {
-    box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.18);
+    box-shadow: 0 0 0 3px var(--ring-shadow);
   }
   .label {
     @apply mb-2 block text-[13px] font-semibold text-text-label;

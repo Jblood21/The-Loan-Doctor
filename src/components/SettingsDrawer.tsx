@@ -57,37 +57,12 @@ export function SettingsDrawer() {
   const { settings, update, save, saving } = useSettings();
   const { user } = useAuth();
 
-  const [agentForm, setAgentForm] = useState({ name: '', brokerage: '', phone: '', email: '' });
   const { installed, promptInstall } = useInstallPrompt();
   const [installMsg, setInstallMsg] = useState('');
 
   if (!settingsOpen) return null;
 
   const name = settings.name || user?.name || 'Loan Officer';
-
-  // Saved real-estate-agent contacts (add / delete). Selected for a letter on the
-  // Pre-Approval page.
-  const agents = settings.agents ?? [];
-  const newId = () =>
-    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `a-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const addAgent = () => {
-    const agentName = agentForm.name.trim();
-    if (!agentName) return;
-    save({
-      agents: [
-        ...agents,
-        {
-          id: newId(),
-          name: agentName,
-          brokerage: agentForm.brokerage.trim(),
-          phone: agentForm.phone.trim(),
-          email: agentForm.email.trim() || undefined,
-        },
-      ],
-    });
-    setAgentForm({ name: '', brokerage: '', phone: '', email: '' });
-  };
-  const deleteAgent = (id: string) => save({ agents: agents.filter((a) => a.id !== id) });
 
   // Read an uploaded image, downscale it to a letterhead-friendly size, and save it
   // as a data URL. PNG keeps transparency; falls back to JPEG if the file is large.
@@ -135,7 +110,7 @@ export function SettingsDrawer() {
 
         <div className="p-6">
           <div className="mb-[22px] flex items-center gap-[14px] rounded-xl border border-border bg-elevated px-4 py-[14px]">
-            <div className="flex h-11 w-11 items-center justify-center rounded-[11px] bg-brand-gradient text-[16px] font-bold text-app">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[11px] bg-brand text-[16px] font-bold text-on-brand">
               {initials(name)}
             </div>
             <div>
@@ -173,82 +148,6 @@ export function SettingsDrawer() {
               </Button>
             </div>
           ))}
-
-          {/* Real-estate agent contacts — saved here, selectable on the Pre-Approval page */}
-          <div className="mb-6">
-            <div className="mb-1 text-[14px] font-bold text-text-primary">Real-Estate Agents</div>
-            <div className="mb-[14px] text-[12.5px] text-text-muted">
-              Save agents to co-brand pre-approval letters. Pick one from the dropdown on the Pre-Approval page.
-            </div>
-
-            {agents.length > 0 ? (
-              <div className="mb-3 flex flex-col gap-2">
-                {agents.map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between gap-3 rounded-[10px] border border-border bg-elevated px-3.5 py-2.5"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-[13.5px] font-semibold text-text-primary">{a.name}</div>
-                      <div className="truncate text-[12px] text-text-muted">
-                        {[a.brokerage, a.phone, a.email].filter(Boolean).join(' · ') || 'No details'}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteAgent(a.id)}
-                      aria-label={`Delete ${a.name}`}
-                      className="flex-shrink-0 cursor-pointer border-none bg-transparent text-[12.5px] font-semibold text-text-muted underline hover:text-danger"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="mb-3 rounded-[10px] border border-dashed border-border-input px-3.5 py-3 text-[12.5px] text-text-muted">
-                No agents saved yet — add one below.
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2 rounded-[10px] border border-border-input bg-input p-3">
-              <div className="grid grid-cols-2 gap-2">
-                <TextField
-                  placeholder="Agent name"
-                  value={agentForm.name}
-                  onChange={(e) => setAgentForm((f) => ({ ...f, name: e.target.value }))}
-                  className="!h-[40px] !text-[13.5px]"
-                />
-                <TextField
-                  placeholder="Brokerage"
-                  value={agentForm.brokerage}
-                  onChange={(e) => setAgentForm((f) => ({ ...f, brokerage: e.target.value }))}
-                  className="!h-[40px] !text-[13.5px]"
-                />
-                <TextField
-                  placeholder="Phone"
-                  value={agentForm.phone}
-                  onChange={(e) => setAgentForm((f) => ({ ...f, phone: e.target.value }))}
-                  className="!h-[40px] !text-[13.5px]"
-                />
-                <TextField
-                  placeholder="Email (optional)"
-                  value={agentForm.email}
-                  onChange={(e) => setAgentForm((f) => ({ ...f, email: e.target.value }))}
-                  className="!h-[40px] !text-[13.5px]"
-                />
-              </div>
-              <Button
-                variant="secondary"
-                size="md"
-                className="mt-1 self-start"
-                disabled={saving || !agentForm.name.trim()}
-                onClick={addAgent}
-              >
-                {saving ? 'Saving…' : 'Add Agent'}
-              </Button>
-            </div>
-          </div>
 
           <div className="mb-6">
             <div className="mb-1 text-[14px] font-bold text-text-primary">Letterhead Logo</div>
@@ -306,7 +205,7 @@ export function SettingsDrawer() {
           <div className="mb-4">
             <div className="mb-1 text-[14px] font-bold text-text-primary">Desktop App</div>
             <div className="mb-[14px] text-[12.5px] text-text-muted">
-              Install LoanDr. as a desktop app — it opens in its own window with a taskbar/dock icon, no browser tabs.
+              Install Basecamp as a desktop app — it opens in its own window with a taskbar/dock icon, no browser tabs.
             </div>
             {installed ? (
               <div className="rounded-[10px] border border-[rgba(52,211,153,0.28)] bg-[rgba(52,211,153,0.1)] px-3.5 py-2.5 text-[13px] font-semibold text-good">
@@ -336,7 +235,7 @@ export function SettingsDrawer() {
                 <div className="rounded-[10px] border border-border-input bg-input px-3.5 py-2.5 text-[12px] leading-[1.6] text-text-soft">
                   <div className="mb-1 font-semibold text-text-primary">Install manually</div>
                   <div>
-                    <strong>Chrome / Edge:</strong> click the install icon (a monitor with a ↓) at the right of the address bar, or the ⋮ menu → “Install LoanDr…”.
+                    <strong>Chrome / Edge:</strong> click the install icon (a monitor with a ↓) at the right of the address bar, or the ⋮ menu → “Install Basecamp…”.
                   </div>
                   <div className="mt-1">
                     <strong>Safari (Mac):</strong> File → “Add to Dock”.

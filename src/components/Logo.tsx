@@ -1,52 +1,49 @@
-// LoanDr. brand mark — gradient "pulse/heartbeat" tile + wordmark.
+// Loan Base Camp brand lockup — genuine vector artwork from the brand package.
+// LogoMark is the icon-only mountain mark (used on the splash and tight spots);
+// Logo is the full "Loan Base Camp" badge lockup. Both are the supplied SVGs,
+// rendered as-is (no redraw / recolor / stretch) per the brand guidelines.
 
 interface LogoProps {
-  /** tile size in px */
+  /** base size in px; the lockup renders at ~1.2x this height */
   size?: number;
-  /** wordmark font size in px; 0 hides the wordmark */
+  /** accepted for call-site compatibility; the wordmark is part of the art */
   wordmark?: number;
-  /** glow shadow under the tile */
+  /** soft drop shadow */
   glow?: boolean;
-  /** stroke color of the pulse path */
-  stroke?: string;
 }
 
-export function LogoMark({ size = 34, glow = false, stroke = '#07111d' }: Omit<LogoProps, 'wordmark'>) {
+export function LogoMark({ size = 34, glow = false }: Omit<LogoProps, 'wordmark'>) {
+  // The mountain mark sits on the brand's white panel so it reads in both themes.
   return (
     <div
-      className="flex items-center justify-center bg-brand-gradient"
+      className="flex items-center justify-center bg-white"
       style={{
         width: size,
         height: size,
         borderRadius: size * 0.26,
-        boxShadow: glow ? '0 8px 24px rgba(45,212,191,.28)' : undefined,
+        boxShadow: glow ? 'var(--shadow-card)' : undefined,
       }}
     >
-      <svg
-        width={size * 0.52}
-        height={size * 0.52}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke={stroke}
-        strokeWidth={2.4}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M3 13h3l2 5 4-12 2 7h4" />
-      </svg>
+      <img
+        src="/brand/mountain-icon.svg"
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="select-none"
+        style={{ width: size * 0.74, height: size * 0.74 }}
+      />
     </div>
   );
 }
 
-export function Logo({ size = 34, wordmark = 19, glow = false }: LogoProps) {
+export function Logo({ size = 34, glow = false }: LogoProps) {
   return (
-    <div className="flex items-center" style={{ gap: size * 0.32 }}>
-      <LogoMark size={size} glow={glow} />
-      {wordmark > 0 && (
-        <span className="font-display font-bold tracking-[-0.4px]" style={{ fontSize: wordmark }}>
-          Loan<span className="text-brand-teal">Dr.</span>
-        </span>
-      )}
-    </div>
+    <img
+      src="/brand/loan-base-camp.svg"
+      alt="Loan Base Camp"
+      draggable={false}
+      className="block w-auto select-none"
+      style={{ height: Math.round(size * 1.2), filter: glow ? 'drop-shadow(0 6px 16px rgba(0,0,0,.22))' : undefined }}
+    />
   );
 }

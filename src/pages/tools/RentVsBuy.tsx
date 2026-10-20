@@ -9,7 +9,7 @@ export default function RentVsBuy({ open, onClose }: CalcProps) {
   const [rentGrowth, setRentGrowth] = useState(3);
   const [price, setPrice] = useState(400000);
   const [downPct, setDownPct] = useState(10);
-  const [rate, setRate] = useState(6.5);
+  const [rate, setRate] = useState(7.25);
   const [term, setTerm] = useState('30');
   const [years, setYears] = useState(7);
   const [carryPct, setCarryPct] = useState(1.8); // taxes + ins + maintenance %/yr
