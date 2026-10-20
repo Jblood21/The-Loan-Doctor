@@ -2,8 +2,28 @@
 
 export type TransactionType = 'purchase' | 'refinance';
 export type LoanType = 'conventional' | 'fha' | 'va' | 'usda' | 'arm' | 'dscr';
-/** DSCR prepayment-penalty structures ('' = none). Percent of the balance charged in years 1, 2, 3… */
+/** The two fixed prepayment presets older saved scenarios used ('' = none). Read as an
+ *  equivalent PrepayPlan; new scenarios store a PrepayPlan instead. */
 export type DscrPrepay = '' | '3-2-1' | '5-4-3-2-1';
+
+/**
+ * A prepayment penalty, entered by the loan officer.
+ *  • 'percent'  — a percentage for each year of the penalty period (e.g. 5-4-3-2-1).
+ *  • 'interest' — a number of months of interest, optionally with a penalty-free amount.
+ */
+export interface PrepayPlan {
+  mode: 'none' | 'percent' | 'interest';
+  /** percent: the % charged in each year of the period; stepPct[0] is year 1. */
+  stepPct?: number[];
+  /** percent: charged on the remaining balance at payoff (default) or the original loan amount. */
+  basis?: 'balance' | 'original';
+  /** interest: months of interest charged. */
+  interestMonths?: number;
+  /** interest: the penalty applies to payoffs in the first this-many years. */
+  interestYears?: number;
+  /** interest: penalty-free amount, as a % of the original loan (the penalty is on the balance above it). */
+  freePct?: number;
+}
 export type LoanProgram = 'standard' | 'homeready' | 'homepossible' | 'firsttime';
 export type LoanTerm = '30' | '20' | '15' | '10';
 export type PayoutOption = 'lump' | 'tenure' | 'line';
@@ -74,7 +94,9 @@ export interface Scenario {
   vaSubsequentUse?: boolean;
   /** DSCR only: gross monthly rent (the lease, or the market rent from the appraisal). */
   rentMonthly?: number;
-  /** DSCR only: prepayment-penalty structure. Absent/'' = none. */
+  /** DSCR only: the prepayment penalty. Absent = none. */
+  prepay?: PrepayPlan;
+  /** DSCR only — legacy: the old fixed presets. Read as an equivalent `prepay`; no longer written. */
   dscrPrepay?: DscrPrepay;
   /** DSCR only: interest-only for the first 10 years, then fully amortizing. */
   interestOnly?: boolean;

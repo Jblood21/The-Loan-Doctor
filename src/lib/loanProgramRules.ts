@@ -224,11 +224,29 @@ export const DSCR = {
     ioYears: 10,
   },
 
-  /** Prepayment-penalty structures: % of the balance charged if paid off in year 1, 2, 3… */
+  /**
+   * Prepayment-penalty helpers. Penalties are lender-specific, so the loan officer enters
+   * the real schedule; these are only quick-fill presets, input limits, and defaults.
+   */
   prepay: {
-    '3-2-1': { label: '3-2-1', steps: [3, 2, 1] },
-    '5-4-3-2-1': { label: '5-4-3-2-1', steps: [5, 4, 3, 2, 1] },
-  } as Record<'3-2-1' | '5-4-3-2-1', { label: string; steps: number[] }>,
+    /** Quick-fill presets for the percent-by-year editor (% of the balance in year 1, 2, 3…). */
+    presets: [
+      { id: '5-4-3-2-1', steps: [5, 4, 3, 2, 1] },
+      { id: '4-3-2-1', steps: [4, 3, 2, 1] },
+      { id: '3-2-1', steps: [3, 2, 1] },
+      { id: '2-1', steps: [2, 1] },
+      { id: '3-3-3', steps: [3, 3, 3] },
+      { id: '5-5-5-5-5', steps: [5, 5, 5, 5, 5] },
+    ] as { id: string; steps: number[] }[],
+    /** Input limits. */
+    maxYears: 10,
+    maxPct: 20,
+    maxMonths: 36,
+    /** Starting values when the months-of-interest structure is picked (all editable). */
+    defaults: { interestMonths: 6, interestYears: 3, freePct: 20 },
+    /** The two fixed presets older saved scenarios used, as their equivalent year-by-year steps. */
+    legacy: { '3-2-1': [3, 2, 1], '5-4-3-2-1': [5, 4, 3, 2, 1] } as Record<'3-2-1' | '5-4-3-2-1', number[]>,
+  },
 
   programNotes: [
     'DSCR loans qualify on the property’s rental income, not the borrower’s personal income, so there is no DTI and no income documentation. They are for investment properties only.',

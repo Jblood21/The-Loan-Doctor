@@ -9,7 +9,7 @@ import {
   interestOnlyPayment,
   monthlyPayment,
 } from './finance';
-import type { Scenario } from '@/types';
+import type { PrepayPlan, Scenario } from '@/types';
 
 // A DSCR purchase: $400k property, 25% down → $300k loan, 7.5%, 30-yr, rent $3,000/mo.
 const base = {
@@ -126,29 +126,178 @@ describe('DSCR soft guideline flags', () => {
   });
 });
 
-describe('prepayment penalty', () => {
+// Balance after k payments, from the closed-form loan formula (independent of the app's schedule code).
+const balanceAfter = (loan: number, ratePct: number, termYears: number, k: number) => {
+  const r = ratePct / 100 / 12;
+  const n = termYears * 12;
+  const pmt = (loan * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+  return loan * Math.pow(1 + r, k) - (pmt * (Math.pow(1 + r, k) - 1)) / r;
+};
+const withPrepay = (prepay: PrepayPlan, over: Partial<Scenario> = {}) =>
+  computeScenario({ ...base, prepay, ...over } as Scenario).dscr!;
+
+describe('prepayment penalty — none', () => {
   it('none by default', () => {
     const d = computeScenario(base).dscr!;
-    expect(d.prepay).toBe('');
+    expect(d.prepay).toBeNull();
     expect(d.prepayLabel).toBe('None');
     expect(d.prepayYear1Amount).toBe(0);
   });
-  it('5-4-3-2-1 charges 5% of the balance in year 1', () => {
-    const d = computeScenario({ ...base, dscrPrepay: '5-4-3-2-1' } as Scenario).dscr!;
-    expect(d.prepayLabel).toBe('5-4-3-2-1');
-    expect(d.prepayYear1Pct).toBe(5);
-    expect(d.prepayYear1Amount).toBeCloseTo(15000, 6);
-  });
-  it('3-2-1 charges 3% in year 1', () => {
-    const d = computeScenario({ ...base, dscrPrepay: '3-2-1' } as Scenario).dscr!;
-    expect(d.prepayYear1Amount).toBeCloseTo(9000, 6);
+  it('an explicit "none" plan means none', () => {
+    expect(withPrepay({ mode: 'none', stepPct: [5, 4, 3] }).prepay).toBeNull();
   });
   it('does not change the payment, APR or cash to close', () => {
     const a = computeScenario(base);
-    const b = computeScenario({ ...base, dscrPrepay: '5-4-3-2-1' } as Scenario);
+    const b = computeScenario({ ...base, prepay: { mode: 'percent', stepPct: [5, 4, 3, 2, 1] } } as Scenario);
     expect(b.totalMonthly).toBe(a.totalMonthly);
     expect(b.apr).toBe(a.apr);
     expect(b.cashToClose).toBe(a.cashToClose);
+  });
+});
+
+describe('prepayment penalty — percent by year', () => {
+  const steps = [5, 4, 3, 2, 1];
+
+  it('charges each year\'s percent on the balance at the start of that year', () => {
+    const d = withPrepay({ mode: 'percent', stepPct: steps, basis: 'balance' });
+    const p = d.prepay!;
+    expect(p.years).toBe(5);
+    expect(p.label).toBe('5-4-3-2-1');
+    p.rows.forEach((row, i) => {
+      const bal = balanceAfter(300000, 7.5, 30, 12 * i); // start of year i+1
+      expect(row.year).toBe(i + 1);
+      expect(row.pct).toBe(steps[i]);
+      expect(row.balance).toBeCloseTo(bal, 4);
+      expect(row.amount).toBeCloseTo((bal * steps[i]) / 100, 4);
+    });
+    expect(p.year1Amount).toBeCloseTo(15000, 6); // 5% of the full $300,000 in year 1
+    expect(d.prepayYear1Amount).toBeCloseTo(15000, 6);
+  });
+
+  it('later years cost less than the same percent would on the original balance', () => {
+    const bal = withPrepay({ mode: 'percent', stepPct: [4, 4, 4], basis: 'balance' }).prepay!;
+    const orig = withPrepay({ mode: 'percent', stepPct: [4, 4, 4], basis: 'original' }).prepay!;
+    expect(bal.rows[0].amount).toBeCloseTo(orig.rows[0].amount, 6); // year 1 is the same
+    expect(bal.rows[2].amount).toBeLessThan(orig.rows[2].amount); // the balance has paid down
+  });
+
+  it('"original loan amount" basis is flat at pct × the loan', () => {
+    const p = withPrepay({ mode: 'percent', stepPct: steps, basis: 'original' }).prepay!;
+    p.rows.forEach((row, i) => expect(row.amount).toBeCloseTo((300000 * steps[i]) / 100, 6));
+  });
+
+  it('any years and percentages can be entered, including decimals', () => {
+    const p = withPrepay({ mode: 'percent', stepPct: [2.5, 1.25] }).prepay!;
+    expect(p.label).toBe('2.5-1.25');
+    expect(p.years).toBe(2);
+    expect(p.rows[0].amount).toBeCloseTo(7500, 6);
+    expect(p.rows[1].amount).toBeCloseTo((balanceAfter(300000, 7.5, 30, 12) * 1.25) / 100, 4);
+  });
+
+  it('names flat and single-year penalties plainly', () => {
+    expect(withPrepay({ mode: 'percent', stepPct: [3, 3, 3] }).prepay!.label).toBe('3% flat · 3 yrs');
+    expect(withPrepay({ mode: 'percent', stepPct: [2] }).prepay!.label).toBe('2% · 1 yr');
+  });
+
+  it('trailing 0% years drop off; all-zero or empty means no penalty', () => {
+    const p = withPrepay({ mode: 'percent', stepPct: [3, 2, 0, 0] }).prepay!;
+    expect(p.years).toBe(2);
+    expect(p.label).toBe('3-2');
+    expect(withPrepay({ mode: 'percent', stepPct: [0, 0] }).prepay).toBeNull();
+    expect(withPrepay({ mode: 'percent', stepPct: [] }).prepay).toBeNull();
+    expect(withPrepay({ mode: 'percent' }).prepay).toBeNull();
+  });
+
+  it('a 0% year in the middle is kept (the penalty can lapse and come back)', () => {
+    const p = withPrepay({ mode: 'percent', stepPct: [3, 0, 2] }).prepay!;
+    expect(p.years).toBe(3);
+    expect(p.rows[1].amount).toBe(0);
+  });
+
+  it('limits: percentages cap at 20% and the period at 10 years', () => {
+    const p = withPrepay({ mode: 'percent', stepPct: [50, -3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] }).prepay!;
+    expect(p.years).toBe(10);
+    expect(p.rows[0].pct).toBe(20);
+    expect(p.rows[1].pct).toBe(0); // a negative entry can't become a credit
+  });
+
+  it('describes the schedule in a plain sentence', () => {
+    expect(withPrepay({ mode: 'percent', stepPct: steps }).prepay!.description).toBe(
+      '5%, 4%, 3%, 2% and 1% of the remaining balance if the loan is paid off in years 1 through 5, respectively.',
+    );
+    expect(withPrepay({ mode: 'percent', stepPct: [3, 3, 3], basis: 'original' }).prepay!.description).toBe(
+      '3% of the original loan amount if the loan is paid off in the first 3 years.',
+    );
+  });
+
+  it('on an interest-only loan the balance holds, so year 2 costs the same as year 1', () => {
+    const p = withPrepay({ mode: 'percent', stepPct: [4, 4, 4] }, { interestOnly: true }).prepay!;
+    expect(p.rows[1].balance).toBeCloseTo(300000, 6);
+    expect(p.rows[1].amount).toBeCloseTo(p.rows[0].amount, 6);
+  });
+
+  it('older saved scenarios that used the two fixed presets still read correctly', () => {
+    const old = computeScenario({ ...base, dscrPrepay: '5-4-3-2-1' } as Scenario).dscr!;
+    expect(old.prepay!.label).toBe('5-4-3-2-1');
+    expect(old.prepayYear1Amount).toBeCloseTo(15000, 6);
+    expect(computeScenario({ ...base, dscrPrepay: '3-2-1' } as Scenario).dscr!.prepay!.label).toBe('3-2-1');
+    expect(computeScenario({ ...base, dscrPrepay: '' } as Scenario).dscr!.prepay).toBeNull();
+    // A new plan wins over a leftover legacy value.
+    const both = computeScenario({ ...base, dscrPrepay: '5-4-3-2-1', prepay: { mode: 'percent', stepPct: [2] } } as Scenario).dscr!;
+    expect(both.prepay!.label).toBe('2% · 1 yr');
+  });
+});
+
+describe('prepayment penalty — months of interest', () => {
+  const plan = (over: Partial<PrepayPlan> = {}): PrepayPlan => ({ mode: 'interest', interestMonths: 6, interestYears: 3, freePct: 20, ...over });
+
+  it('is months of interest on the balance above the penalty-free amount', () => {
+    const p = withPrepay(plan()).prepay!;
+    // Year 1: (300,000 − 20% × 300,000) × 7.5% ÷ 12 × 6 months = $9,000.
+    expect(p.rows[0].amount).toBeCloseTo((300000 - 60000) * 0.00625 * 6, 6);
+    expect(p.rows[0].amount).toBeCloseTo(9000, 6);
+    // Year 2 uses the lower balance; the free amount stays 20% of the ORIGINAL loan.
+    const bal2 = balanceAfter(300000, 7.5, 30, 12);
+    expect(p.rows[1].amount).toBeCloseTo((bal2 - 60000) * 0.00625 * 6, 4);
+    expect(p.rows[1].amount).toBeLessThan(p.rows[0].amount);
+    expect(p.years).toBe(3);
+    expect(p.label).toBe('6 mo. interest · 3 yrs');
+    expect(p.mode).toBe('interest');
+  });
+
+  it('with no penalty-free amount it is interest on the whole balance', () => {
+    const p = withPrepay(plan({ freePct: 0 })).prepay!;
+    expect(p.rows[0].amount).toBeCloseTo(300000 * 0.00625 * 6, 6); // $11,250
+  });
+
+  it('the effective percent of the balance is reported for each year', () => {
+    const p = withPrepay(plan()).prepay!;
+    expect(p.rows[0].pct).toBeCloseTo((9000 / 300000) * 100, 6); // 3%
+  });
+
+  it('a penalty-free amount larger than the balance means no charge', () => {
+    const p = withPrepay(plan({ freePct: 100 })).prepay!;
+    expect(p.rows.every((r) => r.amount === 0)).toBe(true);
+  });
+
+  it('zero months or zero years means no penalty', () => {
+    expect(withPrepay(plan({ interestMonths: 0 })).prepay).toBeNull();
+    expect(withPrepay(plan({ interestYears: 0 })).prepay).toBeNull();
+  });
+
+  it('a higher rate costs more interest', () => {
+    const lo = withPrepay(plan(), { rate: 6 }).prepay!.rows[0].amount;
+    const hi = withPrepay(plan(), { rate: 9 }).prepay!.rows[0].amount;
+    expect(hi).toBeGreaterThan(lo);
+  });
+
+  it('describes itself in a plain sentence', () => {
+    expect(withPrepay(plan()).prepay!.description).toBe(
+      '6 months of interest on the balance above 20% of the original loan if the loan is paid off in the first 3 years.',
+    );
+    expect(withPrepay(plan({ freePct: 0, interestMonths: 1, interestYears: 1 })).prepay!.description).toBe(
+      '1 month of interest on the balance if the loan is paid off in the first year.',
+    );
   });
 });
 

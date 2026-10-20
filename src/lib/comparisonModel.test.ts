@@ -167,7 +167,7 @@ describe('buildComparisonModel — DSCR', () => {
     expect(base).toMatch(/no mortgage insurance/i);
     expect(base).not.toMatch(/Interest-only:/);
     expect(base).not.toMatch(/prepayment penalty is a fee/);
-    const full = buildComparisonModel([dscr({ interestOnly: true, dscrPrepay: '3-2-1' })]).notes.join(' ');
+    const full = buildComparisonModel([dscr({ interestOnly: true, prepay: { mode: 'percent', stepPct: [3, 2, 1] } })]).notes.join(' ');
     expect(full).toMatch(/Interest-only:/);
     expect(full).toMatch(/prepayment penalty is a fee/);
     // No DSCR notes when no DSCR scenario is compared.
@@ -178,5 +178,36 @@ describe('buildComparisonModel — DSCR', () => {
     const m = buildComparisonModel([sc('conventional'), dscr()]);
     expect(m.programLabels).toEqual(['Conventional', 'DSCR']);
     expect(m.mixed).toBe(true);
+  });
+
+  it('the prepayment cell shows the structure and the most it could be in year 1', () => {
+    const [none, pct, months] = buildComparisonModel([
+      dscr(),
+      dscr({ prepay: { mode: 'percent', stepPct: [5, 4, 3, 2, 1] } }),
+      dscr({ prepay: { mode: 'interest', interestMonths: 6, interestYears: 3, freePct: 20 } }),
+    ]).columns;
+    expect(none.cells.dscrPrepay).toBe('None');
+    // This helper's loan is $400,000 − $100,000 = $300,000 at 7.5%.
+    expect(pct.cells.dscrPrepay).toBe('5-4-3-2-1 (yr 1: $15,000)'); // 5% × $300,000
+    expect(months.cells.dscrPrepay).toBe('6 mo. interest · 3 yrs (yr 1: $9,000)'); // ($300,000 − 20% free) × 7.5% ÷ 12 × 6
+  });
+
+  it('the report note spells out the actual schedule', () => {
+    const one = buildComparisonModel([dscr({ prepay: { mode: 'percent', stepPct: [5, 4, 3, 2, 1] } })]).notes.join('\n');
+    expect(one).toContain('5%, 4%, 3%, 2% and 1% of the remaining balance if the loan is paid off in years 1 through 5, respectively. Up to $15,000 in year 1.');
+    expect(one).not.toMatch(/Scenario|DSCR:/); // a single scenario isn't named
+  });
+
+  it('with two penalty scenarios each note is named', () => {
+    const notes = buildComparisonModel([
+      dscr({ name: 'Option A', prepay: { mode: 'percent', stepPct: [3, 3, 3] } }),
+      dscr({ name: 'Option B', prepay: { mode: 'interest', interestMonths: 6, interestYears: 3, freePct: 20 } }),
+    ]).notes;
+    expect(notes.some((n) => n.startsWith('Option A: 3% of the remaining balance'))).toBe(true);
+    expect(notes.some((n) => n.startsWith('Option B: 6 months of interest on the balance above 20%'))).toBe(true);
+  });
+
+  it('no penalty → no prepayment note', () => {
+    expect(buildComparisonModel([dscr()]).notes.join(' ')).not.toMatch(/prepayment penalty/i);
   });
 });

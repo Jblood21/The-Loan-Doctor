@@ -111,7 +111,8 @@ function cellValue(key: string, s: Scenario, c: ScenarioResult): string {
       // Payment once the interest-only period ends (other scenarios keep their normal payment).
       return c.dscr && c.dscr.amortizedPitia != null ? fmt2(c.dscr.amortizedPitia) : c.dscr ? fmt2(c.totalMonthly) : DASH;
     case 'dscrPrepay':
-      return c.dscr ? (c.dscr.prepay ? c.dscr.prepayLabel : 'None') : DASH;
+      // The structure plus the most it could be in year 1, e.g. "5-4-3-2-1 (yr 1: $11,250)".
+      return c.dscr ? (c.dscr.prepay ? `${c.dscr.prepay.label} (yr 1: ${fmt(c.dscr.prepay.year1Amount)})` : 'None') : DASH;
     case 'cashToClose':
       return fmt(c.cashToClose);
     default:
@@ -192,8 +193,15 @@ export function buildComparisonModel(scenarios: Scenario[]): ComparisonModel {
     }
     if (anyPrepay) {
       notes.push(
-        'A prepayment penalty is a fee if the loan is paid off or refinanced early. For example, 3-2-1 charges 3%, 2% and then 1% of the balance in years 1 through 3. Terms vary by lender.',
+        'A prepayment penalty is a fee if the loan is paid off or refinanced early. Terms vary by lender, and the dollar amounts shown are the most it could be in each year.',
       );
+      // Spell out each scenario's actual schedule (named when more than one carries one).
+      const withPenalty = results.filter(({ c }) => c.dscr?.prepay);
+      for (const { s, c } of withPenalty) {
+        const p = c.dscr!.prepay!;
+        const lead = withPenalty.length > 1 ? `${s.name}: ` : '';
+        notes.push(`${lead}${p.description} Up to ${fmt(p.year1Amount)} in year 1.`);
+      }
     }
   }
   if (anyConvPmi) {

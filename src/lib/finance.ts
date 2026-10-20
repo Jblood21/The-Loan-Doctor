@@ -12,7 +12,7 @@
 // All rates are documented inline. Lender-specific factors are centralized here so a
 // backend can later override them per lender.
 
-import type { ClosingCostItem, DscrPrepay, LoanType, Scenario, TransactionType } from '@/types';
+import type { ClosingCostItem, LoanType, PrepayPlan, Scenario, TransactionType } from '@/types';
 import { buildTitleScheduleFees, titleBasisAmount } from './titleFees';
 import { CONVENTIONAL, DSCR, FHA, USDA, VA } from './loanProgramRules';
 
@@ -336,6 +336,114 @@ export const DSCR_BAND_LABEL: Record<DscrBand, string> = {
   strong: 'Strong',
 };
 
+// ---------------------------------------------------------------------------
+// Prepayment penalty — entered year by year (a percentage for each year) or as a
+// number of months of interest. Penalties are lender-specific, so the loan officer
+// enters the real terms; this only does the arithmetic, on the loan's actual balance.
+// ---------------------------------------------------------------------------
+
+/** One year of a prepayment penalty. */
+export interface PrepayRow {
+  year: number;
+  /** Percent structure: the % entered for the year. Interest structure: the effective % of the balance. */
+  pct: number;
+  /** Balance at the start of the year — the most it can be if the loan is paid off during that year. */
+  balance: number;
+  /** The most the penalty can be if the loan is paid off during this year. */
+  amount: number;
+}
+
+export interface PrepayResult {
+  mode: 'percent' | 'interest';
+  /** Short name for tables: "5-4-3-2-1", "3% flat · 3 yrs", "6 mo. interest · 3 yrs". */
+  label: string;
+  /** A plain sentence for the report notes (no dollar amounts). */
+  description: string;
+  /** Length of the penalty period, in years. */
+  years: number;
+  rows: PrepayRow[];
+  /** The most the penalty can be if the loan is paid off during year 1. */
+  year1Amount: number;
+}
+
+const clampNum = (n: unknown, lo: number, hi: number): number => {
+  const v = Number(n);
+  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo;
+};
+const trimNum = (n: number): string => String(Math.round(n * 100) / 100);
+const andList = (xs: string[]): string =>
+  xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+const plural = (n: number, word: string): string => `${trimNum(n)} ${word}${n === 1 ? '' : 's'}`;
+
+/**
+ * The prepayment plan a scenario carries, or null for none. Older saved scenarios stored
+ * one of two fixed presets (`dscrPrepay`); those are read as the equivalent year-by-year plan.
+ */
+export function resolvePrepayPlan(s: Pick<Scenario, 'prepay' | 'dscrPrepay'>): PrepayPlan | null {
+  if (s.prepay) return s.prepay.mode === 'none' ? null : s.prepay;
+  const legacy = s.dscrPrepay ? DSCR.prepay.legacy[s.dscrPrepay] : undefined;
+  return legacy ? { mode: 'percent', stepPct: [...legacy], basis: 'balance' } : null;
+}
+
+/**
+ * Work out a prepayment penalty year by year against the loan's real balance.
+ * Each year's figure is the most the penalty can be if the loan is paid off during that
+ * year, so it is measured on the balance at the START of the year (the highest it gets).
+ * Returns null when the plan charges nothing (no steps, or every step is 0%).
+ */
+export function computePrepay(
+  plan: PrepayPlan,
+  x: { loan: number; ratePct: number; schedule: AmortRow[] },
+): PrepayResult | null {
+  const { maxYears, maxPct, maxMonths } = DSCR.prepay;
+  const balanceAtStart = (year: number): number =>
+    year <= 1 ? x.loan : (x.schedule[12 * (year - 1) - 1]?.balance ?? 0);
+
+  if (plan.mode === 'percent') {
+    const steps = (plan.stepPct ?? []).slice(0, maxYears).map((p) => clampNum(p, 0, maxPct));
+    while (steps.length && steps[steps.length - 1] === 0) steps.pop(); // trailing 0% years don't count
+    if (!steps.length) return null;
+    const onOriginal = plan.basis === 'original';
+    const rows = steps.map((pct, i) => {
+      const balance = balanceAtStart(i + 1);
+      return { year: i + 1, pct, balance, amount: ((onOriginal ? x.loan : balance) * pct) / 100 };
+    });
+    const n = steps.length;
+    const flat = n > 1 && steps.every((p) => p === steps[0]);
+    const what = onOriginal ? 'original loan amount' : 'remaining balance';
+    const label = n === 1 ? `${trimNum(steps[0])}% · 1 yr` : flat ? `${trimNum(steps[0])}% flat · ${n} yrs` : steps.map(trimNum).join('-');
+    const description =
+      n === 1
+        ? `${trimNum(steps[0])}% of the ${what} if the loan is paid off in the first year.`
+        : flat
+          ? `${trimNum(steps[0])}% of the ${what} if the loan is paid off in the first ${n} years.`
+          : `${andList(steps.map((p) => `${trimNum(p)}%`))} of the ${what} if the loan is paid off in years 1 through ${n}, respectively.`;
+    return { mode: 'percent', label, description, years: n, rows, year1Amount: rows[0].amount };
+  }
+
+  if (plan.mode === 'interest') {
+    const months = clampNum(plan.interestMonths, 0, maxMonths);
+    const years = Math.round(clampNum(plan.interestYears, 0, maxYears));
+    const freePct = clampNum(plan.freePct, 0, 100);
+    if (!(months > 0) || years < 1) return null;
+    const monthlyRate = x.ratePct / 100 / 12;
+    const rows = Array.from({ length: years }, (_, i) => {
+      const balance = balanceAtStart(i + 1);
+      // The penalty is months of interest on the balance above the penalty-free amount.
+      const base = Math.max(0, balance - (x.loan * freePct) / 100);
+      const amount = base * monthlyRate * months;
+      return { year: i + 1, pct: balance > 0 ? (amount / balance) * 100 : 0, balance, amount };
+    });
+    const label = `${trimNum(months)} mo. interest · ${plural(years, 'yr')}`;
+    const description = `${plural(months, 'month')} of interest ${
+      freePct > 0 ? `on the balance above ${trimNum(freePct)}% of the original loan` : 'on the balance'
+    } if the loan is paid off in the first ${years === 1 ? 'year' : `${years} years`}.`;
+    return { mode: 'interest', label, description, years, rows, year1Amount: rows[0].amount };
+  }
+
+  return null;
+}
+
 export interface DscrResult {
   /** Gross monthly rent used. */
   rent: number;
@@ -349,11 +457,11 @@ export interface DscrResult {
   /** rent − pitia, per month (negative = the property doesn't cover its payment). */
   cashFlow: number;
   band: DscrBand;
-  prepay: DscrPrepay;
-  /** "None", "3-2-1" or "5-4-3-2-1". */
+  /** The prepayment penalty year by year, or null when there is none. */
+  prepay: PrepayResult | null;
+  /** "None" or the penalty's short name, e.g. "5-4-3-2-1". */
   prepayLabel: string;
-  /** What the first-year penalty would be on this loan, if paid off then. */
-  prepayYear1Pct: number;
+  /** The most the penalty can be if the loan is paid off during year 1 (0 when none). */
   prepayYear1Amount: number;
   /** Soft "confirm with your lender" flags against typical DSCR norms. */
   flags: string[];
@@ -387,14 +495,24 @@ export function interestOnlyPayment(principal: number, annualRatePct: number): n
 
 function buildDscr(
   s: Scenario,
-  x: { baseLoan: number; ltv: number; creditScore: number; totalMonthly: number; pi: number; piAfterIo: number; ioMonths: number },
+  x: {
+    baseLoan: number;
+    financedLoan: number;
+    ltv: number;
+    creditScore: number;
+    totalMonthly: number;
+    pi: number;
+    piAfterIo: number;
+    ioMonths: number;
+    schedule: AmortRow[];
+  },
 ): DscrResult {
   const rent = Math.max(0, s.rentMonthly || 0);
   const ratio = dscrRatio(rent, x.totalMonthly);
   const amortizedPitia = x.ioMonths > 0 ? x.totalMonthly - x.pi + x.piAfterIo : null;
   const ratioAmortized = amortizedPitia != null ? dscrRatio(rent, amortizedPitia) : null;
-  const prepay: DscrPrepay = s.dscrPrepay && DSCR.prepay[s.dscrPrepay] ? s.dscrPrepay : '';
-  const steps = prepay ? DSCR.prepay[prepay].steps : [];
+  const plan = resolvePrepayPlan(s);
+  const prepay = plan ? computePrepay(plan, { loan: x.financedLoan, ratePct: s.rate || 0, schedule: x.schedule }) : null;
   const t = DSCR.typical;
 
   const flags: string[] = [];
@@ -424,9 +542,8 @@ function buildDscr(
     cashFlow: rent - x.totalMonthly,
     band: dscrBand(rent, ratio),
     prepay,
-    prepayLabel: prepay ? DSCR.prepay[prepay].label : 'None',
-    prepayYear1Pct: steps[0] ?? 0,
-    prepayYear1Amount: (x.baseLoan * (steps[0] ?? 0)) / 100,
+    prepayLabel: prepay ? prepay.label : 'None',
+    prepayYear1Amount: prepay ? prepay.year1Amount : 0,
     flags,
   };
 }
@@ -573,7 +690,10 @@ export function computeScenario(s: Scenario): ScenarioResult {
     closingItemized,
     ioMonths,
     piAfterIo,
-    dscr: s.loanType === 'dscr' ? buildDscr(s, { baseLoan, ltv, creditScore, totalMonthly, pi, piAfterIo, ioMonths }) : undefined,
+    dscr:
+      s.loanType === 'dscr'
+        ? buildDscr(s, { baseLoan, financedLoan, ltv, creditScore, totalMonthly, pi, piAfterIo, ioMonths, schedule })
+        : undefined,
     subline: `${Math.round(baseLoan).toLocaleString('en-US')} loan · ${s.rate || 0}% · ${s.term} yr · ${Math.round(ltv)}% LTV${ioMonths > 0 ? ' · interest-only' : ''}`,
   };
 }
