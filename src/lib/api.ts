@@ -116,6 +116,14 @@ export const api = {
   preApprovalPdf: (payload: unknown) => request<Blob>('POST', '/preapproval/pdf', payload),
   preApprovalHistory: () => request<{ history: PreApprovalRecord[] }>('GET', '/preapproval/history'),
 
+  // Look up a signed-up agent's co-brand profile by email, so a pre-approval can pull the
+  // agent's own details (name, brokerage, phone, photo) instead of the LO re-typing them.
+  agentLookup: (email: string) =>
+    request<{ found: boolean; agent?: { name: string; brokerage: string; phone: string; email: string; photo: string; license: string } }>(
+      'GET',
+      `/preapproval/agent-lookup?email=${encodeURIComponent(email)}`,
+    ),
+
   // agent assignments (loan-officer side): hand a pre-approval to an agent to edit
   listAssignments: () => request<{ assignments: Assignment[] }>('GET', '/preapproval/assignments'),
   createAssignment: (payload: unknown) => request<{ assignment: Assignment }>('POST', '/preapproval/assignments', payload),

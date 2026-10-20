@@ -8,6 +8,7 @@ import {
   findAssignmentById,
   updateAssignment,
   deleteAssignment,
+  findAgentByEmail,
 } from '../store.js';
 import { requireAuth } from '../auth.js';
 import { streamLetterPdf } from '../lib/letterPdfRender.js';
@@ -20,7 +21,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Keep only the keys the letter renderer understands, so an assignment never stores
 // arbitrary caller data. streamLetterPdf re-coerces each field, so loose typing is safe.
-const LETTER_KEYS = ['style', 'showHeadshot', 'date', 'title', 'reLine', 'salutation', 'paragraphs', 'terms', 'validity', 'closing', 'officer', 'lender', 'agentAck', 'logo', 'headshot', 'signature'];
+const LETTER_KEYS = ['style', 'showHeadshot', 'date', 'title', 'reLine', 'salutation', 'paragraphs', 'terms', 'validity', 'closing', 'officer', 'lender', 'agentAck', 'agent', 'logo', 'headshot', 'signature'];
 const CTX_KEYS = ['p1Template', 'priceLabel', 'downLabel', 'loanAmount', 'showSubjectAddress', 'isRefi'];
 function pick(src, keys) {
   const out = {};
@@ -56,6 +57,27 @@ export function publicAssignment(a) {
     editedByAgentAt: a.editedByAgentAt || null,
   };
 }
+
+// Resolve a signed-up agent's co-brand profile by email so the loan officer can pull the
+// agent's own details onto a pre-approval letter instead of re-typing them. Keyed by the
+// exact email the LO already knows; returns only co-brand fields.
+router.get('/agent-lookup', requireAuth, (req, res) => {
+  const email = str(req.query.email).trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Enter a valid email.' });
+  const a = findAgentByEmail(email);
+  if (!a) return res.json({ found: false });
+  res.json({
+    found: true,
+    agent: {
+      name: str(a.name),
+      brokerage: str(a.brokerage),
+      phone: str(a.phone),
+      email: str(a.email),
+      photo: str(a.photo),
+      license: str(a.license),
+    },
+  });
+});
 
 router.post('/pdf', requireAuth, (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};

@@ -57,6 +57,12 @@ export function streamLetterPdf(res, body) {
   const officer = obj(b.officer);
   const lender = obj(b.lender);
   const agentAck = str(b.agentAck);
+  // Agent co-brand (pulled from the agent's account): optional headshot + contact line.
+  const agentObj = obj(b.agent);
+  const agentPhotoBuf = decodeDataUrl(agentObj.photo);
+  const agent = agentAck
+    ? { name: str(agentObj.name), brokerage: str(agentObj.brokerage), phone: str(agentObj.phone), email: str(agentObj.email), photoSource: agentPhotoBuf }
+    : null;
 
   let logoSource = fs.existsSync(LOGO) ? LOGO : null;
   const logoBuf = decodeDataUrl(b.logo);
@@ -95,6 +101,7 @@ export function streamLetterPdf(res, body) {
     officer,
     lender,
     agentAck,
+    agent,
   });
 
   doc.end();

@@ -288,6 +288,9 @@ export interface LetterAgent {
   name: string;
   brokerage: string;
   phone: string;
+  /** Co-brand contact + headshot, pulled from the agent's own portal account. */
+  email?: string;
+  photo?: string;
 }
 
 export interface PreApprovalLetter {
@@ -381,7 +384,8 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
     includeAgent && agent && agent.name
       ? andify(
           [agent.name, agent.brokerage].filter((v) => v && v.trim()).join(', ') +
-            (agent.phone && agent.phone.trim() ? ` · ${agent.phone.trim()}` : ''),
+            (agent.phone && agent.phone.trim() ? ` · ${agent.phone.trim()}` : '') +
+            (agent.email && agent.email.trim() ? ` · ${agent.email.trim()}` : ''),
         )
       : '';
 
