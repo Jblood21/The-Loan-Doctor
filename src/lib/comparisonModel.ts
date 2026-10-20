@@ -5,15 +5,16 @@
 // This is the producer-side engine the spec calls for: given the scenarios, it
 // identifies the loan programs present, adds only the program-specific rows that
 // are relevant (FHA UFMIP/MIP only when an FHA scenario is present, VA funding fee
-// only for VA, USDA fees only for USDA, PMI only when a conventional scenario
+// only for VA, USDA fees only for USDA, rent/DSCR rows only for DSCR, PMI only when a
+// conventional scenario
 // actually carries it), hides rows nothing uses (e.g. HOA when every scenario is 0),
 // and generates the matching program notes. It is pure and unit-tested; the on-screen
 // notes and (in a later phase) the dynamic PDF both render from this one model.
 
 import type { LoanType, Scenario } from '@/types';
-import { computeScenario, temporaryBuydown, TEMP_BUYDOWN_STRUCTURES, type ScenarioResult } from './finance';
-import { FHA, VA, USDA } from './loanProgramRules';
-import { fmt, fmt2, pct } from './format';
+import { computeScenario, DSCR_BAND_LABEL, temporaryBuydown, TEMP_BUYDOWN_STRUCTURES, type ScenarioResult } from './finance';
+import { DSCR, FHA, VA, USDA } from './loanProgramRules';
+import { fmt, fmt2, fmt2Signed, pct } from './format';
 
 /** The buydown reduction schedule for a scenario, or null when no buydown applies. */
 function buydownReductions(s: Scenario): number[] | null {
@@ -99,6 +100,18 @@ function cellValue(key: string, s: Scenario, c: ScenarioResult): string {
       const y1 = buydownYear1Total(s, c);
       return fmt2(y1 == null ? c.totalMonthly : y1);
     }
+    case 'dscrRent':
+      return c.dscr ? (c.dscr.rent > 0 ? fmt2(c.dscr.rent) : 'Not entered') : DASH;
+    case 'dscrRatio':
+      // "1.18 (Meets 1.0)" — the band is spelled out so it never relies on color alone.
+      return c.dscr ? (c.dscr.band === 'none' ? 'Enter rent' : `${c.dscr.ratio.toFixed(2)} (${DSCR_BAND_LABEL[c.dscr.band]})`) : DASH;
+    case 'dscrCashFlow':
+      return c.dscr ? (c.dscr.rent > 0 ? fmt2Signed(c.dscr.cashFlow) : DASH) : DASH;
+    case 'dscrAfterIo':
+      // Payment once the interest-only period ends (other scenarios keep their normal payment).
+      return c.dscr && c.dscr.amortizedPitia != null ? fmt2(c.dscr.amortizedPitia) : c.dscr ? fmt2(c.totalMonthly) : DASH;
+    case 'dscrPrepay':
+      return c.dscr ? (c.dscr.prepay ? c.dscr.prepayLabel : 'None') : DASH;
     case 'cashToClose':
       return fmt(c.cashToClose);
     default:
@@ -116,6 +129,9 @@ export function buildComparisonModel(scenarios: Scenario[]): ComparisonModel {
   const anyFha = has('fha');
   const anyVa = has('va');
   const anyUsda = has('usda');
+  const anyDscr = has('dscr');
+  const anyIo = results.some(({ c }) => c.ioMonths > 0);
+  const anyPrepay = results.some(({ c }) => !!c.dscr?.prepay);
   const anyConvPmi = results.some(({ s, c }) => isConv(s.loanType) && c.mi.applies && c.mi.monthly > 0);
   const anyHoa = results.some(({ c }) => c.hoa > 0);
   const anyBuydown = results.some(({ s }) => buydownReductions(s) != null);
@@ -146,6 +162,13 @@ export function buildComparisonModel(scenarios: Scenario[]): ComparisonModel {
   if (anyHoa) rows.push({ key: 'hoa', label: 'HOA Dues' });
   rows.push({ key: 'totalMonthly', label: 'Estimated Monthly Payment' });
   if (anyBuydown) rows.push({ key: 'buydownYear1', label: 'First-Year Payment (Buydown)' });
+  if (anyDscr) {
+    rows.push({ key: 'dscrRent', label: 'Monthly Rent' });
+    rows.push({ key: 'dscrRatio', label: 'DSCR' });
+    rows.push({ key: 'dscrCashFlow', label: 'Monthly Cash Flow' });
+    if (anyIo) rows.push({ key: 'dscrAfterIo', label: 'Payment After Interest-Only' });
+    rows.push({ key: 'dscrPrepay', label: 'Prepayment Penalty' });
+  }
   rows.push({ key: 'cashToClose', label: 'Estimated Cash to Close' });
 
   const columns: ComparisonColumn[] = results.map(({ s, c }) => {
@@ -160,6 +183,19 @@ export function buildComparisonModel(scenarios: Scenario[]): ComparisonModel {
   if (anyFha) notes.push(...FHA.programNotes);
   if (anyVa) notes.push(...VA.programNotes);
   if (anyUsda) notes.push(...USDA.programNotes);
+  if (anyDscr) {
+    notes.push(...DSCR.programNotes);
+    if (anyIo) {
+      notes.push(
+        `Interest-only: the first ${DSCR.typical.ioYears} years are interest-only, then the payment resets to fully pay off the loan over the remaining term. The DSCR shown uses the starting payment; some lenders qualify on the fully amortizing payment instead.`,
+      );
+    }
+    if (anyPrepay) {
+      notes.push(
+        'A prepayment penalty is a fee if the loan is paid off or refinanced early. For example, 3-2-1 charges 3%, 2% and then 1% of the balance in years 1 through 3. Terms vary by lender.',
+      );
+    }
+  }
   if (anyConvPmi) {
     notes.push('Conventional PMI applies when the down payment is under 20%; it can be cancelled at 80% LTV (auto at 78%) of the original value.');
   }

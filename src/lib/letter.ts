@@ -21,6 +21,7 @@ export const LETTER_TEMPLATES: LetterTemplateMeta[] = [
   { id: 'usda', label: 'USDA' },
   { id: 'jumbo', label: 'Jumbo' },
   { id: 'nonqm', label: 'Non-QM' },
+  { id: 'dscr', label: 'DSCR (investor)' },
   { id: 'firsttime', label: 'First-Time Buyer' },
 ];
 
@@ -172,6 +173,64 @@ const KIND_WORDING: Record<LetterKind, KindWording> = {
   },
 };
 
+/** DSCR (investor) loans are qualified on the property's rental income, so the letter must
+ *  not claim the borrower's personal income was verified. Assets and credit still are. */
+interface DscrKindWording {
+  verb: string;
+  basis: (name: string, pr: PronounSet, credit: CreditClause, two: boolean) => string;
+  readiness: (name: string, pr: PronounSet, appraisalWaiver: boolean) => string;
+  validityTail: (appraisalWaiver: boolean) => string;
+}
+
+/** What still has to happen before closing — a rent analysis rides along with the appraisal. */
+const dscrPending = (waived: boolean) =>
+  waived
+    ? 'a fully executed sales contract and an acceptable title insurance commitment'
+    : 'a compliant appraisal with a rent analysis, a fully executed sales contract, and an acceptable title insurance commitment';
+
+const DSCR_WORDING: Record<LetterKind, DscrKindWording> = {
+  preapproval: {
+    verb: 'pre-approved',
+    basis: (name, pr, credit, two) =>
+      `${name}'s pre-approval is supported by ${pr.poss} ${credit.adjective}credit history${credit.scoreClause} and the rental income the property is expected to produce. In addition, ${name} ${two ? 'have' : 'has'} provided the documents needed to verify the assets required for this transaction.`,
+    readiness: (name, _pr, waived) =>
+      `Based on this, ${name} can close in a timely manner pending final underwriter review including ${dscrPending(waived)}.`,
+    validityTail: (waived) =>
+      waived
+        ? 'subject to clear title and final underwriting approval.'
+        : 'subject to a satisfactory appraisal with a rent analysis, clear title, and final underwriting approval.',
+  },
+  preunderwritten: {
+    verb: 'fully pre-underwritten and pre-approved',
+    basis: (name, pr, credit) =>
+      `${name}'s pre-underwritten pre-approval is supported by ${pr.poss} ${credit.adjective}credit history${credit.scoreClause} and the rental income the property is expected to produce. The documents ${name} provided to verify the assets required for this transaction have been reviewed and verified by a mortgage underwriter.`,
+    readiness: (name, pr, waived) =>
+      `Because ${name}'s file has been pre-underwritten, ${pr.subj} can close in a very timely manner pending a final underwriter review of ${pr.poss} file including ${dscrPending(waived)}.`,
+    validityTail: (waived) =>
+      waived
+        ? 'subject to clear title and satisfaction of the remaining underwriting conditions.'
+        : 'subject to a satisfactory appraisal with a rent analysis, clear title, and satisfaction of the remaining underwriting conditions.',
+  },
+  prequalified: {
+    verb: 'pre-qualified',
+    basis: (name, pr, credit, two) =>
+      `${name}'s pre-qualification is based on a review of ${pr.poss} ${credit.adjective}credit history${credit.scoreClause} and the estimated rental income and asset figures provided by the ${two ? 'buyers' : 'buyer'}.`,
+    readiness: (name, _pr, waived) =>
+      `Based on the information provided, ${name} can close in a timely manner pending verification of the assets needed for the purchase and the property's rental income, as well as ${dscrPending(waived)}.`,
+    validityTail: (waived) =>
+      waived
+        ? "subject to verification of the borrower's assets and credit, clear title, and full underwriting approval."
+        : "subject to verification of the borrower's assets and credit, a satisfactory appraisal with a rent analysis, clear title, and full underwriting approval.",
+  },
+};
+
+/** True when the letter should use the DSCR (investor) wording: the DSCR template is
+ *  picked, or "Auto" is picked and the scenario is a DSCR loan. */
+export function isDscrLetter(templateId: string | undefined, scenario: Scenario): boolean {
+  const id = templateId || 'auto';
+  return id === 'dscr' || (id === 'auto' && scenario.loanType === 'dscr');
+}
+
 /** The RE-line / heading noun for a kind (e.g. "Pre-Approval"). */
 export function letterKindNoun(kind: LetterKind): string {
   return (KIND_WORDING[kind] || KIND_WORDING.preapproval).noun;
@@ -191,6 +250,7 @@ const TEMPLATE_SPECS: Record<string, TemplateSpec> = {
   jumbo: { label: 'jumbo', tail: ', financing above standard conforming limits' },
   nonqm: { label: 'non-QM', tail: '' },
   firsttime: { label: null, tail: ', under our first-time homebuyer program' },
+  dscr: { label: 'DSCR', tail: ', which qualifies on the property’s rental income rather than personal income' },
 };
 
 export interface ResolvedTemplate {
@@ -235,12 +295,13 @@ function creditClauseFrom(opts: BodyOpts, two: boolean): CreditClause {
 }
 
 export function resolveTemplate(id: string, scenario: Scenario, opts: BodyOpts = {}): ResolvedTemplate {
-  const spec = TEMPLATE_SPECS[id] || TEMPLATE_SPECS.auto;
+  const dscr = isDscrLetter(id, scenario);
+  const spec = TEMPLATE_SPECS[dscr ? 'dscr' : id] || TEMPLATE_SPECS.auto;
   const label = spec.label ?? loanTypeLabel(scenario.loanType);
-  return { paragraphs: bodyParagraphs(scenario, opts, label, spec.tail) };
+  return { paragraphs: bodyParagraphs(scenario, opts, label, spec.tail, dscr) };
 }
 
-function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: string, tail: string): string[] {
+function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: string, tail: string, dscr = false): string[] {
   const calc = computeScenario(scenario);
   const isRefi = scenario.transaction === 'refinance';
   const two = scenario.borrowers === '2';
@@ -251,6 +312,7 @@ function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: stri
   const loan = fmt(calc.baseLoan);
   const pr = pronounSet(opts.pronoun || 'they', two);
   const w = KIND_WORDING[opts.kind || 'preapproval'] || KIND_WORDING.preapproval;
+  const dw = DSCR_WORDING[opts.kind || 'preapproval'] || DSCR_WORDING.preapproval;
   const credit = creditClauseFrom(opts, two);
 
   // Mid-sentence the financing type reads as a common noun ("conventional financing"),
@@ -260,12 +322,16 @@ function bodyParagraphs(scenario: Scenario, opts: BodyOpts, financingLabel: stri
   const waived = !!opts.appraisalWaiver;
   // When an appraisal waiver applies, note it in the opening paragraph.
   const waiverSentence = waived ? ` This loan has an appraisal waiver, so no appraisal is required.` : '';
+  // DSCR loans are for investment property and qualify on its rent, so the wording differs.
+  const verb = dscr ? dw.verb : w.verb;
   const p1 = isRefi
-    ? `${name} ${isAre} ${w.verb} to refinance the property located at ${property} with a loan amount of ${loan} using ${fin} financing${tail}.${waiverSentence}`
-    : `${name} ${isAre} ${w.verb} for the purchase of the home located at ${property} at a purchase price of ${price} using ${fin} financing${tail}.${waiverSentence}`;
-  const p2 = w.basis(name, pr, credit, two);
-  const p3 = w.readiness(name, pr, waived);
-  const p4 = `Please contact me with any questions regarding ${name}'s income and credit pre-approval.`;
+    ? `${name} ${isAre} ${verb} to refinance the ${dscr ? 'investment ' : ''}property located at ${property} with a loan amount of ${loan} using ${fin} financing${tail}.${waiverSentence}`
+    : `${name} ${isAre} ${verb} for the purchase of the ${dscr ? 'investment property' : 'home'} located at ${property} at a purchase price of ${price} using ${fin} financing${tail}.${waiverSentence}`;
+  const p2 = dscr ? dw.basis(name, pr, credit, two) : w.basis(name, pr, credit, two);
+  const p3 = dscr ? dw.readiness(name, pr, waived) : w.readiness(name, pr, waived);
+  const p4 = dscr
+    ? `Please contact me with any questions regarding ${name}'s ${w.nounLower}.`
+    : `Please contact me with any questions regarding ${name}'s income and credit pre-approval.`;
   return [p1, p2, p3, p4];
 }
 
@@ -366,7 +432,8 @@ export function buildPreApprovalLetter(scenario: Scenario, settings: Settings, o
 
   const expDays = opts.expDays || 90;
   const exp = new Date(now.getTime() + expDays * 86_400_000);
-  const validity = `This ${w.nounLower} is valid through ${longDate(exp)} and is ${w.validityTail(!!opts.appraisalWaiver)}`;
+  const tailFor = isDscrLetter(opts.templateId, scenario) ? (DSCR_WORDING[opts.kind || 'preapproval'] || DSCR_WORDING.preapproval).validityTail : w.validityTail;
+  const validity = `This ${w.nounLower} is valid through ${longDate(exp)} and is ${tailFor(!!opts.appraisalWaiver)}`;
 
   // The agent to co-brand comes from the Pre-Approval page (pulled from the agent's account
   // by email, or a one-off manual entry). No separate saved-contacts list.

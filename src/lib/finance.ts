@@ -4,7 +4,7 @@
 //   • Principal & Interest (standard amortization)
 //   • Property tax + homeowners insurance estimates (configurable rates)
 //   • Mortgage insurance: conventional PMI by LTV + credit, FHA upfront+annual MIP,
-//     VA funding fee, USDA upfront guarantee + annual fee
+//     VA funding fee, USDA upfront guarantee + annual fee, DSCR (none)
 //   • APR (solved numerically from the payment stream and financed costs)
 //   • Total interest + full amortization schedule
 //   • HECM principal limit via an interpolated PLF table
@@ -12,9 +12,9 @@
 // All rates are documented inline. Lender-specific factors are centralized here so a
 // backend can later override them per lender.
 
-import type { ClosingCostItem, LoanType, Scenario, TransactionType } from '@/types';
+import type { ClosingCostItem, DscrPrepay, LoanType, Scenario, TransactionType } from '@/types';
 import { buildTitleScheduleFees, titleBasisAmount } from './titleFees';
-import { CONVENTIONAL, FHA, USDA, VA } from './loanProgramRules';
+import { CONVENTIONAL, DSCR, FHA, USDA, VA } from './loanProgramRules';
 
 export const DEFAULT_TAX_RATE = 1.25; // %/yr of home value
 export const DEFAULT_INSURANCE_RATE = 0.35; // %/yr of home value
@@ -227,17 +227,26 @@ export function computeApr(
   prepaidFinanceCharges: number,
   miMonthly = 0,
   miMonths = 0,
+  /** Interest-only loans: `monthly` is the interest-only payment for `months`, after which
+   *  `afterPayment` (the fully amortizing payment) runs for the rest of the term. */
+  io?: { months: number; afterPayment: number },
 ): number {
   const n = Math.max(1, Math.round(termYears * 12));
   const amountFinanced = financedLoan - prepaidFinanceCharges;
   if (amountFinanced <= 0 || monthly <= 0) return 0;
   const mi = miMonthly > 0 ? miMonthly : 0;
   const miN = Math.max(0, Math.min(n, Math.round(miMonths)));
+  const ioN = io ? Math.max(0, Math.min(n - 1, Math.round(io.months))) : 0;
   // amountFinanced = PV of the payment stream at monthly rate i (bisection). The stream
-  // is level P&I for n months plus MI for the first miN months (closed-form annuities).
+  // is level P&I for n months (or interest-only for ioN months, then the amortizing
+  // payment for the rest) plus MI for the first miN months (closed-form annuities).
   const pv = (i: number) => {
-    if (i === 0) return monthly * n + mi * miN;
-    const level = (monthly * (1 - Math.pow(1 + i, -n))) / i;
+    if (i === 0) return (ioN > 0 && io ? monthly * ioN + io.afterPayment * (n - ioN) : monthly * n) + mi * miN;
+    const level =
+      ioN > 0 && io
+        ? (monthly * (1 - Math.pow(1 + i, -ioN))) / i +
+          (((io.afterPayment * (1 - Math.pow(1 + i, -(n - ioN)))) / i) * Math.pow(1 + i, -ioN))
+        : (monthly * (1 - Math.pow(1 + i, -n))) / i;
     const miPv = mi > 0 && miN > 0 ? (mi * (1 - Math.pow(1 + i, -miN))) / i : 0;
     return level + miPv;
   };
@@ -291,16 +300,20 @@ export function amortizationSchedule(
   annualRatePct: number,
   termYears: number,
   extraMonthly = 0,
+  /** Months of interest-only payments up front (DSCR); the loan then re-amortizes over
+   *  the remaining term. 0 = fully amortizing from the first payment. */
+  ioMonths = 0,
 ): AmortRow[] {
   const rows: AmortRow[] = [];
   const r = annualRatePct / 100 / 12;
-  const base = monthlyPayment(principal, annualRatePct, termYears);
+  const io = Math.max(0, Math.min(Math.round(ioMonths), Math.round(termYears * 12) - 1));
+  const base = monthlyPayment(principal, annualRatePct, termYears - io / 12);
   let balance = principal;
   let cumulativeInterest = 0;
   const maxMonths = Math.round(termYears * 12) + 600; // guard
   for (let month = 1; balance > 0.005 && month <= maxMonths; month++) {
     const interest = balance * r;
-    let principalPaid = base - interest + extraMonthly;
+    let principalPaid = month <= io ? 0 : base - interest + extraMonthly;
     if (principalPaid > balance) principalPaid = balance;
     const payment = interest + principalPaid;
     balance -= principalPaid;
@@ -308,6 +321,114 @@ export function amortizationSchedule(
     rows.push({ month, payment, principal: principalPaid, interest, balance: Math.max(0, balance), cumulativeInterest });
   }
   return rows;
+}
+
+// ---------------------------------------------------------------------------
+// DSCR (investor) loans — qualified on the property's rent, not personal income.
+// ---------------------------------------------------------------------------
+export type DscrBand = 'none' | 'below' | 'meets' | 'strong';
+
+/** Short plain-word label for each coverage band (never color alone). */
+export const DSCR_BAND_LABEL: Record<DscrBand, string> = {
+  none: 'Enter rent',
+  below: 'Below 1.0',
+  meets: 'Meets 1.0',
+  strong: 'Strong',
+};
+
+export interface DscrResult {
+  /** Gross monthly rent used. */
+  rent: number;
+  /** The payment the ratio is measured against: full PITIA at the initial payment. */
+  pitia: number;
+  /** rent ÷ pitia (0 when there is no rent or no payment). */
+  ratio: number;
+  /** Interest-only loans: the full payment after the interest-only period, and the ratio on it. */
+  amortizedPitia: number | null;
+  ratioAmortized: number | null;
+  /** rent − pitia, per month (negative = the property doesn't cover its payment). */
+  cashFlow: number;
+  band: DscrBand;
+  prepay: DscrPrepay;
+  /** "None", "3-2-1" or "5-4-3-2-1". */
+  prepayLabel: string;
+  /** What the first-year penalty would be on this loan, if paid off then. */
+  prepayYear1Pct: number;
+  prepayYear1Amount: number;
+  /** Soft "confirm with your lender" flags against typical DSCR norms. */
+  flags: string[];
+}
+
+/** Rent ÷ payment, or 0 when either is missing. */
+export function dscrRatio(rent: number, pitia: number): number {
+  return rent > 0 && pitia > 0 ? rent / pitia : 0;
+}
+
+/** Coverage band, judged on the ratio rounded to two decimals the way lenders quote it. */
+export function dscrBand(rent: number, ratio: number): DscrBand {
+  if (!(rent > 0)) return 'none';
+  const r = Math.round(ratio * 100) / 100;
+  if (r >= DSCR.typical.strongRatio) return 'strong';
+  if (r >= DSCR.typical.minRatio) return 'meets';
+  return 'below';
+}
+
+/** Months of interest-only payments: 10 years on a DSCR loan that opts in and runs longer
+ *  than the interest-only period; otherwise 0. */
+export function interestOnlyMonths(s: Scenario, termYears: number): number {
+  if (s.loanType !== 'dscr' || !s.interestOnly) return 0;
+  return termYears > DSCR.typical.ioYears ? DSCR.typical.ioYears * 12 : 0;
+}
+
+/** Interest-only payment on a balance. */
+export function interestOnlyPayment(principal: number, annualRatePct: number): number {
+  return principal > 0 ? (principal * (annualRatePct / 100)) / 12 : 0;
+}
+
+function buildDscr(
+  s: Scenario,
+  x: { baseLoan: number; ltv: number; creditScore: number; totalMonthly: number; pi: number; piAfterIo: number; ioMonths: number },
+): DscrResult {
+  const rent = Math.max(0, s.rentMonthly || 0);
+  const ratio = dscrRatio(rent, x.totalMonthly);
+  const amortizedPitia = x.ioMonths > 0 ? x.totalMonthly - x.pi + x.piAfterIo : null;
+  const ratioAmortized = amortizedPitia != null ? dscrRatio(rent, amortizedPitia) : null;
+  const prepay: DscrPrepay = s.dscrPrepay && DSCR.prepay[s.dscrPrepay] ? s.dscrPrepay : '';
+  const steps = prepay ? DSCR.prepay[prepay].steps : [];
+  const t = DSCR.typical;
+
+  const flags: string[] = [];
+  const shown = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
+  if (rent > 0 && Math.round(ratio * 100) / 100 < t.minRatio) {
+    flags.push(`DSCR is ${shown(ratio)}, below 1.0. Many lenders require at least 1.0; some allow less with a lower LTV and higher pricing.`);
+  } else if (
+    rent > 0 &&
+    ratioAmortized != null &&
+    Math.round(ratioAmortized * 100) / 100 < t.minRatio
+  ) {
+    flags.push(`After the interest-only period, DSCR drops to ${shown(ratioAmortized)}. Some lenders qualify on the fully amortizing payment.`);
+  }
+  if (x.ltv > t.maxLtv + 0.005) {
+    flags.push(`LTV is above the typical DSCR maximum of about ${t.maxLtv}% (cash-out refinances are usually lower).`);
+  }
+  if (x.creditScore < t.minCredit) {
+    flags.push(`Credit score is below the typical DSCR minimum of about ${t.minCredit}.`);
+  }
+
+  return {
+    rent,
+    pitia: x.totalMonthly,
+    ratio,
+    amortizedPitia,
+    ratioAmortized,
+    cashFlow: rent - x.totalMonthly,
+    band: dscrBand(rent, ratio),
+    prepay,
+    prepayLabel: prepay ? DSCR.prepay[prepay].label : 'None',
+    prepayYear1Pct: steps[0] ?? 0,
+    prepayYear1Amount: (x.baseLoan * (steps[0] ?? 0)) / 100,
+    flags,
+  };
 }
 
 export interface ScenarioResult {
@@ -333,6 +454,12 @@ export interface ScenarioResult {
   /** Dollar value of the points, signed: positive = a cost added to closing,
    *  negative = a lender credit that offsets cash to close. */
   lenderPointsAmount: number;
+  /** Months of interest-only payments at the start (0 = fully amortizing from day one). */
+  ioMonths: number;
+  /** The fully amortizing P&I that follows the interest-only period (0 when there isn't one). */
+  piAfterIo: number;
+  /** DSCR coverage analysis — present only on DSCR scenarios. */
+  dscr?: DscrResult;
   subline: string;
 }
 
@@ -342,6 +469,7 @@ const TYPE_LABELS: Record<LoanType, string> = {
   va: 'VA',
   usda: 'USDA',
   arm: 'ARM',
+  dscr: 'DSCR',
 };
 
 export function loanTypeLabel(t: LoanType): string {
@@ -365,7 +493,11 @@ export function computeScenario(s: Scenario): ScenarioResult {
   });
   const financedLoan = baseLoan + mi.upfrontFinanced;
 
-  const pi = monthlyPayment(financedLoan, s.rate || 0, termYears);
+  // DSCR loans can be interest-only for the first 10 years: the starting payment is
+  // interest only, and the amortizing payment that follows is kept for comparison.
+  const ioMonths = interestOnlyMonths(s, termYears);
+  const pi = ioMonths > 0 ? interestOnlyPayment(financedLoan, s.rate || 0) : monthlyPayment(financedLoan, s.rate || 0, termYears);
+  const piAfterIo = ioMonths > 0 ? monthlyPayment(financedLoan, s.rate || 0, termYears - ioMonths / 12) : 0;
   const taxRate = s.taxRatePct ?? DEFAULT_TAX_RATE;
   const insRate = s.insuranceRatePct ?? DEFAULT_INSURANCE_RATE;
   // A manual $/mo entry (taxMonthly / insuranceMonthly) overrides the auto % estimate.
@@ -374,7 +506,7 @@ export function computeScenario(s: Scenario): ScenarioResult {
   const hoa = Math.max(0, s.hoaMonthly || 0);
   const totalMonthly = pi + taxes + insurance + hoa + mi.monthly;
 
-  const schedule = amortizationSchedule(financedLoan, s.rate || 0, termYears);
+  const schedule = amortizationSchedule(financedLoan, s.rate || 0, termYears, 0, ioMonths);
   const totalInterest = schedule.length ? schedule[schedule.length - 1].cumulativeInterest : 0;
   const payoffMonths = schedule.length;
 
@@ -407,7 +539,15 @@ export function computeScenario(s: Scenario): ScenarioResult {
       : mi.upfrontFinanced + baseLoan * 0.005 + 1200) + pointsCost;
   // Recurring MI is a finance charge — include it in the APR stream for the months it applies.
   const miMonths = mi.monthly > 0 ? miAprMonths(s.loanType, ltv, schedule, homeValue) : 0;
-  const apr = computeApr(financedLoan, pi, termYears, prepaidFinanceCharges, mi.monthly, miMonths);
+  const apr = computeApr(
+    financedLoan,
+    pi,
+    termYears,
+    prepaidFinanceCharges,
+    mi.monthly,
+    miMonths,
+    ioMonths > 0 ? { months: ioMonths, afterPayment: piAfterIo } : undefined,
+  );
   const creditsApplied = (s.lenderCredit || 0) + (s.sellerCredit || 0) + (s.otherCredits || 0) + pointsCredit;
   const cashToClose = Math.max(0, (s.downPayment || 0) + closingCosts - creditsApplied);
 
@@ -431,7 +571,10 @@ export function computeScenario(s: Scenario): ScenarioResult {
     lenderPoints,
     lenderPointsAmount: pointsCost - pointsCredit,
     closingItemized,
-    subline: `${Math.round(baseLoan).toLocaleString('en-US')} loan · ${s.rate || 0}% · ${s.term} yr · ${Math.round(ltv)}% LTV`,
+    ioMonths,
+    piAfterIo,
+    dscr: s.loanType === 'dscr' ? buildDscr(s, { baseLoan, ltv, creditScore, totalMonthly, pi, piAfterIo, ioMonths }) : undefined,
+    subline: `${Math.round(baseLoan).toLocaleString('en-US')} loan · ${s.rate || 0}% · ${s.term} yr · ${Math.round(ltv)}% LTV${ioMonths > 0 ? ' · interest-only' : ''}`,
   };
 }
 

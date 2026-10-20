@@ -17,6 +17,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Basecamp estimates PMI/MIP from loan type, LTV, and credit score using standard national rate cards: conventional PMI, FHA upfront + annual MIP, VA funding fee, and USDA guarantee fees. Exact lender factors can be wired into your backend.',
   },
   {
+    q: 'How does the DSCR loan option work?',
+    a: 'DSCR loans are for investment properties and qualify on the property’s rent instead of the borrower’s income. Pick DSCR on the Compare tab, then enter the monthly rent. Basecamp divides the rent by the full monthly payment (principal, interest, taxes, insurance and any HOA) to show the DSCR, and shows the monthly cash flow too. Many lenders want a DSCR of at least 1.0. There is no mortgage insurance. Pricing, limits and prepayment penalties vary by lender, so enter the rate you were quoted and confirm the rest with your lender.',
+  },
+  {
     q: 'Where do I set my branding?',
     a: 'Open Settings from the sidebar to add loan-officer, lender, and dual-branding (real-estate agent) details. These appear on generated pre-approval letters.',
   },

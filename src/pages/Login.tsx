@@ -9,7 +9,7 @@ import { api, ApiError } from '@/lib/api';
 
 const STATS = [
   { value: '6', label: 'scenarios at once' },
-  { value: '5', label: 'loan programs' },
+  { value: '6', label: 'loan programs' },
   { value: '1', label: 'click to export' },
 ];
 
@@ -90,7 +90,7 @@ export default function Login() {
             Every loan scenario, side by side in seconds.
           </div>
           <p className="mt-[22px] max-w-[430px] text-[16px] leading-[1.6] text-ink-muted">
-            The comparison workspace built for loan officers — model Conventional, FHA, VA, USDA, ARM and reverse
+            The comparison workspace built for loan officers — model Conventional, FHA, VA, USDA, ARM, DSCR and reverse
             mortgages, then hand your borrower a clean breakdown.
           </p>
           <div className="mt-[34px] flex gap-7">

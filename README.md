@@ -61,7 +61,7 @@ You can also click **Create an account** on the login screen to register a new u
 ## What to test
 
 - **Compare Loans** — switch **Purchase ⇄ Refinance** (the price field relabels to
-  "Home Value"), change loan type (Conventional/FHA/VA/USDA/ARM) and watch mortgage
+  "Home Value"), change loan type (Conventional/FHA/VA/USDA/ARM/DSCR) and watch mortgage
   insurance update, edit the linked **Down Payment $ / %** fields, add/remove scenarios
   (up to 6), **Save** (persists to the backend) and **Export** (downloads JSON).
 - **Reverse (HECM)** — toggle Refinance/Equity vs. HECM for Purchase, add other liens/debts

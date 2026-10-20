@@ -5,6 +5,13 @@ export function fmt(n: number): string {
   return '$' + Math.round(n || 0).toLocaleString('en-US');
 }
 
+/** Currency with cents and a proper minus sign for negatives: –$212.00 (not $-212.00). */
+export function fmt2Signed(n: number): string {
+  const v = Math.round((n || 0) * 100) / 100;
+  const body = '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v < 0 ? '\u2013' + body : body;
+}
+
 /** Currency with cents, e.g. $1,234.56. */
 export function fmt2(n: number): string {
   const v = Math.round((n || 0) * 100) / 100;

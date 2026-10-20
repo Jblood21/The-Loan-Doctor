@@ -12,13 +12,13 @@ import { ClosingCostsEditor, cloneFees } from '@/components/ClosingCostsEditor';
 import { SavedScenariosModal } from '@/components/SavedScenariosModal';
 import { useScenarios, MAX_SCENARIOS } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
-import { computeScenario, defaultClosingCosts, temporaryBuydown, TEMP_BUYDOWN_STRUCTURES } from '@/lib/finance';
+import { computeScenario, defaultClosingCosts, DSCR_BAND_LABEL, temporaryBuydown, TEMP_BUYDOWN_STRUCTURES, type DscrBand } from '@/lib/finance';
 import { buildComparisonModel } from '@/lib/comparisonModel';
-import { RATES_AS_OF } from '@/lib/loanProgramRules';
+import { DSCR, RATES_AS_OF } from '@/lib/loanProgramRules';
 import { DonutChart, PAYMENT_COLORS } from '@/components/charts/DonutChart';
 import { api, ApiError } from '@/lib/api';
-import { fmt, fmt2, pct } from '@/lib/format';
-import type { ClosingCostItem, LoanProgram, LoanType, Scenario, TransactionType } from '@/types';
+import { fmt, fmt2, fmt2Signed, pct } from '@/lib/format';
+import type { ClosingCostItem, DscrPrepay, LoanProgram, LoanType, Scenario, TransactionType } from '@/types';
 
 const LOAN_TYPES: { value: LoanType; label: string }[] = [
   { value: 'conventional', label: 'Conventional' },
@@ -26,6 +26,7 @@ const LOAN_TYPES: { value: LoanType; label: string }[] = [
   { value: 'va', label: 'VA' },
   { value: 'usda', label: 'USDA' },
   { value: 'arm', label: 'ARM' },
+  { value: 'dscr', label: 'DSCR' },
 ];
 const PROGRAMS: { value: LoanProgram; label: string }[] = [
   { value: 'standard', label: 'Standard' },
@@ -33,6 +34,19 @@ const PROGRAMS: { value: LoanProgram; label: string }[] = [
   { value: 'homepossible', label: 'Home Possible' },
   { value: 'firsttime', label: 'First-Time Buyer' },
 ];
+const DSCR_PREPAY_OPTIONS: { value: DscrPrepay; label: string }[] = [
+  { value: '', label: 'None' },
+  // Labeled with the length so they can't be confused with the temporary-buydown "3-2-1" below.
+  { value: '3-2-1', label: '3-2-1 (3 yrs)' },
+  { value: '5-4-3-2-1', label: '5-4-3-2-1 (5 yrs)' },
+];
+// Coverage chip colors — always paired with the band's words, never color alone.
+const DSCR_CHIP: Record<DscrBand, string> = {
+  none: 'bg-[rgba(140,165,195,0.16)] text-text-dim',
+  below: 'bg-[rgba(248,113,113,0.14)] text-danger',
+  meets: 'bg-[rgba(47,100,156,0.14)] text-brand-blue-light',
+  strong: 'bg-[rgba(52,211,153,0.14)] text-good',
+};
 const TERMS = [
   { value: '30', label: '30 Years' },
   { value: '20', label: '20 Years' },
@@ -145,7 +159,12 @@ export default function Compare() {
       { label: 'Closing Costs', get: ({ c }) => fmt(c.closingCosts) },
       { label: 'Cash to Close', get: ({ c }) => fmt(c.cashToClose) },
     ];
-    const metrics = rows.map((row) => ({ label: row.label, values: results.map(row.get) }));
+    const baseMetrics = rows.map((row) => ({ label: row.label, values: results.map(row.get) }));
+    // DSCR scenarios add their rent / coverage / cash-flow rows (same cells as the PDF).
+    const dscrMetrics = comparisonModel.rows
+      .filter((row) => row.key.startsWith('dscr'))
+      .map((row) => ({ label: row.label, values: comparisonModel.columns.map((col) => col.cells[row.key] ?? '—') }));
+    const metrics = [...baseMetrics, ...dscrMetrics];
     const lender = {
       name: settings.lenderName || settings.company,
       phone: settings.lenderPhone || settings.phone,
@@ -224,7 +243,7 @@ export default function Compare() {
     };
     // Header program + rate collapse to a single value only when every scenario shares it.
     const programLabel = sameType
-      ? `${current.term}-Year ${current.loanType === 'arm' ? 'ARM' : 'Fixed'} ${r.typeLabel}`
+      ? `${current.term}-Year ${current.loanType === 'arm' ? 'ARM' : 'Fixed'} ${r.typeLabel}${results.every(({ c }) => c.ioMonths > 0) ? ' (Interest-Only)' : ''}`
       : 'Loan Scenario Comparison';
     const subLine = sameType
       ? `FICO ${current.credit}  ·  ${current.transaction === 'refinance' ? 'Refinance' : 'Purchase'}`
@@ -502,19 +521,71 @@ export default function Compare() {
           </div>
 
           <PillGroup
-            className="mb-2.5"
+            className={current.loanType === 'dscr' ? 'mb-3' : 'mb-2.5'}
             variant="teal"
             options={LOAN_TYPES}
             value={current.loanType}
             onChange={(v) => patch({ loanType: v })}
           />
-          <PillGroup
-            className={current.loanType === 'va' ? 'mb-3' : 'mb-6'}
-            variant="blue"
-            options={PROGRAMS}
-            value={current.program}
-            onChange={(v) => patch({ program: v })}
-          />
+          {/* Conventional-style programs (HomeReady etc.) don't apply to an investor DSCR loan. */}
+          {current.loanType !== 'dscr' && (
+            <PillGroup
+              className={current.loanType === 'va' ? 'mb-3' : 'mb-6'}
+              variant="blue"
+              options={PROGRAMS}
+              value={current.program}
+              onChange={(v) => patch({ program: v })}
+            />
+          )}
+
+          {current.loanType === 'dscr' && (
+            <div className="mb-6 rounded-[12px] border border-[rgba(47,100,156,0.3)] bg-[rgba(47,100,156,0.06)] p-4">
+              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.5px] text-brand-blue-light">DSCR · Investment Property</div>
+              <div className="flex flex-col gap-3.5">
+                <div>
+                  <Label>Monthly Rent</Label>
+                  <NumberField
+                    prefix="$"
+                    value={current.rentMonthly ?? 0}
+                    onChange={(v) => setField('rentMonthly', v)}
+                    ariaLabel="Monthly rent"
+                  />
+                  <div className="mt-1.5 text-[11.5px] text-text-dim">Use the lease, or the market rent from the appraisal.</div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[13px] font-medium text-text-soft">Interest-only for {DSCR.typical.ioYears} years?</span>
+                    {(parseInt(current.term, 10) || 30) > DSCR.typical.ioYears ? (
+                      <SegmentedControl
+                        size="sm"
+                        options={[
+                          { value: 'no', label: 'No' },
+                          { value: 'yes', label: 'Yes' },
+                        ]}
+                        value={current.interestOnly ? 'yes' : 'no'}
+                        onChange={(v) => patch({ interestOnly: v === 'yes' })}
+                      />
+                    ) : (
+                      <span className="text-[11.5px] text-text-dim">Needs a term over {DSCR.typical.ioYears} years</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-[7px] block text-[12.5px] font-semibold text-text-soft">Prepayment Penalty</label>
+                  <PillGroup
+                    variant="blue"
+                    options={DSCR_PREPAY_OPTIONS}
+                    value={current.dscrPrepay ?? ''}
+                    onChange={(v) => patch({ dscrPrepay: v as DscrPrepay })}
+                  />
+                </div>
+              </div>
+              <div className="mt-3 text-[11.5px] leading-[1.5] text-text-dim">
+                DSCR loans qualify on the property’s rent, not the borrower’s income, so there is no DTI and no income documentation.
+                Investment properties only. Pricing and limits vary by lender, so enter the rate you were quoted.
+              </div>
+            </div>
+          )}
 
           {current.loanType === 'va' && (
             <div className="mb-6 rounded-[12px] border border-[rgba(129,140,248,0.28)] bg-[rgba(129,140,248,0.06)] p-4">
@@ -780,7 +851,8 @@ export default function Compare() {
             )}
             <div className="mt-5 flex flex-col gap-px">
               {[
-                { label: 'Principal & Interest', value: fmt2(r.pi), color: 'text-text-primary' },
+                { label: r.ioMonths > 0 ? `Interest-Only Payment (first ${r.ioMonths / 12} yrs)` : 'Principal & Interest', value: fmt2(r.pi), color: 'text-text-primary' },
+                ...(r.ioMonths > 0 ? [{ label: 'P&I After Interest-Only', value: fmt2(r.piAfterIo), color: 'text-warn-text' }] : []),
                 { label: `Property Taxes${taxManual ? '' : ' (est.)'}`, value: fmt2(r.taxes), color: 'text-text-softer' },
                 { label: `Homeowners Insurance${insManual ? '' : ' (est.)'}`, value: fmt2(r.insurance), color: 'text-text-softer' },
                 ...(r.hoa > 0 ? [{ label: 'HOA Dues', value: fmt2(r.hoa), color: 'text-text-softer' }] : []),
@@ -800,6 +872,63 @@ export default function Compare() {
               ))}
             </div>
           </Card>
+
+          {r.dscr && (
+            <Card className="p-5">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <span className="text-[13px] font-bold text-text-softer">Debt Service Coverage (DSCR)</span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${DSCR_CHIP[r.dscr.band]}`}>
+                  {DSCR_BAND_LABEL[r.dscr.band]}
+                </span>
+              </div>
+              <div className="flex items-end gap-3">
+                <div className="num text-[40px] font-semibold leading-none tracking-[-1.5px] text-text-heading">
+                  {r.dscr.band === 'none' ? '—' : r.dscr.ratio.toFixed(2)}
+                </div>
+                <div className="pb-1 text-[12.5px] text-text-muted">monthly rent ÷ monthly payment</div>
+              </div>
+              {r.dscr.band === 'none' && (
+                <div className="mt-2 text-[12.5px] text-text-dim">Enter the monthly rent to see the coverage ratio.</div>
+              )}
+              <div className="mt-4 flex flex-col gap-px">
+                {[
+                  { label: 'Monthly Rent', value: r.dscr.rent > 0 ? fmt2(r.dscr.rent) : '—', color: 'text-text-primary' },
+                  { label: 'Monthly Payment (PITIA)', value: fmt2(r.dscr.pitia), color: 'text-text-softer' },
+                  {
+                    label: 'Monthly Cash Flow',
+                    value: r.dscr.rent > 0 ? fmt2Signed(r.dscr.cashFlow) : '—',
+                    color: r.dscr.rent > 0 ? (r.dscr.cashFlow < 0 ? 'text-danger' : 'text-good') : 'text-text-softer',
+                  },
+                  ...(r.dscr.ratioAmortized != null && r.dscr.rent > 0
+                    ? [{ label: 'DSCR After Interest-Only', value: r.dscr.ratioAmortized.toFixed(2), color: 'text-warn-text' }]
+                    : []),
+                  {
+                    label: 'Prepayment Penalty',
+                    value: r.dscr.prepay ? `${r.dscr.prepayLabel} · ${fmt(r.dscr.prepayYear1Amount)} in year 1` : 'None',
+                    color: 'text-text-softer',
+                  },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-3 border-b border-[rgba(140,165,195,0.08)] py-2.5">
+                    <span className="text-[13.5px] text-text-soft">{row.label}</span>
+                    <span className={`num text-right text-[14px] font-medium ${row.color}`}>{row.value}</span>
+                  </div>
+                ))}
+              </div>
+              {r.dscr.flags.length > 0 && (
+                <div className="mt-3 rounded-[10px] border border-[rgba(251,191,36,0.28)] bg-[rgba(251,191,36,0.08)] px-3.5 py-2.5">
+                  <div className="mb-1 text-[11.5px] font-bold uppercase tracking-[0.4px] text-warn-text">Check with your lender</div>
+                  <ul className="m-0 list-disc pl-4 text-[12px] leading-[1.55] text-warn-text">
+                    {r.dscr.flags.map((f) => (
+                      <li key={f}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="mt-3 text-[11px] leading-[1.5] text-text-dim">
+                Typical lender norms, not a quote: many want a DSCR of at least 1.0 (1.25 or more is a comfortable cushion), an LTV of about {DSCR.typical.maxLtv}% or less and a credit score of about {DSCR.typical.minCredit}+.
+              </div>
+            </Card>
+          )}
 
           <Card className="p-5">
             <div className="mb-3.5 text-[13px] font-bold text-text-softer">Monthly Payment Breakdown</div>

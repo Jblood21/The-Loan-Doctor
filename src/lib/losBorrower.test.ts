@@ -36,6 +36,9 @@ describe('mapLoanType', () => {
     expect(mapLoanType('5/1 ARM')).toBe('arm');
     expect(mapLoanType('Conventional')).toBe('conventional');
     expect(mapLoanType('Conforming 30yr')).toBe('conventional');
+    expect(mapLoanType('DSCR')).toBe('dscr');
+    expect(mapLoanType('Investor - DSCR 30yr')).toBe('dscr');
+    expect(mapLoanType('Debt Service Coverage')).toBe('dscr');
   });
   it('returns null for unknown/empty', () => {
     expect(mapLoanType('')).toBeNull();

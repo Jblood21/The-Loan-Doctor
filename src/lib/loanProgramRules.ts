@@ -187,6 +187,56 @@ export const USDA = {
   programNotes: ['USDA loans include an upfront guarantee fee (financed) and an ongoing annual fee.'],
 };
 
+// ---------------------------------------------------------------------------
+// DSCR (investor) — qualifies on the property's rent, not the borrower's income
+// ---------------------------------------------------------------------------
+// DSCR loans are non-agency products priced and underwritten by each lender, so unlike
+// the programs above there is no published rate card to follow. The numbers in `typical`
+// are widely seen industry norms used ONLY to raise soft "confirm with your lender"
+// flags — never as a quote. A lender's own guidelines always win.
+export const DSCR = {
+  meta: {
+    label: 'DSCR',
+    asOf: '2026',
+    sources: ['Non-QM / investor lender guidelines (vary by lender)'],
+    notes: [
+      'DSCR = gross monthly rent ÷ the full monthly payment (principal, interest, taxes, insurance and any HOA).',
+      'No mortgage insurance. No personal-income documentation or DTI — qualification rests on the property cash flow.',
+      'Pricing, minimum credit score, maximum LTV, reserves and prepayment terms all vary by lender; the figures in `typical` are only for soft flags.',
+    ],
+  } as ProgramMeta,
+
+  monthlyMortgageInsurance: false,
+  upfrontFee: false,
+  fundingFee: false,
+
+  /** Widely seen norms — used for soft flags only (see the note above). */
+  typical: {
+    /** Many lenders want at least 1.0 (rent covers the payment). */
+    minRatio: 1.0,
+    /** A comfortable cushion; higher ratios often price better. */
+    strongRatio: 1.25,
+    /** Typical max LTV on a purchase (cash-out refinances are usually lower, ~75%). */
+    maxLtv: 80,
+    /** Typical minimum credit score. */
+    minCredit: 660,
+    /** Length of the optional interest-only period, in years. */
+    ioYears: 10,
+  },
+
+  /** Prepayment-penalty structures: % of the balance charged if paid off in year 1, 2, 3… */
+  prepay: {
+    '3-2-1': { label: '3-2-1', steps: [3, 2, 1] },
+    '5-4-3-2-1': { label: '5-4-3-2-1', steps: [5, 4, 3, 2, 1] },
+  } as Record<'3-2-1' | '5-4-3-2-1', { label: string; steps: number[] }>,
+
+  programNotes: [
+    'DSCR loans qualify on the property’s rental income, not the borrower’s personal income, so there is no DTI and no income documentation. They are for investment properties only.',
+    'DSCR is the monthly rent divided by the full monthly payment (principal, interest, taxes, insurance and any HOA). Many lenders want at least 1.0, and a higher ratio can earn better pricing.',
+    'There is no mortgage insurance. Pricing, minimum credit score, maximum LTV, reserves and prepayment penalties vary by lender, so confirm them before quoting.',
+  ],
+};
+
 /** Every program keyed by the app's LoanType values (ARM reuses conventional rules). */
 export const LOAN_PROGRAM_RULES = {
   conventional: CONVENTIONAL,
@@ -194,4 +244,5 @@ export const LOAN_PROGRAM_RULES = {
   fha: FHA,
   va: VA,
   usda: USDA,
+  dscr: DSCR,
 };
