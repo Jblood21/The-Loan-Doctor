@@ -21,6 +21,7 @@ export const parseNum = (v: string | undefined): number => Number(String(v || ''
 export function mapLoanType(raw: string | undefined): LoanType | null {
   const s = (raw || '').toLowerCase();
   if (!s) return null;
+  if (/\bdscr\b|debt[\s-]*service/.test(s)) return 'dscr';
   if (/\bfha\b/.test(s)) return 'fha';
   if (/\bva\b|veteran/.test(s)) return 'va';
   if (/usda|rural/.test(s)) return 'usda';

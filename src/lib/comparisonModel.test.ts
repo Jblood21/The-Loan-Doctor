@@ -109,3 +109,74 @@ describe('buildComparisonModel — cell values', () => {
     expect(fha.cells.pmi).toBe('—'); // FHA has no conventional PMI
   });
 });
+
+describe('buildComparisonModel — DSCR', () => {
+  const dscr = (over: Partial<Scenario> = {}) =>
+    sc('dscr', { downPayment: 100000, downPct: 25, rate: 7.5, rentMonthly: 3000, ...over });
+
+  it('adds the rent / DSCR / cash-flow / prepayment rows only when a DSCR scenario is present', () => {
+    const k = keys([sc('conventional'), dscr()]);
+    for (const row of ['dscrRent', 'dscrRatio', 'dscrCashFlow', 'dscrPrepay']) expect(k).toContain(row);
+    const none = keys([sc('conventional'), sc('fha')]);
+    for (const row of ['dscrRent', 'dscrRatio', 'dscrCashFlow', 'dscrPrepay', 'dscrAfterIo']) expect(none).not.toContain(row);
+  });
+
+  it('DSCR carries no insurance rows (no PMI/FHA/VA/USDA) even at high LTV', () => {
+    const k = keys([dscr({ downPayment: 40000, downPct: 10 })]);
+    for (const row of ['pmi', 'fhaUfmip', 'fhaMip', 'vaFundingFee', 'usdaUpfront', 'usdaAnnual']) expect(k).not.toContain(row);
+  });
+
+  it('the DSCR cell spells out the band, and non-DSCR scenarios show a dash', () => {
+    const m = buildComparisonModel([sc('conventional'), dscr()]);
+    const [conv, d] = m.columns;
+    expect(conv.cells.dscrRatio).toBe('—');
+    expect(conv.cells.dscrRent).toBe('—');
+    expect(conv.cells.dscrCashFlow).toBe('—');
+    expect(d.cells.dscrRent).toBe('$3,000.00');
+    expect(d.cells.dscrRatio).toMatch(/^1\.\d\d \((Meets 1\.0|Strong)\)$/); // no nested parentheses
+    expect(d.cells.dscrPrepay).toBe('None');
+  });
+
+  it('a negative cash flow reads with a real minus sign', () => {
+    const [d] = buildComparisonModel([dscr({ rentMonthly: 2000 })]).columns;
+    expect(d.cells.dscrCashFlow).toMatch(/^–\$[\d,]+\.\d\d$/);
+    expect(d.cells.dscrRatio).toMatch(/\(Below 1\.0\)$/);
+  });
+
+  it('no rent yet reads as a prompt, not a zero ratio', () => {
+    const [d] = buildComparisonModel([dscr({ rentMonthly: 0 })]).columns;
+    expect(d.cells.dscrRatio).toBe('Enter rent');
+    expect(d.cells.dscrRent).toBe('Not entered');
+    expect(d.cells.dscrCashFlow).toBe('—');
+  });
+
+  it('the after-interest-only row appears only when a scenario is interest-only', () => {
+    expect(keys([dscr()])).not.toContain('dscrAfterIo');
+    const m = buildComparisonModel([dscr({ interestOnly: true }), sc('conventional')]);
+    expect(m.rows.map((r) => r.key)).toContain('dscrAfterIo');
+    // The interest-only scenario shows the higher post-reset payment; the other keeps its own.
+    expect(m.columns[1].cells.dscrAfterIo).toBe('—');
+    const start = Number(m.columns[0].cells.totalMonthly.replace(/[$,]/g, ''));
+    const after = Number(m.columns[0].cells.dscrAfterIo.replace(/[$,]/g, ''));
+    expect(after).toBeGreaterThan(start);
+  });
+
+  it('prints the DSCR notes, plus interest-only / prepayment notes only when used', () => {
+    const base = buildComparisonModel([dscr()]).notes.join(' ');
+    expect(base).toMatch(/qualify on the property.s rental income/);
+    expect(base).toMatch(/no mortgage insurance/i);
+    expect(base).not.toMatch(/Interest-only:/);
+    expect(base).not.toMatch(/prepayment penalty is a fee/);
+    const full = buildComparisonModel([dscr({ interestOnly: true, dscrPrepay: '3-2-1' })]).notes.join(' ');
+    expect(full).toMatch(/Interest-only:/);
+    expect(full).toMatch(/prepayment penalty is a fee/);
+    // No DSCR notes when no DSCR scenario is compared.
+    expect(buildComparisonModel([sc('conventional')]).notes.join(' ')).not.toMatch(/DSCR/);
+  });
+
+  it('labels the program in the model', () => {
+    const m = buildComparisonModel([sc('conventional'), dscr()]);
+    expect(m.programLabels).toEqual(['Conventional', 'DSCR']);
+    expect(m.mixed).toBe(true);
+  });
+});

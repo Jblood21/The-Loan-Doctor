@@ -1,7 +1,9 @@
 // Shared domain types for Basecamp
 
 export type TransactionType = 'purchase' | 'refinance';
-export type LoanType = 'conventional' | 'fha' | 'va' | 'usda' | 'arm';
+export type LoanType = 'conventional' | 'fha' | 'va' | 'usda' | 'arm' | 'dscr';
+/** DSCR prepayment-penalty structures ('' = none). Percent of the balance charged in years 1, 2, 3… */
+export type DscrPrepay = '' | '3-2-1' | '5-4-3-2-1';
 export type LoanProgram = 'standard' | 'homeready' | 'homepossible' | 'firsttime';
 export type LoanTerm = '30' | '20' | '15' | '10';
 export type PayoutOption = 'lump' | 'tenure' | 'line';
@@ -70,6 +72,12 @@ export interface Scenario {
   /** VA only: subsequent use of the VA benefit (raises the <5%-down funding fee).
    *  Absent/false = first use. */
   vaSubsequentUse?: boolean;
+  /** DSCR only: gross monthly rent (the lease, or the market rent from the appraisal). */
+  rentMonthly?: number;
+  /** DSCR only: prepayment-penalty structure. Absent/'' = none. */
+  dscrPrepay?: DscrPrepay;
+  /** DSCR only: interest-only for the first 10 years, then fully amortizing. */
+  interestOnly?: boolean;
 }
 
 export interface HecmInputs {
