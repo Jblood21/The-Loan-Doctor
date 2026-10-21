@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import type { ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { cloneFees } from '@/components/ClosingCostsEditor';
-import { defaultClosingCosts } from '@/lib/finance';
+import { defaultClosingCosts, resolvePrepayPlan } from '@/lib/finance';
 import type { ClosingCostItem, Scenario } from '@/types';
 import { useAuth } from './AuthContext';
 import { useSettings } from './SettingsContext';
@@ -17,7 +17,7 @@ export const MAX_SCENARIOS = 6;
 export function normalizeScenario(input: unknown): Scenario {
   const o = (input && typeof input === 'object' ? input : {}) as Partial<Scenario>;
   const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
-  return {
+  const out = {
     ...o,
     name: o.name ?? 'Scenario',
     transaction: o.transaction ?? 'purchase',
@@ -34,6 +34,14 @@ export function normalizeScenario(input: unknown): Scenario {
     sellerCredit: num(o.sellerCredit, 0),
     otherCredits: num(o.otherCredits, 0),
   } as Scenario;
+  // DSCR scenarios saved before the prepayment editor stored one of two fixed presets
+  // ('3-2-1' / '5-4-3-2-1'). Carry that forward as an editable year-by-year plan.
+  if (!out.prepay && out.dscrPrepay) {
+    const plan = resolvePrepayPlan(out);
+    if (plan) out.prepay = plan;
+  }
+  delete out.dscrPrepay;
+  return out;
 }
 
 function normalizeList(list: unknown): Scenario[] {

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AdminBilling } from '@/components/AdminBilling';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { TextField } from '@/components/ui/TextField';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import { initials, num } from '@/lib/format';
-import type { AdminStat, User } from '@/types';
+import type { AdminStat, AdminUser } from '@/types';
 
 // Shown only if the stats/users API is unreachable — honest zeros, not fake data.
 const FALLBACK_STATS: AdminStat[] = [
@@ -15,7 +16,7 @@ const FALLBACK_STATS: AdminStat[] = [
   { label: 'Pre-Approvals', value: '—', delta: 'unavailable' },
 ];
 
-const FALLBACK_USERS: User[] = [];
+const FALLBACK_USERS: AdminUser[] = [];
 
 const AVATAR_PALETTE = [
   'linear-gradient(135deg,#2f80ed,#2dd4bf)',
@@ -31,12 +32,31 @@ const STATUS_TINT: Record<string, { bg: string; fg: string }> = {
   Inactive: { bg: 'rgba(140,165,195,.14)', fg: '#8ba0b6' },
 };
 
-const COLS = '1.6fr 2fr 1.2fr 1fr 0.9fr';
+const COLS = '1.5fr 1.9fr 1.1fr 0.8fr 1.3fr 1.5fr';
+
+const ACCESS_TINT: Record<string, { bg: string; fg: string }> = {
+  trial: { bg: 'rgba(251,191,36,.16)', fg: '#fbbf24' },
+  subscribed: { bg: 'rgba(52,211,153,.16)', fg: '#34d399' },
+  team: { bg: 'rgba(52,211,153,.16)', fg: '#34d399' },
+  comp: { bg: 'rgba(47,128,237,.16)', fg: '#5fa8f5' },
+  locked: { bg: 'rgba(248,113,113,.16)', fg: '#f87171' },
+  exempt: { bg: 'rgba(140,165,195,.14)', fg: '#8ba0b6' },
+  off: { bg: 'rgba(140,165,195,.14)', fg: '#8ba0b6' },
+};
+
+const GRANTS = [
+  { value: '', label: 'Give free access…' },
+  { value: 'forever', label: 'Free, no end date' },
+  { value: '3', label: 'Free for 3 months' },
+  { value: '6', label: 'Free for 6 months' },
+  { value: '12', label: 'Free for 12 months' },
+];
 
 export default function Admin() {
   const { isAdmin } = useAuth();
   const [stats, setStats] = useState<AdminStat[]>(FALLBACK_STATS);
-  const [users, setUsers] = useState<User[]>(FALLBACK_USERS);
+  const [users, setUsers] = useState<AdminUser[]>(FALLBACK_USERS);
+  const [accessError, setAccessError] = useState('');
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -56,6 +76,28 @@ export default function Admin() {
       cancelled = true;
     };
   }, [isAdmin]);
+
+  const swapUser = (next: AdminUser) => setUsers((list) => list.map((u) => (u.id === next.id ? { ...u, ...next } : u)));
+
+  const grant = async (u: AdminUser, value: string) => {
+    if (!value) return;
+    setAccessError('');
+    try {
+      const { user } = await api.adminGrantFree(u.id, value === 'forever' ? { mode: 'forever' } : { mode: 'months', months: Number(value) });
+      swapUser(user);
+    } catch (err) {
+      setAccessError(err instanceof ApiError ? err.message : 'Could not change access.');
+    }
+  };
+
+  const removeFree = async (u: AdminUser) => {
+    setAccessError('');
+    try {
+      swapUser((await api.adminRemoveFree(u.id)).user);
+    } catch (err) {
+      setAccessError(err instanceof ApiError ? err.message : 'Could not change access.');
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -96,6 +138,8 @@ export default function Admin() {
         ))}
       </div>
 
+      <AdminBilling />
+
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-[22px] py-[18px]">
           <span className="text-[15px] font-semibold">Users</span>
@@ -106,9 +150,10 @@ export default function Admin() {
             className="!h-9 !w-full !rounded-[9px] !bg-input !text-[13px] sm:!w-[220px]"
           />
         </div>
-        {/* Horizontal scroll on phones keeps the 5-column table readable instead of clipping it. */}
+        {accessError && <div className="border-b border-border bg-danger-tint px-[22px] py-2.5 text-[13px] text-danger">{accessError}</div>}
+        {/* Horizontal scroll on phones keeps the table readable instead of clipping it. */}
         <div className="overflow-x-auto">
-          <div className="min-w-[640px]">
+          <div className="min-w-[900px]">
             <div
               className="grid border-b border-[rgba(140,165,195,0.08)] px-[22px] py-3 text-[11.5px] font-bold tracking-[0.5px] text-text-dim"
               style={{ gridTemplateColumns: COLS }}
@@ -117,10 +162,11 @@ export default function Admin() {
               <span>EMAIL</span>
               <span>COMPANY</span>
               <span>SCENARIOS</span>
-              <span>STATUS</span>
+              <span>ACCESS</span>
+              <span>FREE ACCESS</span>
             </div>
             {filtered.map((u, i) => {
-              const tint = STATUS_TINT[u.status || 'Active'] || STATUS_TINT.Active;
+              const access = ACCESS_TINT[u.access?.state || ''] || STATUS_TINT[u.status || 'Active'] || STATUS_TINT.Active;
               return (
                 <div
                   key={u.id}
@@ -142,10 +188,37 @@ export default function Admin() {
                   <span>
                     <span
                       className="rounded-[20px] px-[11px] py-1 text-[11.5px] font-semibold"
-                      style={{ background: tint.bg, color: tint.fg }}
+                      style={{ background: access.bg, color: access.fg }}
+                      title={`Account status: ${u.status || 'Active'}${u.team ? ` · Team: ${u.team}` : ''}`}
                     >
-                      {u.status || 'Active'}
+                      {u.access?.label || u.status || 'Active'}
                     </span>
+                  </span>
+                  <span>
+                    {u.role === 'admin' ? (
+                      <span className="text-text-dim">—</span>
+                    ) : u.access?.state === 'comp' ? (
+                      <button
+                        onClick={() => removeFree(u)}
+                        className="cursor-pointer border-none bg-transparent text-[12.5px] font-semibold text-danger hover:underline"
+                        aria-label={`Remove free access for ${u.name}`}
+                      >
+                        Remove free access
+                      </button>
+                    ) : (
+                      <select
+                        value=""
+                        onChange={(e) => grant(u, e.target.value)}
+                        aria-label={`Give free access to ${u.name}`}
+                        className="h-8 max-w-full cursor-pointer rounded-[8px] border border-border-input bg-input px-2 text-[12.5px] text-text-primary"
+                      >
+                        {GRANTS.map((g) => (
+                          <option key={g.value} value={g.value}>
+                            {g.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </span>
                 </div>
               );

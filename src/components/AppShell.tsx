@@ -1,4 +1,6 @@
 import { Outlet } from 'react-router-dom';
+import { BillingBanner } from './BillingBanner';
+import { BillingGate } from './BillingGate';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { SettingsDrawer } from './SettingsDrawer';
@@ -7,6 +9,7 @@ import { UIProvider, useUI } from '@/context/UIContext';
 import { SettingsProvider } from '@/context/SettingsContext';
 import { ScenariosProvider } from '@/context/ScenariosContext';
 import { ReportProvider } from '@/context/ReportContext';
+import { BillingProvider } from '@/context/BillingContext';
 
 /** Top bar shown only on phones/tablets — carries the hamburger that opens the nav drawer. */
 function MobileTopBar() {
@@ -29,6 +32,7 @@ function MobileTopBar() {
 export function AppShell() {
   return (
     <UIProvider>
+      <BillingProvider>
       <SettingsProvider>
         <ScenariosProvider>
           <ReportProvider>
@@ -50,7 +54,10 @@ export function AppShell() {
             <main className="max-h-screen min-w-0 flex-1 overflow-y-auto">
               <MobileTopBar />
               <div className="mx-auto max-w-content px-4 pb-16 pt-5 sm:px-6 lg:px-10 lg:pb-20 lg:pt-[34px]">
-                <Outlet />
+                <BillingBanner />
+                <BillingGate>
+                  <Outlet />
+                </BillingGate>
               </div>
             </main>
             <SettingsDrawer />
@@ -58,6 +65,7 @@ export function AppShell() {
           </ReportProvider>
         </ScenariosProvider>
       </SettingsProvider>
+      </BillingProvider>
     </UIProvider>
   );
 }

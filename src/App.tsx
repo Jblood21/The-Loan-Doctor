@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { AppShell } from '@/components/AppShell';
 import { LogoMark } from '@/components/Logo';
@@ -15,6 +15,8 @@ import SharedQuote from '@/pages/SharedQuote';
 import AgentPortal from '@/pages/AgentPortal';
 import AgentShare from '@/pages/AgentShare';
 import ResetPassword from '@/pages/ResetPassword';
+import Billing from '@/pages/Billing';
+import JoinTeam from '@/pages/JoinTeam';
 
 /** Window/tab title per page, so several windows are easy to tell apart in the taskbar. */
 const PAGE_TITLES: [prefix: string, title: string][] = [
@@ -25,6 +27,8 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/tools', 'Tools'],
   ['/help', 'Help Center'],
   ['/admin', 'Admin'],
+  ['/billing', 'Plan & billing'],
+  ['/join-team', 'Join your team'],
   ['/agent', 'Agent Portal'],
   ['/login', 'Sign in'],
   ['/reset-password', 'Reset password'],
@@ -61,8 +65,11 @@ function RequireAuth() {
 
 function LoginGate() {
   const { user, loading } = useAuth();
+  const [params] = useSearchParams();
+  const invite = params.get('invite');
   if (loading) return <Splash />;
-  if (user) return <Navigate to="/compare" replace />;
+  // Someone who followed a team invitation goes on to join the team once signed in.
+  if (user) return <Navigate to={invite ? `/billing?join=${encodeURIComponent(invite)}` : '/compare'} replace />;
   return <Login />;
 }
 
@@ -77,6 +84,8 @@ function AppRoutes() {
       <Route path="/s/:token" element={<AgentShare />} />
       {/* Public self-serve password reset reached from the emailed link. */}
       <Route path="/reset-password" element={<ResetPassword />} />
+      {/* Team invitation links land here, then go to sign-in or the plan page. */}
+      <Route path="/join-team" element={<JoinTeam />} />
       <Route path="/login" element={<LoginGate />} />
       <Route element={<RequireAuth />}>
         <Route path="/compare" element={<Compare />} />
@@ -85,6 +94,7 @@ function AppRoutes() {
         <Route path="/tools" element={<Tools />} />
         <Route path="/help" element={<Help />} />
         <Route path="/agents" element={<Agents />} />
+        <Route path="/billing" element={<Billing />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/" element={<Navigate to="/compare" replace />} />
         <Route path="*" element={<Navigate to="/compare" replace />} />

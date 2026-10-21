@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
-import { requireAuth } from '../auth.js';
+import { requireAccess } from '../billing/access.js';
 
 const router = Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -315,7 +315,7 @@ function coerceLegacy(body) {
 }
 
 /** Branded, dynamic "Home Financing Comparison" sheet a borrower can keep. */
-router.post('/pdf', requireAuth, (req, res) => {
+router.post('/pdf', requireAccess, (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const title = str(body.title, 'Home Financing Comparison').slice(0, 120);
   const borrowerName = str(body.borrowerName).slice(0, 120);

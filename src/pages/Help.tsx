@@ -18,7 +18,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'How does the DSCR loan option work?',
-    a: 'DSCR loans are for investment properties and qualify on the property’s rent instead of the borrower’s income. Pick DSCR on the Compare tab, then enter the monthly rent. Basecamp divides the rent by the full monthly payment (principal, interest, taxes, insurance and any HOA) to show the DSCR, and shows the monthly cash flow too. Many lenders want a DSCR of at least 1.0. There is no mortgage insurance. Pricing, limits and prepayment penalties vary by lender, so enter the rate you were quoted and confirm the rest with your lender.',
+    a: 'DSCR loans are for investment properties and qualify on the property’s rent instead of the borrower’s income. Pick DSCR on the Compare tab, then enter the monthly rent. Basecamp divides the rent by the full monthly payment (principal, interest, taxes, insurance and any HOA) to show the DSCR, and shows the monthly cash flow too. Many lenders want a DSCR of at least 1.0. There is no mortgage insurance. Pricing, limits and prepayment penalties vary by lender, so enter the rate you were quoted and confirm the rest with your lender. For a prepayment penalty, enter the lender’s terms: the percentage for each year, or months of interest with any penalty-free amount. Basecamp shows what it could cost in each year.',
   },
   {
     q: 'Where do I set my branding?',

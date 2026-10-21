@@ -43,11 +43,10 @@ services:
         sync: false
 
       # ---- Access control ------------------------------------------------
-      # Public self-signup is OFF. To invite people without opening signups to
-      # everyone, set a PRIVATE SIGNUP_CODE in Render → Environment (they enter it
-      # on the Create-account screen); leave it unset to fully close signups. Your
-      # own owner login never needs the code. Do NOT commit a real code here — a
-      # guessable value committed to the repo effectively opens registration.
+      # With ALLOW_SIGNUP=false the site is INVITATION-ONLY: people get in with an
+      # access code (Admin Dashboard → Billing & access codes) or a team invitation.
+      # Set it to "true" to let anyone create an account. Your own owner login never
+      # needs a code. (SIGNUP_CODE below is no longer used; access codes replaced it.)
       - key: ALLOW_SIGNUP
         value: "false"
       - key: SIGNUP_CODE
@@ -70,6 +69,19 @@ services:
         sync: false
       # - key: ANTHROPIC_MODEL
       #   value: claude-haiku-4-5
+
+      # ---- Billing (off until you turn it on) ----------------------------
+      # Add these in Render -> Environment (not here) when you are ready to charge;
+      # DEPLOYMENT.md has the Stripe walk-through. Nothing is gated until
+      # BILLING_ENABLED is "true".
+      # - key: BILLING_ENABLED
+      #   value: "true"
+      # - key: STRIPE_SECRET_KEY
+      #   sync: false
+      # - key: STRIPE_WEBHOOK_SECRET
+      #   sync: false
+      # - key: BILLING_EXEMPT_EMAILS     # comma-separated emails that never pay
+      #   sync: false
 
       # ---- County median-income tool -------------------------------------
       # Pulls real data from the U.S. Census Bureau; works with no key. Set a

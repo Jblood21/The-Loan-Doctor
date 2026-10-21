@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { Label, TextField } from '@/components/ui/TextField';
 import { ClosingCostsEditor, cloneFees } from '@/components/ClosingCostsEditor';
 import { SavedScenariosModal } from '@/components/SavedScenariosModal';
+import { PrepayEditor } from '@/components/PrepayEditor';
 import { useScenarios, MAX_SCENARIOS } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
 import { computeScenario, defaultClosingCosts, DSCR_BAND_LABEL, temporaryBuydown, TEMP_BUYDOWN_STRUCTURES, type DscrBand } from '@/lib/finance';
@@ -18,7 +19,7 @@ import { DSCR, RATES_AS_OF } from '@/lib/loanProgramRules';
 import { DonutChart, PAYMENT_COLORS } from '@/components/charts/DonutChart';
 import { api, ApiError } from '@/lib/api';
 import { fmt, fmt2, fmt2Signed, pct } from '@/lib/format';
-import type { ClosingCostItem, DscrPrepay, LoanProgram, LoanType, Scenario, TransactionType } from '@/types';
+import type { ClosingCostItem, LoanProgram, LoanType, Scenario, TransactionType } from '@/types';
 
 const LOAN_TYPES: { value: LoanType; label: string }[] = [
   { value: 'conventional', label: 'Conventional' },
@@ -33,12 +34,6 @@ const PROGRAMS: { value: LoanProgram; label: string }[] = [
   { value: 'homeready', label: 'HomeReady' },
   { value: 'homepossible', label: 'Home Possible' },
   { value: 'firsttime', label: 'First-Time Buyer' },
-];
-const DSCR_PREPAY_OPTIONS: { value: DscrPrepay; label: string }[] = [
-  { value: '', label: 'None' },
-  // Labeled with the length so they can't be confused with the temporary-buydown "3-2-1" below.
-  { value: '3-2-1', label: '3-2-1 (3 yrs)' },
-  { value: '5-4-3-2-1', label: '5-4-3-2-1 (5 yrs)' },
 ];
 // Coverage chip colors — always paired with the band's words, never color alone.
 const DSCR_CHIP: Record<DscrBand, string> = {
@@ -570,15 +565,11 @@ export default function Compare() {
                     )}
                   </div>
                 </div>
-                <div>
-                  <label className="mb-[7px] block text-[12.5px] font-semibold text-text-soft">Prepayment Penalty</label>
-                  <PillGroup
-                    variant="blue"
-                    options={DSCR_PREPAY_OPTIONS}
-                    value={current.dscrPrepay ?? ''}
-                    onChange={(v) => patch({ dscrPrepay: v as DscrPrepay })}
-                  />
-                </div>
+                <PrepayEditor
+                  plan={current.prepay}
+                  onChange={(plan) => patch({ prepay: plan, dscrPrepay: undefined })}
+                  result={r.dscr?.prepay ?? null}
+                />
               </div>
               <div className="mt-3 text-[11.5px] leading-[1.5] text-text-dim">
                 DSCR loans qualify on the property’s rent, not the borrower’s income, so there is no DTI and no income documentation.
@@ -904,7 +895,7 @@ export default function Compare() {
                     : []),
                   {
                     label: 'Prepayment Penalty',
-                    value: r.dscr.prepay ? `${r.dscr.prepayLabel} · ${fmt(r.dscr.prepayYear1Amount)} in year 1` : 'None',
+                    value: r.dscr.prepay ? `${r.dscr.prepay.label} · up to ${fmt(r.dscr.prepay.year1Amount)} in year 1` : 'None',
                     color: 'text-text-softer',
                   },
                 ].map((row) => (

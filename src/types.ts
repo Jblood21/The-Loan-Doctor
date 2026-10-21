@@ -2,8 +2,28 @@
 
 export type TransactionType = 'purchase' | 'refinance';
 export type LoanType = 'conventional' | 'fha' | 'va' | 'usda' | 'arm' | 'dscr';
-/** DSCR prepayment-penalty structures ('' = none). Percent of the balance charged in years 1, 2, 3… */
+/** The two fixed prepayment presets older saved scenarios used ('' = none). Read as an
+ *  equivalent PrepayPlan; new scenarios store a PrepayPlan instead. */
 export type DscrPrepay = '' | '3-2-1' | '5-4-3-2-1';
+
+/**
+ * A prepayment penalty, entered by the loan officer.
+ *  • 'percent'  — a percentage for each year of the penalty period (e.g. 5-4-3-2-1).
+ *  • 'interest' — a number of months of interest, optionally with a penalty-free amount.
+ */
+export interface PrepayPlan {
+  mode: 'none' | 'percent' | 'interest';
+  /** percent: the % charged in each year of the period; stepPct[0] is year 1. */
+  stepPct?: number[];
+  /** percent: charged on the remaining balance at payoff (default) or the original loan amount. */
+  basis?: 'balance' | 'original';
+  /** interest: months of interest charged. */
+  interestMonths?: number;
+  /** interest: the penalty applies to payoffs in the first this-many years. */
+  interestYears?: number;
+  /** interest: penalty-free amount, as a % of the original loan (the penalty is on the balance above it). */
+  freePct?: number;
+}
 export type LoanProgram = 'standard' | 'homeready' | 'homepossible' | 'firsttime';
 export type LoanTerm = '30' | '20' | '15' | '10';
 export type PayoutOption = 'lump' | 'tenure' | 'line';
@@ -74,7 +94,9 @@ export interface Scenario {
   vaSubsequentUse?: boolean;
   /** DSCR only: gross monthly rent (the lease, or the market rent from the appraisal). */
   rentMonthly?: number;
-  /** DSCR only: prepayment-penalty structure. Absent/'' = none. */
+  /** DSCR only: the prepayment penalty. Absent = none. */
+  prepay?: PrepayPlan;
+  /** DSCR only — legacy: the old fixed presets. Read as an equivalent `prepay`; no longer written. */
   dscrPrepay?: DscrPrepay;
   /** DSCR only: interest-only for the first 10 years, then fully amortizing. */
   interestOnly?: boolean;
@@ -146,6 +168,110 @@ export interface User {
   status?: 'Active' | 'Trial' | 'Inactive';
   createdAt?: string;
   scenarioCount?: number;
+}
+
+// ---- billing ---------------------------------------------------------------
+export type AccessState = 'off' | 'exempt' | 'comp' | 'team' | 'subscribed' | 'trial' | 'locked';
+
+export interface AccessInfo {
+  allowed: boolean;
+  state: AccessState;
+  /** When the trial / free access / current period ends. */
+  endsAt?: string | null;
+  daysLeft?: number;
+  /** Free access with no end date. */
+  forever?: boolean;
+  paymentIssue?: boolean;
+  cancelAtPeriodEnd?: boolean;
+  lockedReason?: 'trial_ended' | 'canceled' | 'comp_ended';
+}
+
+export interface SubscriptionInfo {
+  status: string;
+  interval: 'month' | 'year' | null;
+  quantity: number;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: 'owner' | 'member';
+}
+
+export interface TeamInvite {
+  id: string;
+  email: string;
+  createdAt: string;
+  expiresAt: string;
+  link: string;
+}
+
+export interface TeamInfo {
+  id: string;
+  name: string;
+  role: 'owner' | 'member';
+  members: TeamMember[];
+  invites: TeamInvite[];
+  seatsBilled: number;
+  seatCents: number;
+  minSeats: number;
+  subscription: SubscriptionInfo | null;
+  seatSyncError: string | null;
+}
+
+export interface BillingStatus {
+  /** False until the owner switches billing on — then nothing is gated or shown. */
+  enabled: boolean;
+  stripeReady: boolean;
+  access: AccessInfo;
+  plans: {
+    trialDays: number;
+    soloMonthlyCents: number;
+    soloAnnualMonthlyCents: number;
+    teamSeatCents: number;
+    teamMinSeats: number;
+  };
+  subscription: SubscriptionInfo | null;
+  team: TeamInfo | null;
+}
+
+export type CodeKind = 'free_forever' | 'free_months' | 'free_until' | 'trial_days';
+
+export interface AccessCode {
+  id: string;
+  code: string;
+  label: string;
+  kind: CodeKind;
+  months: number | null;
+  until: string | null;
+  trialDays: number | null;
+  maxUses: number | null;
+  uses: number;
+  redeemBy: string | null;
+  lockedEmail: string | null;
+  revoked: boolean;
+  createdAt: string;
+  gives: string;
+  redemptions: { userId: string; email: string; at: string }[];
+}
+
+export interface AdminBilling {
+  enabled: boolean;
+  stripeReady: boolean;
+  webhookReady: boolean;
+  webhookUrl: string;
+  counts: Record<'trial' | 'subscribed' | 'team' | 'comp' | 'locked' | 'exempt', number>;
+  teams: number;
+  mrrCents: number;
+  codes: AccessCode[];
+}
+
+export interface AdminUser extends User {
+  access?: { state: AccessState; label: string };
+  team?: string | null;
 }
 
 export interface AdminStat {

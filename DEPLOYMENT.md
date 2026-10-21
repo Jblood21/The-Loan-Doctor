@@ -44,7 +44,6 @@ haven't merged yet.
    | Variable          | What to enter                                                             |
    |-------------------|---------------------------------------------------------------------------|
    | `ADMIN_EMAIL`     | Your preferred admin login email (defaults to `admin@loandr.app`).        |
-   | `SIGNUP_CODE`     | Invite code others type to register. Defaults to `123456` — change it to something private, or clear it to fully close signups. |
    | `PUBLIC_BASE_URL` | Leave blank for now — you'll set it after Step 4 to your live URL.        |
 
 4. Click **Apply** (or **Create Resources**) and wait ~3–5 minutes while it builds. You'll
@@ -71,13 +70,85 @@ shown inside the app correct.
 That's it — you have a shareable link. 🎉
 
 ### Inviting others (optional)
-The app ships locked down to your accounts. Two ways to give access to other people:
+Anyone can create an account unless you set `ALLOW_SIGNUP=false`. With signups closed the
+site is **invitation-only**, and there are two ways in:
 
-- **Invite code:** the deploy ships with `SIGNUP_CODE=123456` so you can hand the link to a
-  few people right away — they pick **Create an account** and enter `123456`. Change it to
-  something private in Render → Environment whenever you like (it's easy to guess as-is).
-- **Fully open signups:** set `ALLOW_SIGNUP=true` and leave `SIGNUP_CODE` blank — then anyone
-  with the link can register their own account.
+- **Access code:** in the app, sign in as admin → **Admin Dashboard → Billing & access
+  codes → Make an access code**. Give the code to the person; they enter it on the
+  **Create an account** screen (or later under **Plan & billing**). A code can give free
+  access forever, for some months, until a date, or extra trial days, and can be limited to
+  one email or a number of uses.
+- **Team invitation:** a team owner invites a loan officer by email from **Plan & billing**;
+  the invitation link lets that person sign up even while signups are closed.
+
+(The old `SIGNUP_CODE` setting is no longer used — access codes replace it.)
+
+---
+
+## Charging for the app (billing)
+
+Billing is **off until you turn it on**, so nothing about the live site changes until you
+decide. When it is on:
+
+- New accounts get a **14-day free trial**. Accounts that already exist when you switch
+  billing on get **30 days** from that moment.
+- After the trial, a person can still sign in, see their saved work and **download their
+  data**, but can't create new things until they pick a plan.
+- **Solo** is **$59/month**, or **$49/month billed yearly ($588)**. **Team** is **$39 per
+  loan officer per month, billed for at least 3 seats** — the owner adds and removes people
+  and the bill follows.
+- Real-estate agents are always free.
+- Your own `OWNER_EMAIL` login and the admin account never need a plan. Add more with
+  `BILLING_EXEMPT_EMAILS` (comma-separated).
+- **Access codes** (above) give free access without a card, and you can also grant free
+  access to a person straight from the Users table.
+
+### Turning it on
+1. Create a [Stripe](https://stripe.com) account. Start in **test mode** (the toggle at the
+   top of the Stripe dashboard) and repeat these steps with live keys when you're ready.
+2. Stripe → **Developers → API keys** → copy the **Secret key** → in Render → **Environment**
+   add `STRIPE_SECRET_KEY`.
+3. Stripe → **Developers → Webhooks → Add endpoint**. The address is
+   `https://YOUR-SITE/api/billing/webhook` (the Admin Dashboard shows it, with a copy
+   button). Listen for **customer.subscription.created**, **customer.subscription.updated**,
+   **customer.subscription.deleted** and **checkout.session.completed**. Copy the endpoint's
+   **Signing secret** (starts with `whsec_`) → add `STRIPE_WEBHOOK_SECRET`.
+4. Stripe → **Settings → Billing → Customer portal** → turn it on (let customers update their
+   card, cancel, and see invoices). This powers the **Manage subscription** button.
+5. Set `PUBLIC_BASE_URL` to your live address (Stripe sends people back there after paying).
+6. Add `BILLING_ENABLED` = `true` and save. The Admin Dashboard's **Billing on / Stripe
+   connected / Webhook ready** badges should all be green.
+
+In test mode you can pay with the card number `4242 4242 4242 4242`, any future date, any
+CVC. Prices and trial lengths live in the app, not in Stripe, so they can't disagree; change
+them with `BILLING_SOLO_MONTHLY_CENTS`, `BILLING_SOLO_ANNUAL_MONTHLY_CENTS`,
+`BILLING_TEAM_SEAT_CENTS`, `BILLING_TEAM_MIN_SEATS`, `BILLING_TRIAL_DAYS` and
+`BILLING_EXISTING_TRIAL_DAYS` (amounts are in cents).
+
+Billing records are stored with everything else, so the **persistent disk** described below
+matters even more once people are paying.
+
+---
+
+## Showing up on Google
+
+The site has a public home page at `/` that search engines can read, plus `/robots.txt` and
+`/sitemap.xml`. Everything else (the signed-in app, shared borrower quotes, agent links, the
+API) is marked **noindex**, so it stays out of search results.
+
+1. Set **`PUBLIC_BASE_URL`** to the address people should find you at (for example
+   `https://loandr.onrender.com`, or your own domain once you have one). Google is told this
+   is the "official" address of the home page.
+2. In [Google Search Console](https://search.google.com/search-console), add your site and
+   verify it. The repo already serves the HTML verification file
+   (`/google8c5a0c4e5772ce9a.html`) — keep it in place so the site stays verified.
+3. In Search Console, submit `https://YOUR-SITE/sitemap.xml` (Indexing → Sitemaps), then paste
+   the home page address into the search bar at the top and choose **Request indexing**.
+4. Give it days to a few weeks. A custom domain that matches the brand (for example
+   `loanbasecamp.com`) and a few links to the site from places you control (LinkedIn, your
+   email signature, your own website) make a name search much more likely to find you.
+
+If you move to a new domain, add it as a new property in Search Console and verify it again.
 
 ---
 

@@ -10,7 +10,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
-import { seed, dataDirInfo } from './store.js';
+import { seed, dataDirInfo, noteBillingEnabled } from './store.js';
 import authRoutes from './routes/auth.js';
 import settingsRoutes from './routes/settings.js';
 import scenarioRoutes from './routes/scenarios.js';
@@ -24,6 +24,10 @@ import shareRoutes from './routes/share.js';
 import aiRoutes from './routes/ai.js';
 import censusRoutes from './routes/census.js';
 import reportRoutes from './routes/report.js';
+import billingRoutes, { stripeWebhook } from './routes/billing.js';
+import { landingHtml, noindexExceptHome, robotsTxt, siteBase, sitemapXml } from './seo.js';
+import { billingEnabled } from './billing/config.js';
+import { stripeConfigured, webhookConfigured } from './billing/stripe.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -40,6 +44,9 @@ app.set('trust proxy', 1); // behind Render/other TLS proxy — needed for corre
 // hardening headers (HSTS, X-Content-Type-Options, frameguard, referrer policy) apply.
 app.use(helmet({ contentSecurityPolicy: false }));
 
+// Only the public home page is meant for search results; everything else is noindex.
+app.use(noindexExceptHome);
+
 // CORS — reflect any origin in dev; lock to the CORS_ORIGIN list in production. The API
 // and SPA ship as one service (same origin), so production needs cross-origin access
 // only when a separate frontend host is configured; otherwise deny it rather than
@@ -52,6 +59,10 @@ app.use(
     credentials: true,
   }),
 );
+// Stripe's signature covers the exact bytes it sent, so the webhook reads the RAW body.
+// It must be registered before the JSON parser below.
+app.post('/api/billing/webhook', rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false }), express.raw({ type: '*/*', limit: '1mb' }), stripeWebhook);
+
 // 6mb so branding uploads (logo, signature, officer photo, all sent as data URLs in
 // JSON) fit; endpoints are rate-limited, so this isn't a meaningful DoS widening.
 app.use(express.json({ limit: '6mb' }));
@@ -61,10 +72,12 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeade
 const webhookLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
 // The AI assistant costs money per call — cap it; Census is a courtesy limit.
 const aiLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+const billingLimiter = rateLimit({ windowMs: 60 * 1000, max: 90, standardHeaders: true, legacyHeaders: false });
 const censusLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, ...BUILD }));
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/billing', billingLimiter, billingRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/scenarios', scenarioRoutes);
 app.use('/api/admin', adminRoutes);
@@ -82,6 +95,12 @@ app.use('/api/report', reportRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/ai', aiLimiter, aiRoutes);
 app.use('/api/census', censusLimiter, censusRoutes);
+
+// Public home page + search-engine files. These must come before the static/SPA block
+// below, which would otherwise answer "/" with the app shell.
+app.get('/', (req, res) => res.type('html').send(landingHtml(siteBase(req), { signupsOpen: process.env.ALLOW_SIGNUP !== 'false' })));
+app.get('/robots.txt', (req, res) => res.type('text/plain').send(robotsTxt(siteBase(req))));
+app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(sitemapXml(siteBase(req))));
 
 // Unknown API routes → JSON 404 (before the static SPA fallback).
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
@@ -123,6 +142,9 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
 }
 
 seed();
+// Pin down the moment billing was switched on, so accounts that already exist get the
+// longer "existing account" trial counted from today rather than from their sign-up date.
+if (billingEnabled()) noteBillingEnabled();
 app.listen(PORT, () => {
   const isProd = process.env.NODE_ENV === 'production';
   console.log(`\n  Basecamp API → http://localhost:${PORT}`);
@@ -137,6 +159,12 @@ app.listen(PORT, () => {
     console.warn('    Fix: attach a persistent disk mounted at /var/data (or set DATA_DIR to a mounted path) in your host settings, then redeploy.');
   } else {
     console.log(`  Storage      → ${store.dir}  [local dev]`);
+  }
+
+  if (billingEnabled()) {
+    console.log(`  Billing      → ON  (Stripe ${stripeConfigured() ? 'connected' : 'NOT connected — checkout is unavailable until STRIPE_SECRET_KEY is set'}, webhook ${webhookConfigured() ? 'ready' : 'NOT set — set STRIPE_WEBHOOK_SECRET'})`);
+  } else {
+    console.log('  Billing      → off (everyone has full access; set BILLING_ENABLED=true to start charging)');
   }
 
   if (isProd) {

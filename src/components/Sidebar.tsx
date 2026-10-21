@@ -10,11 +10,13 @@ import {
   Settings as SettingsIcon,
   LogOut,
   MonitorDown,
+  CreditCard,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
+import { useBilling } from '@/context/BillingContext';
 import { useUI } from '@/context/UIContext';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 
@@ -52,6 +54,9 @@ export function Sidebar() {
   const { logout, isAdmin } = useAuth();
   const { openSettings, navOpen, closeNav } = useUI();
   const { canInstall, installed, promptInstall } = useInstallPrompt();
+  const { status: billing } = useBilling();
+  // The plan page only appears once billing is on, or if the person belongs to a team.
+  const showBilling = !!billing && (billing.enabled || !!billing.team) && !isAdmin;
 
   return (
     <>
@@ -114,6 +119,12 @@ export function Sidebar() {
             </button>
           )}
           <ThemeToggle />
+          {showBilling && (
+            <NavLink to="/billing" onClick={closeNav} className={navClass}>
+              <CreditCard size={18} />
+              Plan & billing
+            </NavLink>
+          )}
           <button
             onClick={() => {
               closeNav();

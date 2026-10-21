@@ -7,6 +7,9 @@ export default defineConfig({
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'server/test/**/*.test.mjs'],
+    // The server tests start real processes; give them room.
+    testTimeout: 30000,
+    hookTimeout: 30000,
   },
 });
