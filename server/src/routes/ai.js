@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
-import { requireAuth } from '../auth.js';
+import { requireAccess } from '../billing/access.js';
 
 const router = Router();
 
@@ -26,7 +26,7 @@ let client = null;
 const getClient = () => (client ??= new Anthropic());
 
 // POST /api/ai/compare  { question, context } → { answer }
-router.post('/compare', requireAuth, async (req, res) => {
+router.post('/compare', requireAccess, async (req, res) => {
   if (!hasKey()) {
     return res.status(503).json({
       notConfigured: true,

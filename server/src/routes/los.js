@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getLos, setLos, getLosBorrowers, upsertLosBorrowers, clearLosBorrowers, findUserByWebhookToken, ensureWebhookToken, regenerateWebhookToken, sharedWebhookToken, primaryOwnerId, addWebhookLog, getWebhookLog, timingSafeEqualStr } from '../store.js';
-import { requireAuth } from '../auth.js';
+import { requireAccess } from '../billing/access.js';
 import { ariveConfigured, ariveSearch } from '../los/arive.js';
 
 const router = Router();
@@ -174,27 +174,27 @@ function webhookUrl(req, token) {
   const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
   return `${base.replace(/\/$/, '')}/api/los/webhook/${token}`;
 }
-router.get('/webhook-info', requireAuth, (req, res) => {
+router.get('/webhook-info', requireAccess, (req, res) => {
   const token = ensureWebhookToken(req.user.id);
   res.json({ token, url: webhookUrl(req, token), count: getLosBorrowers(req.user.id).length });
 });
-router.post('/webhook-info/regenerate', requireAuth, (req, res) => {
+router.post('/webhook-info/regenerate', requireAccess, (req, res) => {
   // The URL is derived from the server secret + user id (stable), so this re-confirms
   // this officer's permanent webhook URL rather than issuing a throwaway one.
   const token = regenerateWebhookToken(req.user.id);
   res.json({ token, url: webhookUrl(req, token) });
 });
-router.post('/webhook-info/clear', requireAuth, (req, res) => {
+router.post('/webhook-info/clear', requireAccess, (req, res) => {
   clearLosBorrowers(req.user.id);
   res.json({ ok: true });
 });
 // Recent webhook activity for THIS officer's URL (field names + counts, names masked).
-router.get('/webhook-info/log', requireAuth, (req, res) => {
+router.get('/webhook-info/log', requireAccess, (req, res) => {
   res.json({ log: getWebhookLog(req.user.id), count: getLosBorrowers(req.user.id).length });
 });
 
 // ---- connect / search ---------------------------------------------------
-router.post('/connect', requireAuth, async (req, res) => {
+router.post('/connect', requireAccess, async (req, res) => {
   const provider = req.body?.provider || 'arive';
   // Direct API (only if a provider exposes one and it's configured via env).
   if (provider === 'arive' && ariveConfigured()) {
@@ -211,13 +211,13 @@ router.post('/connect', requireAuth, async (req, res) => {
   res.json({ connected: true, provider, mode });
 });
 
-router.post('/disconnect', requireAuth, (req, res) => {
+router.post('/disconnect', requireAccess, (req, res) => {
   const provider = req.body?.provider || 'arive';
   setLos(req.user.id, provider, false);
   res.json({ connected: false, provider });
 });
 
-router.get('/borrowers', requireAuth, async (req, res) => {
+router.get('/borrowers', requireAccess, async (req, res) => {
   const provider = req.query.provider || 'arive';
   if (!getLos(req.user.id)[provider]) return res.status(409).json({ error: 'LOS provider not connected' });
 

@@ -2,32 +2,64 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { addUser, findUserByEmail, findUserById, publicUser, updateUser, normalizeEmail, bumpSessionEpoch } from '../store.js';
 import { requireAuth, signToken } from '../auth.js';
+import { checkAccessCode, redeemAccessCode } from '../billing/codes.js';
+import { entitlementContext, syncSeats } from '../billing/service.js';
+import { acceptInvite, checkInvite } from '../billing/team.js';
 import { requestPasswordReset, performPasswordReset } from '../passwordReset.js';
 
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const publicBaseUrl = (req) => process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
 
-// Registration is OPEN and FREE — anyone can create an account (no access code). Each
-// account's data (scenarios, borrowers, settings) is private to that user, so open
-// signup doesn't expose anyone else's information. An operator can still close signups
-// entirely for abuse by setting ALLOW_SIGNUP=false in the environment.
+// Registration is open unless ALLOW_SIGNUP=false. When it is closed the site is
+// invitation-only: a valid access code (issued from the admin console) or a team
+// invitation link still lets that person create an account. Each account's data is
+// private to that user, so open signup doesn't expose anyone else's information.
 const SIGNUPS_OPEN = process.env.ALLOW_SIGNUP !== 'false';
 
-router.post('/register', (req, res) => {
-  const { password, name = '', company = '' } = req.body || {};
-  const email = normalizeEmail(req.body?.email);
+router.post('/register', async (req, res, next) => {
+  try {
+    const { password, name = '', company = '' } = req.body || {};
+    const email = normalizeEmail(req.body?.email);
+    const accessCode = String(req.body?.accessCode || '').trim();
+    const inviteToken = String(req.body?.invite || '').trim();
 
-  if (!SIGNUPS_OPEN) {
-    return res.status(403).json({ error: 'Account creation is temporarily closed. Please try again later.' });
+    // Closed to the public: only someone presenting a code or an invitation may continue
+    // (and each is verified below before any account is created).
+    if (!SIGNUPS_OPEN && !accessCode && !inviteToken) {
+      return res.status(403).json({ error: 'Sign-ups are by invitation right now. Enter the access code you were given, or use your team invitation link.' });
+    }
+
+    if (!EMAIL_RE.test(email || '')) return res.status(400).json({ error: 'A valid email is required' });
+    if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    if (findUserByEmail(email)) return res.status(409).json({ error: 'An account with that email already exists' });
+
+    // Check the code and the invitation BEFORE creating anything, so a typo is fixed
+    // on the same form rather than discovered after the account exists.
+    if (accessCode) {
+      const check = checkAccessCode(accessCode, email);
+      if (!check.ok) return res.status(400).json({ error: check.error, field: 'accessCode' });
+    }
+    let invitedOrg = null;
+    if (inviteToken) {
+      try {
+        invitedOrg = checkInvite(inviteToken, email).org;
+      } catch (err) {
+        return res.status(err.status || 400).json({ error: err.message, field: 'invite' });
+      }
+    }
+
+    const user = addUser({ email, password, name, company, role: 'user', status: 'Active' });
+    let redeemed = null;
+    if (accessCode) redeemed = redeemAccessCode(user, accessCode, entitlementContext(user));
+    if (invitedOrg) {
+      acceptInvite(user, inviteToken);
+      await syncSeats(invitedOrg.id);
+    }
+    res.status(201).json({ token: signToken(user), user: publicUser(user), notice: redeemed?.message || null });
+  } catch (err) {
+    next(err);
   }
-
-  if (!EMAIL_RE.test(email || '')) return res.status(400).json({ error: 'A valid email is required' });
-  if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  if (findUserByEmail(email)) return res.status(409).json({ error: 'An account with that email already exists' });
-
-  const user = addUser({ email, password, name, company, role: 'user', status: 'Active' });
-  res.status(201).json({ token: signToken(user), user: publicUser(user) });
 });
 
 router.post('/login', (req, res) => {

@@ -170,6 +170,110 @@ export interface User {
   scenarioCount?: number;
 }
 
+// ---- billing ---------------------------------------------------------------
+export type AccessState = 'off' | 'exempt' | 'comp' | 'team' | 'subscribed' | 'trial' | 'locked';
+
+export interface AccessInfo {
+  allowed: boolean;
+  state: AccessState;
+  /** When the trial / free access / current period ends. */
+  endsAt?: string | null;
+  daysLeft?: number;
+  /** Free access with no end date. */
+  forever?: boolean;
+  paymentIssue?: boolean;
+  cancelAtPeriodEnd?: boolean;
+  lockedReason?: 'trial_ended' | 'canceled' | 'comp_ended';
+}
+
+export interface SubscriptionInfo {
+  status: string;
+  interval: 'month' | 'year' | null;
+  quantity: number;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: 'owner' | 'member';
+}
+
+export interface TeamInvite {
+  id: string;
+  email: string;
+  createdAt: string;
+  expiresAt: string;
+  link: string;
+}
+
+export interface TeamInfo {
+  id: string;
+  name: string;
+  role: 'owner' | 'member';
+  members: TeamMember[];
+  invites: TeamInvite[];
+  seatsBilled: number;
+  seatCents: number;
+  minSeats: number;
+  subscription: SubscriptionInfo | null;
+  seatSyncError: string | null;
+}
+
+export interface BillingStatus {
+  /** False until the owner switches billing on — then nothing is gated or shown. */
+  enabled: boolean;
+  stripeReady: boolean;
+  access: AccessInfo;
+  plans: {
+    trialDays: number;
+    soloMonthlyCents: number;
+    soloAnnualMonthlyCents: number;
+    teamSeatCents: number;
+    teamMinSeats: number;
+  };
+  subscription: SubscriptionInfo | null;
+  team: TeamInfo | null;
+}
+
+export type CodeKind = 'free_forever' | 'free_months' | 'free_until' | 'trial_days';
+
+export interface AccessCode {
+  id: string;
+  code: string;
+  label: string;
+  kind: CodeKind;
+  months: number | null;
+  until: string | null;
+  trialDays: number | null;
+  maxUses: number | null;
+  uses: number;
+  redeemBy: string | null;
+  lockedEmail: string | null;
+  revoked: boolean;
+  createdAt: string;
+  gives: string;
+  redemptions: { userId: string; email: string; at: string }[];
+}
+
+export interface AdminBilling {
+  enabled: boolean;
+  stripeReady: boolean;
+  webhookReady: boolean;
+  webhookUrl: string;
+  counts: Record<'trial' | 'subscribed' | 'team' | 'comp' | 'locked' | 'exempt', number>;
+  teams: number;
+  mrrCents: number;
+  codes: AccessCode[];
+}
+
+export interface AdminUser extends User {
+  access?: { state: AccessState; label: string };
+  team?: string | null;
+}
+
 export interface AdminStat {
   label: string;
   value: string;

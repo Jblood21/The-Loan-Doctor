@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createShare, getShare } from '../store.js';
-import { requireAuth } from '../auth.js';
+import { requireAccess } from '../billing/access.js';
 
 const router = Router();
 
@@ -10,7 +10,7 @@ function baseUrl(req) {
 }
 
 // Create a read-only shareable quote snapshot (authed).
-router.post('/', requireAuth, (req, res) => {
+router.post('/', requireAccess, (req, res) => {
   const body = req.body || {};
   const snapshot = {
     title: String(body.title || 'Loan Comparison').slice(0, 120),

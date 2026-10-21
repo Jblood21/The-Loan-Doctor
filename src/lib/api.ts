@@ -3,7 +3,7 @@
 // In development the Vite dev server proxies /api to the Express backend, so
 // API_BASE can stay empty. In production set VITE_API_BASE to the API origin.
 
-import type { Assignment, PreApprovalRecord, Scenario, Settings, User } from '@/types';
+import type { AccessCode, AdminBilling, AdminUser, Assignment, BillingStatus, CodeKind, PreApprovalRecord, Scenario, Settings, User } from '@/types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
 const TOKEN_KEY = 'loandr.token';
@@ -18,6 +18,9 @@ export function setToken(token: string | null, remember = true) {
   sessionStorage.removeItem(TOKEN_KEY);
   if (token) (remember ? localStorage : sessionStorage).setItem(TOKEN_KEY, token);
 }
+
+/** Fired when the server says the plan has lapsed (HTTP 402) so the UI can react. */
+export const BILLING_REQUIRED_EVENT = 'basecamp:billing-required';
 
 export class ApiError extends Error {
   status: number;
@@ -40,12 +43,16 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (!res.ok) {
     let message = res.statusText;
+    let code: string | undefined;
     try {
       const data = await res.json();
       message = data.error || data.message || message;
+      code = data.code;
     } catch {
       /* non-JSON error */
     }
+    // A lapsed plan: tell the app so it can show the plan page instead of a bare error.
+    if (res.status === 402 && code === 'billing_required') window.dispatchEvent(new Event(BILLING_REQUIRED_EVENT));
     throw new ApiError(res.status, message);
   }
   if (res.status === 204) return undefined as T;
@@ -57,6 +64,20 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export interface AuthResponse {
   token: string;
   user: User;
+  /** Plain-language note when an access code was applied at sign-up. */
+  notice?: string | null;
+}
+
+export interface CodeInput {
+  kind: CodeKind;
+  label?: string;
+  code?: string;
+  months?: number | string;
+  until?: string;
+  trialDays?: number | string;
+  maxUses?: number | string;
+  redeemBy?: string;
+  lockedEmail?: string;
 }
 
 export const api = {
@@ -64,7 +85,7 @@ export const api = {
   health: () => request<{ ok: boolean }>('GET', '/health'),
 
   // auth
-  register: (data: { email: string; password: string; name?: string; company?: string; code?: string }) =>
+  register: (data: { email: string; password: string; name?: string; company?: string; accessCode?: string; invite?: string }) =>
     request<AuthResponse>('POST', '/auth/register', data),
   login: (data: { email: string; password: string }) => request<AuthResponse>('POST', '/auth/login', data),
   me: () => request<{ user: User }>('GET', '/auth/me'),
@@ -92,7 +113,29 @@ export const api = {
 
   // admin (JWT role=admin gated)
   adminStats: () => request<{ stats: { label: string; value: string; delta: string }[] }>('GET', '/admin/stats'),
-  adminUsers: () => request<{ users: User[] }>('GET', '/admin/users'),
+  adminUsers: () => request<{ users: AdminUser[] }>('GET', '/admin/users'),
+  adminBilling: () => request<AdminBilling>('GET', '/admin/billing'),
+  adminCreateCode: (input: CodeInput) => request<{ code: AccessCode }>('POST', '/admin/codes', input),
+  adminSetCodeRevoked: (id: string, revoked: boolean) => request<{ code: AccessCode }>('PATCH', `/admin/codes/${id}`, { revoked }),
+  adminGrantFree: (userId: string, grant: { mode: 'forever' | 'months' | 'until'; months?: number; until?: string; reason?: string }) =>
+    request<{ user: AdminUser }>('POST', `/admin/users/${userId}/comp`, grant),
+  adminRemoveFree: (userId: string) => request<{ user: AdminUser }>('DELETE', `/admin/users/${userId}/comp`),
+
+  // billing (plans, free-access codes, teams)
+  billingStatus: () => request<BillingStatus>('GET', '/billing'),
+  billingRedeem: (code: string) => request<{ ok: boolean; message: string; already: boolean; status: BillingStatus }>('POST', '/billing/redeem', { code }),
+  billingCheckout: (plan: 'solo' | 'team', interval?: 'month' | 'year') =>
+    request<{ url: string }>('POST', '/billing/checkout', { plan, interval }),
+  billingPortal: (scope?: 'user' | 'org') => request<{ url: string }>('POST', '/billing/portal', { scope }),
+  billingSync: (sessionId: string) => request<BillingStatus>('POST', '/billing/sync', { sessionId }),
+  billingExport: () => request<unknown>('GET', '/billing/export'),
+  inviteInfo: (token: string) => request<{ orgName: string; email: string }>('GET', `/billing/invite-info?token=${encodeURIComponent(token)}`),
+  teamCreate: (name: string) => request<BillingStatus>('POST', '/billing/team', { name }),
+  teamInvite: (email: string) => request<{ emailed: boolean; status: BillingStatus }>('POST', '/billing/team/invites', { email }),
+  teamCancelInvite: (id: string) => request<BillingStatus>('DELETE', `/billing/team/invites/${id}`),
+  teamJoin: (token: string) => request<BillingStatus>('POST', '/billing/team/join', { token }),
+  teamRemoveMember: (userId: string) => request<BillingStatus>('DELETE', `/billing/team/members/${userId}`),
+  teamLeave: () => request<BillingStatus>('POST', '/billing/team/leave'),
 
   // LOS integration — 'live' (direct API), 'zapier' (pushed via webhook), or 'demo'
   losConnect: (provider: string) =>

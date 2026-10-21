@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/Button';
 import { TextField, Label } from '@/components/ui/TextField';
@@ -16,11 +16,15 @@ const STATS = [
 export default function Login() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const invite = params.get('invite') || '';
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
+  const [accessCode, setAccessCode] = useState('');
+  const [inviteInfo, setInviteInfo] = useState<{ orgName: string; email: string } | null>(null);
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -28,6 +32,26 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [devLink, setDevLink] = useState('');
+
+  // Following a team invitation: show who invited them and start on the sign-up form.
+  useEffect(() => {
+    if (!invite) return;
+    let cancelled = false;
+    api
+      .inviteInfo(invite)
+      .then((info) => {
+        if (cancelled) return;
+        setInviteInfo(info);
+        setMode('register');
+        setEmail(info.email);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : 'This invitation link could not be checked.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [invite]);
 
   // Switch between sign-in / register / forgot-password, clearing transient messages.
   const switchMode = (next: 'login' | 'register' | 'forgot') => {
@@ -54,9 +78,16 @@ export default function Login() {
       if (mode === 'login') {
         await login(cleanEmail, password, remember);
       } else {
-        await register({ email: cleanEmail, password, name: name.trim(), company: company.trim() });
+        await register({
+          email: cleanEmail,
+          password,
+          name: name.trim(),
+          company: company.trim(),
+          accessCode: accessCode.trim() || undefined,
+          invite: invite || undefined,
+        });
       }
-      navigate('/compare', { replace: true });
+      navigate(invite ? `/billing?join=${encodeURIComponent(invite)}` : '/compare', { replace: true });
     } catch (err) {
       const msg =
         err instanceof ApiError
@@ -121,6 +152,13 @@ export default function Login() {
                 : 'Enter your email and we’ll send you a link to set a new password.'}
           </p>
 
+          {inviteInfo && mode !== 'forgot' && (
+            <div className="mb-5 rounded-[11px] border border-border bg-surface-tint px-[15px] py-3 text-[13px] leading-[1.55] text-ink">
+              You've been invited to join <strong>{inviteInfo.orgName}</strong>. Use <strong>{inviteInfo.email}</strong> to create your
+              account, or sign in if you already have one. Your team covers the cost.
+            </div>
+          )}
+
           {mode === 'register' && (
             <>
               <Label>Your Name</Label>
@@ -139,6 +177,19 @@ export default function Login() {
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
               />
+              {!invite && (
+                <>
+                  <Label>Access code (optional)</Label>
+                  <TextField
+                    size="lg"
+                    className="mb-[18px] uppercase"
+                    placeholder="XXXX-XXXX"
+                    autoComplete="off"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value)}
+                  />
+                </>
+              )}
             </>
           )}
 

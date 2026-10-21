@@ -10,7 +10,7 @@ import {
   deleteAssignment,
   findAgentByEmail,
 } from '../store.js';
-import { requireAuth } from '../auth.js';
+import { requireAccess } from '../billing/access.js';
 import { streamLetterPdf } from '../lib/letterPdfRender.js';
 import { cappedPrice } from '../lib/assignmentLetter.js';
 
@@ -61,7 +61,7 @@ export function publicAssignment(a) {
 // Resolve a signed-up agent's co-brand profile by email so the loan officer can pull the
 // agent's own details onto a pre-approval letter instead of re-typing them. Keyed by the
 // exact email the LO already knows; returns only co-brand fields.
-router.get('/agent-lookup', requireAuth, (req, res) => {
+router.get('/agent-lookup', requireAccess, (req, res) => {
   const email = str(req.query.email).trim().toLowerCase();
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Enter a valid email.' });
   const a = findAgentByEmail(email);
@@ -79,7 +79,7 @@ router.get('/agent-lookup', requireAuth, (req, res) => {
   });
 });
 
-router.post('/pdf', requireAuth, (req, res) => {
+router.post('/pdf', requireAccess, (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   streamLetterPdf(res, body);
   incPreApprovals();
@@ -106,19 +106,19 @@ router.post('/pdf', requireAuth, (req, res) => {
 });
 
 // Issued-pre-approval history for the signed-in loan officer (newest first).
-router.get('/history', requireAuth, (req, res) => {
+router.get('/history', requireAccess, (req, res) => {
   res.json({ history: getPreApprovals(req.user.id) });
 });
 
 // ---- Agent assignments (loan-officer side) -----------------------------
 // List the assignments this loan officer created.
-router.get('/assignments', requireAuth, (req, res) => {
+router.get('/assignments', requireAccess, (req, res) => {
   res.json({ assignments: getAssignmentsByOwner(req.user.id).map(publicAssignment) });
 });
 
 // Create an assignment from an already-built letter (the client sends the letter
 // snapshot + a small ctx used to regenerate the address/price-dependent parts).
-router.post('/assignments', requireAuth, (req, res) => {
+router.post('/assignments', requireAccess, (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const agentEmail = String(body.agentEmail || '').trim().toLowerCase();
   const propertyAddress = String(body.propertyAddress || '').trim();
@@ -147,7 +147,7 @@ router.post('/assignments', requireAuth, (req, res) => {
 
 // Loan officer updates the terms they control (agent email, address, price ceiling,
 // current price, permission toggle). Never lets price exceed the approved ceiling.
-router.patch('/assignments/:id', requireAuth, (req, res) => {
+router.patch('/assignments/:id', requireAccess, (req, res) => {
   const a = findAssignmentById(req.params.id);
   if (!a || a.ownerId !== req.user.id) return res.status(404).json({ error: 'Assignment not found' });
   const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -168,7 +168,7 @@ router.patch('/assignments/:id', requireAuth, (req, res) => {
   res.json({ assignment: publicAssignment(updateAssignment(a.id, patch)) });
 });
 
-router.delete('/assignments/:id', requireAuth, (req, res) => {
+router.delete('/assignments/:id', requireAccess, (req, res) => {
   const a = findAssignmentById(req.params.id);
   if (!a || a.ownerId !== req.user.id) return res.status(404).json({ error: 'Assignment not found' });
   deleteAssignment(a.id);

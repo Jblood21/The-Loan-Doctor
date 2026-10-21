@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getScenarios, setScenarios, upsertScenarios } from '../store.js';
-import { requireAuth } from '../auth.js';
+import { requireAccess } from '../billing/access.js';
 
 const router = Router();
 
@@ -15,25 +15,25 @@ const sanitizeList = (arr) =>
     .slice(0, MAX_SCENARIOS)
     .map(withId);
 
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAccess, (req, res) => {
   res.json({ scenarios: getScenarios(req.user.id) });
 });
 
 // Merge the working scenarios into the bank by id (Compare's "Save"): existing ids are
 // updated in place, new ones get an id. Returns the full bank plus the saved items (now
 // with ids) so the client can reconcile. Registered before '/:id' so this path wins.
-router.post('/upsert', requireAuth, (req, res) => {
+router.post('/upsert', requireAccess, (req, res) => {
   const saved = sanitizeList(req.body?.scenarios); // withId assigns ids to new ones
   const scenarios = upsertScenarios(req.user.id, saved);
   res.json({ scenarios, saved });
 });
 
 // Replace the whole set (the Compare screen's "Save").
-router.put('/', requireAuth, (req, res) => {
+router.put('/', requireAccess, (req, res) => {
   res.json({ scenarios: setScenarios(req.user.id, sanitizeList(req.body?.scenarios)) });
 });
 
-router.post('/', requireAuth, (req, res) => {
+router.post('/', requireAccess, (req, res) => {
   const body = req.body;
   if (!body || typeof body !== 'object' || Array.isArray(body)) return res.status(400).json({ error: 'Invalid scenario' });
   const list = getScenarios(req.user.id);
@@ -43,7 +43,7 @@ router.post('/', requireAuth, (req, res) => {
   res.status(201).json({ scenario });
 });
 
-router.put('/:id', requireAuth, (req, res) => {
+router.put('/:id', requireAccess, (req, res) => {
   const list = getScenarios(req.user.id);
   const idx = list.findIndex((s) => s.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Scenario not found' });
@@ -52,7 +52,7 @@ router.put('/:id', requireAuth, (req, res) => {
   res.json({ scenario: list[idx] });
 });
 
-router.delete('/:id', requireAuth, (req, res) => {
+router.delete('/:id', requireAccess, (req, res) => {
   const list = getScenarios(req.user.id);
   setScenarios(
     req.user.id,

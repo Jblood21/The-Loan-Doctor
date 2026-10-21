@@ -92,7 +92,12 @@ export function dataDirInfo() {
   return { dir: DATA_DIR, persistent, explicit, onKnownMount };
 }
 
-const EMPTY = { users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {}, agents: [], assignments: [], agentShares: [], resetTokens: {}, counters: { preApprovals: 0 } };
+const EMPTY = {
+  users: [], settings: {}, scenarios: {}, los: {}, losBorrowers: {}, losWebhookLog: {}, shares: {}, preApprovals: {},
+  agents: [], assignments: [], agentShares: [], resetTokens: {}, counters: { preApprovals: 0 },
+  // Billing: teams, their invitations, access codes, and a few deployment-level facts.
+  orgs: [], invites: [], accessCodes: [], billingMeta: {}, stripeEvents: [],
+};
 
 let db = structuredClone(EMPTY);
 
@@ -180,6 +185,130 @@ export function updateUser(id, patch) {
   Object.assign(u, patch);
   persist();
   return u;
+}
+
+// ---- billing: per-user plan facts ----------------------------------------
+// `user.billing` holds { trialEndsAt?, comp?, sub?, stripeCustomerId? } — see billing/entitlement.js.
+export function updateUserBilling(id, patch) {
+  const u = findUserById(id);
+  if (!u) return null;
+  u.billing = { ...(u.billing || {}), ...patch };
+  persist();
+  return u;
+}
+
+/** Deployment-level billing facts. `enabledAt` is when billing was first switched on —
+ *  accounts older than that get the longer "existing account" trial. */
+export function getBillingMeta() {
+  return db.billingMeta || (db.billingMeta = {});
+}
+export function noteBillingEnabled(nowMs = Date.now()) {
+  const meta = getBillingMeta();
+  if (!meta.enabledAt) {
+    meta.enabledAt = new Date(nowMs).toISOString();
+    persist();
+  }
+  return Date.parse(meta.enabledAt);
+}
+
+/** Stripe retries webhooks, so remember event ids to process each only once. */
+export function stripeEventSeen(eventId) {
+  return db.stripeEvents.includes(eventId);
+}
+export function markStripeEventSeen(eventId) {
+  if (db.stripeEvents.includes(eventId)) return;
+  db.stripeEvents.push(eventId);
+  if (db.stripeEvents.length > 300) db.stripeEvents = db.stripeEvents.slice(-200);
+  persist();
+}
+
+// ---- teams (orgs) and invitations ----------------------------------------
+export function getOrgs() {
+  return db.orgs;
+}
+export function findOrg(id) {
+  return id ? db.orgs.find((o) => o.id === id) : undefined;
+}
+export function addOrg({ name, ownerId }) {
+  const org = { id: randomUUID(), name, ownerId, createdAt: new Date().toISOString(), sub: null, stripeCustomerId: null };
+  db.orgs.push(org);
+  persist();
+  return org;
+}
+export function updateOrg(id, patch) {
+  const o = findOrg(id);
+  if (!o) return null;
+  Object.assign(o, patch);
+  persist();
+  return o;
+}
+export function orgMembers(orgId) {
+  return db.users.filter((u) => u.orgId === orgId);
+}
+
+export function getInvites(orgId) {
+  return db.invites.filter((i) => i.orgId === orgId && !i.acceptedAt);
+}
+export function findInviteByToken(token) {
+  if (!token) return undefined;
+  return db.invites.find((i) => timingSafeEqualStr(i.token, token));
+}
+export function findInviteById(id) {
+  return db.invites.find((i) => i.id === id);
+}
+export function addInvite({ orgId, email, invitedBy, ttlMs }) {
+  const e = normalizeEmail(email);
+  // Re-inviting the same address replaces the old link instead of piling up.
+  db.invites = db.invites.filter((i) => !(i.orgId === orgId && i.email === e && !i.acceptedAt));
+  const now = Date.now();
+  const invite = {
+    id: randomUUID(),
+    orgId,
+    email: e,
+    token: randomBytes(24).toString('hex'),
+    invitedBy,
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + ttlMs).toISOString(),
+    acceptedAt: null,
+  };
+  db.invites.push(invite);
+  persist();
+  return invite;
+}
+export function updateInvite(id, patch) {
+  const i = findInviteById(id);
+  if (!i) return null;
+  Object.assign(i, patch);
+  persist();
+  return i;
+}
+export function removeInvite(id) {
+  const before = db.invites.length;
+  db.invites = db.invites.filter((i) => i.id !== id);
+  if (db.invites.length !== before) persist();
+}
+
+// ---- access codes -------------------------------------------------------
+export function getAccessCodes() {
+  return db.accessCodes;
+}
+export function findAccessCodeByKey(key) {
+  return db.accessCodes.find((c) => c.key === key);
+}
+export function findAccessCodeById(id) {
+  return db.accessCodes.find((c) => c.id === id);
+}
+export function addAccessCode(code) {
+  db.accessCodes.push(code);
+  persist();
+  return code;
+}
+export function updateAccessCode(id, patch) {
+  const c = findAccessCodeById(id);
+  if (!c) return null;
+  Object.assign(c, patch);
+  persist();
+  return c;
 }
 
 // ---- settings ----------------------------------------------------------

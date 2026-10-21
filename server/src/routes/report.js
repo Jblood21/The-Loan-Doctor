@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import PDFDocument from 'pdfkit';
-import { requireAuth } from '../auth.js';
+import { requireAccess } from '../billing/access.js';
 
 const router = Router();
 
@@ -133,7 +133,7 @@ export function streamReportPdf(res, { preparedFor, officer, lender, logoBuf, se
   doc.end();
 }
 
-router.post('/pdf', requireAuth, (req, res) => {
+router.post('/pdf', requireAccess, (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const { preparedFor, sections } = parseReportSections(body);
   streamReportPdf(res, {
