@@ -18,7 +18,8 @@ export default function Login() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const invite = params.get('invite') || '';
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  // The home page's "Create an account" button opens this screen on the sign-up form.
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(params.get('mode') === 'register' ? 'register' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');

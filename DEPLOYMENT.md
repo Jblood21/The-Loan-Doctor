@@ -130,6 +130,28 @@ matters even more once people are paying.
 
 ---
 
+## Showing up on Google
+
+The site has a public home page at `/` that search engines can read, plus `/robots.txt` and
+`/sitemap.xml`. Everything else (the signed-in app, shared borrower quotes, agent links, the
+API) is marked **noindex**, so it stays out of search results.
+
+1. Set **`PUBLIC_BASE_URL`** to the address people should find you at (for example
+   `https://loandr.onrender.com`, or your own domain once you have one). Google is told this
+   is the "official" address of the home page.
+2. In [Google Search Console](https://search.google.com/search-console), add your site and
+   verify it. The repo already serves the HTML verification file
+   (`/google8c5a0c4e5772ce9a.html`) — keep it in place so the site stays verified.
+3. In Search Console, submit `https://YOUR-SITE/sitemap.xml` (Indexing → Sitemaps), then paste
+   the home page address into the search bar at the top and choose **Request indexing**.
+4. Give it days to a few weeks. A custom domain that matches the brand (for example
+   `loanbasecamp.com`) and a few links to the site from places you control (LinkedIn, your
+   email signature, your own website) make a name search much more likely to find you.
+
+If you move to a new domain, add it as a new property in Search Console and verify it again.
+
+---
+
 ## Good to know
 
 - **⚠️ Your data resets on restart (free tier) — this breaks the LOS webhook.** The free

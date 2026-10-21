@@ -25,6 +25,7 @@ import aiRoutes from './routes/ai.js';
 import censusRoutes from './routes/census.js';
 import reportRoutes from './routes/report.js';
 import billingRoutes, { stripeWebhook } from './routes/billing.js';
+import { landingHtml, noindexExceptHome, robotsTxt, siteBase, sitemapXml } from './seo.js';
 import { billingEnabled } from './billing/config.js';
 import { stripeConfigured, webhookConfigured } from './billing/stripe.js';
 
@@ -42,6 +43,9 @@ app.set('trust proxy', 1); // behind Render/other TLS proxy — needed for corre
 // Security headers. CSP is left off because the SPA uses inline styles; the other
 // hardening headers (HSTS, X-Content-Type-Options, frameguard, referrer policy) apply.
 app.use(helmet({ contentSecurityPolicy: false }));
+
+// Only the public home page is meant for search results; everything else is noindex.
+app.use(noindexExceptHome);
 
 // CORS — reflect any origin in dev; lock to the CORS_ORIGIN list in production. The API
 // and SPA ship as one service (same origin), so production needs cross-origin access
@@ -91,6 +95,12 @@ app.use('/api/report', reportRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/ai', aiLimiter, aiRoutes);
 app.use('/api/census', censusLimiter, censusRoutes);
+
+// Public home page + search-engine files. These must come before the static/SPA block
+// below, which would otherwise answer "/" with the app shell.
+app.get('/', (req, res) => res.type('html').send(landingHtml(siteBase(req), { signupsOpen: process.env.ALLOW_SIGNUP !== 'false' })));
+app.get('/robots.txt', (req, res) => res.type('text/plain').send(robotsTxt(siteBase(req))));
+app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(sitemapXml(siteBase(req))));
 
 // Unknown API routes → JSON 404 (before the static SPA fallback).
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
