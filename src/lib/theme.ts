@@ -32,13 +32,18 @@ export function applyTheme(theme: Theme): void {
   const root = document.documentElement;
   if (theme === 'system') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', theme);
+  // The concrete light/dark in force — the seasonal themes key their colors off this.
+  root.setAttribute('data-mode', resolvedTheme(theme));
   syncThemeColor(theme);
 }
 
 // When following the OS, re-tint the title bar if the OS flips light/dark while open.
 if (typeof window !== 'undefined' && window.matchMedia) {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (getStoredTheme() === 'system') syncThemeColor('system');
+    if (getStoredTheme() === 'system') {
+      syncThemeColor('system');
+      document.documentElement.setAttribute('data-mode', resolvedTheme('system'));
+    }
   });
 }
 

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useSearchParams } 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { AppShell } from '@/components/AppShell';
 import { LogoMark } from '@/components/Logo';
+import { HolidayDecor } from '@/components/holiday/HolidayDecor';
 import Login from '@/pages/Login';
 import Compare from '@/pages/Compare';
 import Hecm from '@/pages/Hecm';
@@ -107,6 +108,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <RouteTitle />
+      <HolidayDecor />
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>

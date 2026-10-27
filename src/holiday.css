@@ -1,0 +1,707 @@
+/* ------------------------------------------------------------------ *
+ * Seasonal looks. Each holiday swaps the brand colors (by overriding the
+ * same tokens index.css defines) and shows a decoration layer around the
+ * screen edges. <html> carries data-holiday="…" and data-mode="light|dark";
+ * the three-part selectors outrank the base theme rules whatever the file
+ * order. Decorations never take clicks, and hold still when the visitor has
+ * asked their device to reduce motion.
+ * ------------------------------------------------------------------ */
+
+/* ---------- Halloween ---------- */
+:root[data-holiday='halloween'][data-mode='light'] {
+  --brand: #b34700;
+  --brand-hover: #8f3a00;
+  --brand-pressed: #6d2c00;
+  --on-brand: #ffffff;
+  --surface-sunken: #f7eef8;
+  --surface-tint: #f9eadd;
+  --surface-tint-strong: #f1d6bd;
+  --border: #e8dbe6;
+  --focus-ring: #b34700;
+  --ring-shadow: rgba(179, 71, 0, 0.32);
+  --nav-active-bg: rgba(179, 71, 0, 0.13);
+  --app-scene-scrim: linear-gradient(180deg, rgba(222, 196, 245, 0.8) 0%, rgba(246, 205, 190, 0.5) 38%, rgba(255, 205, 150, 0.34) 72%, rgba(255, 190, 120, 0.22) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(240, 224, 250, 0.93) 0%, rgba(250, 218, 198, 0.7) 38%, rgba(250, 212, 170, 0.26) 68%, rgba(250, 212, 170, 0) 100%);
+  --hd-web: rgba(85, 55, 115, 0.55);
+}
+:root[data-holiday='halloween'][data-mode='dark'] {
+  --brand: #ff9a3d;
+  --brand-hover: #ffb066;
+  --brand-pressed: #e8832a;
+  --on-brand: #1c0f05;
+  --surface: #1e1233;
+  --surface-sunken: #120a22;
+  --surface-tint: #2b1a48;
+  --surface-tint-strong: #3a2460;
+  --border: #3a2a58;
+  --border-control: #5a4780;
+  --ink-muted: #b9a9d3;
+  --focus-ring: #ffb066;
+  --ring-shadow: rgba(255, 154, 61, 0.3);
+  --nav-active-bg: rgba(255, 154, 61, 0.17);
+  --app-scene-scrim: linear-gradient(180deg, rgba(28, 8, 52, 0.84) 0%, rgba(64, 22, 96, 0.58) 36%, rgba(120, 52, 24, 0.3) 72%, rgba(40, 12, 18, 0.22) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(20, 6, 38, 0.94) 0%, rgba(42, 14, 72, 0.76) 38%, rgba(70, 24, 44, 0.3) 68%, rgba(0, 0, 0, 0) 100%);
+  --hd-web: rgba(238, 228, 252, 0.62);
+}
+
+/* ---------- Christmas ---------- */
+:root[data-holiday='christmas'][data-mode='light'] {
+  --brand: #b3261e;
+  --brand-hover: #8f1e18;
+  --brand-pressed: #6e1712;
+  --on-brand: #ffffff;
+  --surface-sunken: #f6f3ec;
+  --surface-tint: #fdeceb;
+  --surface-tint-strong: #f7d5d2;
+  --border: #e6ddd2;
+  --focus-ring: #b3261e;
+  --ring-shadow: rgba(179, 38, 30, 0.3);
+  --nav-active-bg: rgba(179, 38, 30, 0.12);
+  --app-scene-scrim: linear-gradient(180deg, rgba(214, 236, 226, 0.84) 0%, rgba(250, 230, 230, 0.5) 38%, rgba(255, 255, 255, 0.26) 72%, rgba(255, 255, 255, 0.14) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(226, 242, 234, 0.94) 0%, rgba(252, 232, 232, 0.7) 38%, rgba(255, 255, 255, 0.28) 68%, rgba(255, 255, 255, 0) 100%);
+  --hd-wire: #2f7d4f;
+}
+:root[data-holiday='christmas'][data-mode='dark'] {
+  --brand: #ff7a73;
+  --brand-hover: #ff958f;
+  --brand-pressed: #e8625b;
+  --on-brand: #2a0c0a;
+  --surface: #122b2a;
+  --surface-sunken: #0a1c1e;
+  --surface-tint: #1a3b38;
+  --surface-tint-strong: #245049;
+  --border: #244844;
+  --border-control: #3f6a62;
+  --focus-ring: #ff958f;
+  --ring-shadow: rgba(255, 122, 115, 0.3);
+  --nav-active-bg: rgba(255, 122, 115, 0.16);
+  --app-scene-scrim: linear-gradient(180deg, rgba(6, 28, 26, 0.84) 0%, rgba(14, 52, 44, 0.54) 36%, rgba(92, 24, 26, 0.26) 74%, rgba(60, 14, 16, 0.2) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(5, 22, 22, 0.94) 0%, rgba(10, 44, 38, 0.76) 38%, rgba(70, 20, 22, 0.3) 68%, rgba(0, 0, 0, 0) 100%);
+  --hd-wire: #3f9a64;
+}
+
+/* ---------- Easter ---------- */
+:root[data-holiday='easter'][data-mode='light'] {
+  --brand: #7a4fb3;
+  --brand-hover: #633e96;
+  --brand-pressed: #4e3078;
+  --on-brand: #ffffff;
+  --surface-sunken: #faf4f9;
+  --surface-tint: #f1e9fa;
+  --surface-tint-strong: #e4d6f3;
+  --border: #eadff0;
+  --focus-ring: #7a4fb3;
+  --ring-shadow: rgba(122, 79, 179, 0.32);
+  --nav-active-bg: rgba(122, 79, 179, 0.13);
+  --app-scene-scrim: linear-gradient(180deg, rgba(255, 214, 234, 0.78) 0%, rgba(255, 244, 205, 0.5) 38%, rgba(208, 240, 224, 0.38) 72%, rgba(208, 240, 224, 0.2) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(255, 228, 240, 0.94) 0%, rgba(255, 246, 214, 0.72) 38%, rgba(214, 242, 228, 0.3) 68%, rgba(214, 242, 228, 0) 100%);
+}
+:root[data-holiday='easter'][data-mode='dark'] {
+  --brand: #c3a6f5;
+  --brand-hover: #d3bcf8;
+  --brand-pressed: #ae8ae8;
+  --on-brand: #1b1230;
+  --surface: #1d1b3a;
+  --surface-sunken: #12112a;
+  --surface-tint: #2a2650;
+  --surface-tint-strong: #3a3468;
+  --border: #38345e;
+  --border-control: #5a5490;
+  --focus-ring: #d3bcf8;
+  --ring-shadow: rgba(195, 166, 245, 0.3);
+  --nav-active-bg: rgba(195, 166, 245, 0.17);
+  --app-scene-scrim: linear-gradient(180deg, rgba(34, 20, 66, 0.84) 0%, rgba(78, 46, 120, 0.54) 36%, rgba(58, 98, 88, 0.3) 74%, rgba(40, 70, 70, 0.2) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(22, 14, 46, 0.94) 0%, rgba(44, 28, 84, 0.76) 38%, rgba(48, 80, 76, 0.3) 68%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* ---------- Fourth of July ---------- */
+:root[data-holiday='july4'][data-mode='light'] {
+  --brand: #1f4fa3;
+  --brand-hover: #173d80;
+  --brand-pressed: #112f63;
+  --on-brand: #ffffff;
+  --surface-sunken: #f4f5f9;
+  --surface-tint: #e6edfa;
+  --surface-tint-strong: #d3dff5;
+  --border: #dde2ee;
+  --focus-ring: #1f4fa3;
+  --ring-shadow: rgba(31, 79, 163, 0.32);
+  --nav-active-bg: rgba(31, 79, 163, 0.13);
+  --app-scene-scrim: linear-gradient(180deg, rgba(214, 226, 255, 0.82) 0%, rgba(255, 255, 255, 0.5) 38%, rgba(255, 224, 224, 0.34) 74%, rgba(255, 224, 224, 0.2) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(222, 232, 255, 0.94) 0%, rgba(255, 255, 255, 0.72) 38%, rgba(255, 230, 230, 0.3) 68%, rgba(255, 230, 230, 0) 100%);
+}
+:root[data-holiday='july4'][data-mode='dark'] {
+  --brand: #7aa6ff;
+  --brand-hover: #9bbcff;
+  --brand-pressed: #5f8fee;
+  --on-brand: #0b1630;
+  --surface: #14213f;
+  --surface-sunken: #0a1330;
+  --surface-tint: #1c2f5c;
+  --surface-tint-strong: #274080;
+  --border: #273a68;
+  --border-control: #47609a;
+  --focus-ring: #9bbcff;
+  --ring-shadow: rgba(122, 166, 255, 0.3);
+  --nav-active-bg: rgba(122, 166, 255, 0.17);
+  --app-scene-scrim: linear-gradient(180deg, rgba(6, 12, 46, 0.86) 0%, rgba(20, 40, 112, 0.54) 36%, rgba(112, 20, 32, 0.28) 74%, rgba(60, 10, 20, 0.2) 100%);
+  --login-scrim: linear-gradient(90deg, rgba(5, 10, 36, 0.94) 0%, rgba(14, 30, 86, 0.76) 38%, rgba(90, 16, 28, 0.3) 68%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* ------------------------------------------------------------------ *
+ * The decoration layer
+ * ------------------------------------------------------------------ */
+.holiday-layer {
+  --k: 1; /* size scale; smaller on phones */
+  position: fixed;
+  inset: 0;
+  z-index: 35; /* above the page, below drawers and dialogs (z-40+) */
+  pointer-events: none;
+  overflow: hidden;
+  user-select: none;
+}
+.holiday-back {
+  z-index: -9; /* above the scenic background (-10), below all page content */
+}
+.holiday-layer.is-shell {
+  top: 62px; /* hang below the phone's top bar */
+}
+@media (min-width: 1024px) {
+  .holiday-layer.is-shell {
+    top: 0;
+    left: 236px; /* beside the sidebar */
+  }
+}
+@media (max-width: 640px) {
+  .holiday-layer {
+    --k: 0.62;
+  }
+  /* The page's text spans the whole phone, so keep the sky clear of fireworks there. */
+  .hd-burst-a,
+  .hd-burst-c,
+  .hd-spark-1,
+  .hd-spark-2 {
+    display: none;
+  }
+  .hd-burst-b {
+    opacity: 0.7;
+  }
+}
+.holiday-layer svg {
+  display: block;
+  overflow: visible;
+}
+.holiday-layer i {
+  display: block;
+}
+@media print {
+  .holiday-layer {
+    display: none;
+  }
+}
+
+/* ---------- Halloween pieces ---------- */
+.hd-web {
+  position: absolute;
+  height: auto;
+  color: var(--hd-web);
+}
+.hd-web-tl {
+  top: 0;
+  left: 0;
+  width: calc(236px * var(--k));
+}
+.hd-web-tr {
+  top: 0;
+  right: 0;
+  width: calc(184px * var(--k));
+  transform: scaleX(-1);
+}
+.hd-spider-wrap {
+  position: absolute;
+  top: 0;
+  right: calc(8px * var(--k));
+  width: calc(36px * var(--k));
+  color: var(--hd-web);
+  transform-origin: 50% 0;
+  animation: hd-swing 4.8s ease-in-out infinite alternate;
+}
+.hd-spider {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.75));
+}
+.hd-bat {
+  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.7));
+  position: absolute;
+  top: var(--top);
+  left: 0;
+  width: calc(56px * var(--k));
+  height: auto;
+  animation: hd-fly var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+.hd-bat-small {
+  width: calc(38px * var(--k));
+  opacity: 0.85;
+}
+.hd-flap {
+  transform-box: fill-box;
+  transform-origin: 50% 70%;
+  animation: hd-flap 0.45s ease-in-out infinite alternate;
+}
+.hd-ghost {
+  position: absolute;
+  width: calc(88px * var(--k));
+  height: auto;
+  opacity: 0.95;
+  filter: drop-shadow(0 4px 10px rgba(110, 70, 170, 0.35));
+  animation: hd-float var(--dur, 8s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+.hd-ghost-a {
+  left: calc(-32px * var(--k));
+  bottom: calc(14px * var(--k));
+  width: calc(80px * var(--k));
+}
+.hd-ghost-b {
+  left: 54%;
+  top: calc(-4px * var(--k));
+  width: calc(40px * var(--k));
+  opacity: 0.88;
+}
+.hd-ghost-c {
+  right: calc(-48px * var(--k));
+  top: 46%;
+  width: calc(86px * var(--k));
+}
+.hd-pumpkin {
+  position: absolute;
+  height: auto;
+  filter: drop-shadow(0 3px 6px rgba(60, 20, 90, 0.3));
+}
+.hd-pumpkin-a {
+  right: calc(-4px * var(--k));
+  bottom: calc(4px * var(--k));
+  width: calc(68px * var(--k));
+}
+.hd-pumpkin-b {
+  right: calc(54px * var(--k));
+  bottom: calc(2px * var(--k));
+  width: calc(36px * var(--k));
+}
+.hd-ember {
+  animation: hd-glow 2.6s ease-in-out infinite;
+}
+
+/* ---------- Christmas pieces ---------- */
+.hd-lights {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  height: calc(64px * var(--k));
+  overflow: hidden;
+}
+.hd-droop {
+  flex: 1 0 calc(88px * var(--k));
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.hd-bulb {
+  animation: hd-twinkle 2.6s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+.hd-flake {
+  position: absolute;
+  top: 0;
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.92;
+  box-shadow: 0 0 0 1px rgba(110, 150, 205, 0.35), 0 0 6px rgba(160, 200, 245, 0.8);
+  animation: hd-fall var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+.hd-drift {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(56px * var(--k));
+}
+.hd-gifts {
+  position: absolute;
+  left: calc(-4px * var(--k));
+  bottom: calc(6px * var(--k));
+  width: calc(68px * var(--k));
+  height: auto;
+}
+.hd-holly {
+  position: absolute;
+  bottom: calc(2px * var(--k));
+  width: calc(44px * var(--k));
+  height: auto;
+}
+.hd-holly-l {
+  left: calc(60px * var(--k));
+}
+.hd-holly-r {
+  right: calc(50px * var(--k));
+  transform: scaleX(-1);
+}
+.hd-tree {
+  position: absolute;
+  right: calc(-2px * var(--k));
+  bottom: calc(8px * var(--k));
+  width: calc(60px * var(--k));
+  height: auto;
+  filter: drop-shadow(0 3px 5px rgba(10, 40, 30, 0.3));
+}
+@media (max-width: 640px) {
+  .hd-droop:nth-child(n + 9) {
+    display: none;
+  }
+}
+
+/* ---------- Easter pieces ---------- */
+.hd-butterfly {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(44px * var(--k));
+  height: auto;
+  animation: hd-meander var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+.hd-wings {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: hd-flutter 0.32s ease-in-out infinite alternate;
+}
+.hd-petal {
+  position: absolute;
+  top: 0;
+  width: var(--s);
+  height: calc(var(--s) * 0.62);
+  border-radius: 60% 40% 60% 40%;
+  background: #f6b8cf;
+  opacity: 0.85;
+  animation: hd-fall var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+.hd-grass {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(58px * var(--k));
+}
+.hd-basket {
+  position: absolute;
+  left: calc(-4px * var(--k));
+  bottom: calc(8px * var(--k));
+  width: calc(68px * var(--k));
+  height: auto;
+}
+.hd-tulip {
+  position: absolute;
+  bottom: calc(6px * var(--k));
+  width: calc(var(--w, 22px) * var(--k));
+  height: auto;
+}
+.hd-tulip-1 {
+  left: calc(66px * var(--k));
+}
+.hd-tulip-2 {
+  left: calc(92px * var(--k));
+}
+.hd-tulip-3 {
+  right: calc(60px * var(--k));
+}
+.hd-tulip-4 {
+  right: calc(82px * var(--k));
+}
+.hd-nest-egg {
+  position: absolute;
+  bottom: calc(5px * var(--k));
+  height: auto;
+  width: calc(20px * var(--k));
+}
+.hd-nest-egg-1 {
+  left: calc(118px * var(--k));
+}
+.hd-nest-egg-2 {
+  left: calc(140px * var(--k));
+  transform: rotate(14deg);
+}
+.hd-bunny {
+  position: absolute;
+  right: calc(-6px * var(--k));
+  bottom: calc(6px * var(--k));
+  width: calc(66px * var(--k));
+  height: auto;
+  filter: drop-shadow(0 3px 5px rgba(90, 60, 110, 0.25));
+}
+
+/* ---------- Fourth of July pieces ---------- */
+.hd-bunting {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  height: calc(70px * var(--k));
+  overflow: hidden;
+}
+.hd-swag {
+  flex: 1 0 calc(88px * var(--k));
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.hd-pennant {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: hd-pennant 3s ease-in-out infinite alternate;
+  animation-delay: var(--delay, 0s);
+}
+.hd-burst {
+  position: absolute;
+  width: calc(130px * var(--k));
+  height: auto;
+  opacity: 0;
+  animation: hd-burst 4.8s ease-out infinite;
+  animation-delay: var(--delay);
+}
+.hd-burst-a {
+  top: calc(34px * var(--k));
+  left: 43%;
+}
+.hd-burst-b {
+  top: calc(104px * var(--k));
+  right: calc(34px * var(--k));
+}
+.hd-burst-c {
+  top: calc(120px * var(--k));
+  left: 62%;
+  width: calc(84px * var(--k));
+}
+.hd-spark {
+  position: absolute;
+  width: calc(18px * var(--k));
+  height: auto;
+  animation: hd-twinkle2 2.4s ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+.hd-spark-1 {
+  top: calc(26px * var(--k));
+  left: 30%;
+}
+.hd-spark-2 {
+  top: calc(96px * var(--k));
+  left: 56%;
+}
+.hd-spark-3 {
+  top: calc(150px * var(--k));
+  right: 20%;
+}
+.hd-spark-4 {
+  top: calc(60px * var(--k));
+  right: calc(8px * var(--k));
+}
+.hd-flag {
+  position: absolute;
+  left: calc(-2px * var(--k));
+  bottom: calc(6px * var(--k));
+  width: calc(70px * var(--k));
+  height: auto;
+  filter: drop-shadow(0 3px 5px rgba(20, 40, 90, 0.3));
+}
+.hd-cloth {
+  transform-box: fill-box;
+  transform-origin: 0 50%;
+  animation: hd-wave 3.2s ease-in-out infinite alternate;
+}
+.hd-star-big {
+  position: absolute;
+  height: auto;
+  animation: hd-spin 22s linear infinite;
+}
+.hd-star-big-a {
+  right: calc(-2px * var(--k));
+  bottom: calc(12px * var(--k));
+  width: calc(46px * var(--k));
+}
+.hd-star-big-b {
+  right: calc(36px * var(--k));
+  bottom: calc(46px * var(--k));
+  width: calc(26px * var(--k));
+  animation-direction: reverse;
+}
+
+/* ---------- Motion ---------- */
+@keyframes hd-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(2deg);
+  }
+}
+@keyframes hd-swing {
+  from {
+    transform: rotate(-6deg);
+  }
+  to {
+    transform: rotate(6deg);
+  }
+}
+@keyframes hd-fall {
+  from {
+    transform: translate3d(0, -8vh, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(var(--sway, 30px), 108vh, 0) rotate(240deg);
+  }
+}
+@keyframes hd-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 5px var(--c));
+  }
+  50% {
+    opacity: 0.5;
+    filter: none;
+  }
+}
+@keyframes hd-twinkle2 {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.6) rotate(25deg);
+  }
+}
+@keyframes hd-fly {
+  from {
+    translate: -12vw 0;
+  }
+  50% {
+    translate: 50vw 22px;
+  }
+  to {
+    translate: 112vw 0;
+  }
+}
+@keyframes hd-flap {
+  from {
+    transform: scaleY(1);
+  }
+  to {
+    transform: scaleY(0.55);
+  }
+}
+@keyframes hd-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 3px rgba(255, 190, 60, 0.7));
+  }
+  50% {
+    filter: drop-shadow(0 0 9px rgba(255, 200, 80, 1));
+  }
+}
+@keyframes hd-meander {
+  0% {
+    translate: -8vw 62vh;
+  }
+  25% {
+    translate: 30vw 38vh;
+  }
+  50% {
+    translate: 58vw 60vh;
+  }
+  75% {
+    translate: 84vw 30vh;
+  }
+  100% {
+    translate: 110vw 54vh;
+  }
+}
+@keyframes hd-flutter {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0.5);
+  }
+}
+@keyframes hd-pennant {
+  from {
+    transform: rotate(-4deg);
+  }
+  to {
+    transform: rotate(4deg);
+  }
+}
+@keyframes hd-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.15);
+  }
+  12% {
+    opacity: 1;
+  }
+  38% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  72% {
+    opacity: 0.75;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.16);
+  }
+}
+@keyframes hd-wave {
+  from {
+    transform: skewY(-2.5deg);
+  }
+  to {
+    transform: skewY(2.5deg);
+  }
+}
+@keyframes hd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .holiday-layer *,
+  .holiday-layer {
+    animation: none !important;
+  }
+  /* Things that only make sense moving are hidden; the rest sit still. */
+  .holiday-layer .hd-flake,
+  .holiday-layer .hd-petal,
+  .holiday-layer .hd-bat,
+  .holiday-layer .hd-butterfly {
+    display: none;
+  }
+  .hd-burst {
+    opacity: 0.85;
+  }
+}
