@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { Logo } from './Logo';
+import { HolidayToggle } from './HolidayToggle';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
 import { useBilling } from '@/context/BillingContext';
@@ -41,7 +42,7 @@ function navClass({ isActive }: { isActive: boolean }) {
   return [
     'flex items-center gap-3 rounded-[9px] px-3 py-[10px] text-[14px] cursor-pointer text-left transition-colors',
     isActive
-      ? 'bg-[rgba(47,128,237,0.14)] text-brand-blue-nav font-semibold'
+      ? 'bg-[var(--nav-active-bg,rgba(47,128,237,0.14))] text-brand-blue-nav font-semibold'
       : 'text-text-soft font-medium hover:bg-[rgba(140,165,195,0.07)]',
   ].join(' ');
 }
@@ -119,6 +120,7 @@ export function Sidebar() {
             </button>
           )}
           <ThemeToggle />
+          <HolidayToggle />
           {showBilling && (
             <NavLink to="/billing" onClick={closeNav} className={navClass}>
               <CreditCard size={18} />
