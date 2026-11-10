@@ -1,7 +1,8 @@
 // Which holiday theme (if any) is showing today.
 //
-// A theme turns on when its holiday is a week away and stays on through the day
-// after the holiday, then the normal look comes back. Dates are the visitor's own
+// A theme turns on a set number of days before its holiday (a week for most; Christmas
+// starts on December 1st) and stays on through the day after, then the normal look
+// comes back. Dates are the visitor's own
 // calendar day (their device clock and time zone), so the change happens at their
 // local midnight.
 
@@ -16,8 +17,13 @@ export const HOLIDAYS: Record<HolidayId, { name: string; short: string }> = {
 
 export const HOLIDAY_IDS = Object.keys(HOLIDAYS) as HolidayId[];
 
-/** How long a theme runs around its holiday, in whole days. */
-export const WINDOW = { daysBefore: 7, daysAfter: 1 } as const;
+/** How long each theme runs around its holiday, in whole days. */
+export const WINDOWS: Record<HolidayId, { daysBefore: number; daysAfter: number }> = {
+  halloween: { daysBefore: 7, daysAfter: 1 },
+  christmas: { daysBefore: 24, daysAfter: 1 }, // December 1st through December 26th
+  easter: { daysBefore: 7, daysAfter: 1 },
+  july4: { daysBefore: 7, daysAfter: 1 },
+};
 
 /** Western (Gregorian) Easter Sunday for a year — the Meeus/Jones/Butcher method. */
 export function easterSunday(year: number): { month: number; day: number } {
@@ -67,7 +73,8 @@ export function activeHoliday(now: Date = new Date()): HolidayId | null {
   for (const id of HOLIDAY_IDS) {
     const { month, day } = holidayOn(id, now.getFullYear());
     const left = daysUntil(now, month, day);
-    if (left <= WINDOW.daysBefore && left >= -WINDOW.daysAfter) return id;
+    const { daysBefore, daysAfter } = WINDOWS[id];
+    if (left <= daysBefore && left >= -daysAfter) return id;
   }
   return null;
 }

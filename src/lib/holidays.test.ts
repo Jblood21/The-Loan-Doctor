@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WINDOW, activeHoliday, easterSunday, holidayOn, HOLIDAY_IDS } from './holidays';
+import { WINDOWS, activeHoliday, easterSunday, holidayOn, HOLIDAY_IDS } from './holidays';
 import type { HolidayId } from './holidays';
 
 // Local-time dates, the way a visitor's device would report them.
@@ -42,13 +42,14 @@ describe('the window around each holiday', () => {
 
   for (const year of [2026, 2027, 2028, 2031]) {
     for (const id of HOLIDAY_IDS) {
-      it(`${id} ${year}: on 7 days before through 1 day after, off outside`, () => {
-        expect(activeHoliday(shift(year, id, -WINDOW.daysBefore - 1))).toBeNull();
-        expect(activeHoliday(shift(year, id, -WINDOW.daysBefore))).toBe(id);
+      it(`${id} ${year}: on from its first day through 1 day after, off outside`, () => {
+        const { daysBefore, daysAfter } = WINDOWS[id];
+        expect(activeHoliday(shift(year, id, -daysBefore - 1))).toBeNull();
+        expect(activeHoliday(shift(year, id, -daysBefore))).toBe(id);
         expect(activeHoliday(shift(year, id, -1))).toBe(id);
         expect(activeHoliday(shift(year, id, 0))).toBe(id);
-        expect(activeHoliday(shift(year, id, WINDOW.daysAfter))).toBe(id);
-        expect(activeHoliday(shift(year, id, WINDOW.daysAfter + 1))).toBeNull();
+        expect(activeHoliday(shift(year, id, daysAfter))).toBe(id);
+        expect(activeHoliday(shift(year, id, daysAfter + 1))).toBeNull();
       });
     }
   }
@@ -58,6 +59,9 @@ describe('the window around each holiday', () => {
     expect(activeHoliday(at(2026, 10, 24))).toBe('halloween');
     expect(activeHoliday(at(2026, 11, 1))).toBe('halloween');
     expect(activeHoliday(at(2026, 11, 2))).toBeNull();
+    // Christmas runs from December 1st through December 26th.
+    expect(activeHoliday(at(2026, 11, 30))).toBeNull();
+    expect(activeHoliday(at(2026, 12, 1))).toBe('christmas');
     expect(activeHoliday(at(2026, 12, 18))).toBe('christmas');
     expect(activeHoliday(at(2026, 12, 26))).toBe('christmas');
     expect(activeHoliday(at(2026, 12, 27))).toBeNull();
@@ -85,18 +89,27 @@ describe('the window around each holiday', () => {
     expect(activeHoliday(at(2028, 3, 21))).toBeNull();
   });
 
+  it('starts Christmas on December 1st in every year, including leap years', () => {
+    for (const y of [2026, 2027, 2028, 2031]) {
+      expect(activeHoliday(at(y, 11, 30))).toBeNull();
+      expect(activeHoliday(at(y, 12, 1))).toBe('christmas');
+      expect(activeHoliday(at(y, 12, 26))).toBe('christmas');
+      expect(activeHoliday(at(y, 12, 27))).toBeNull();
+    }
+  });
+
   it('never has two themes at once, and is off most of the year', () => {
     let on = 0;
     for (let d = new Date(2027, 0, 1); d.getFullYear() === 2027; d.setDate(d.getDate() + 1)) {
       const hits = HOLIDAY_IDS.filter((id) => {
         const { month, day } = holidayOn(id, 2027);
         const diff = Math.round((Date.UTC(2027, month - 1, day) - Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
-        return diff <= WINDOW.daysBefore && diff >= -WINDOW.daysAfter;
+        return diff <= WINDOWS[id].daysBefore && diff >= -WINDOWS[id].daysAfter;
       });
       expect(hits.length).toBeLessThanOrEqual(1);
       if (hits.length) on++;
     }
-    expect(on).toBe(4 * (WINDOW.daysBefore + WINDOW.daysAfter + 1));
+    expect(on).toBe(HOLIDAY_IDS.reduce((sum, id) => sum + WINDOWS[id].daysBefore + WINDOWS[id].daysAfter + 1, 0));
   });
 
   it('is off on an ordinary day', () => {
