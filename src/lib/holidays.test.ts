@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WINDOWS, activeHoliday, easterSunday, holidayOn, HOLIDAY_IDS, thanksgivingDay } from './holidays';
+import { activeHoliday, easterSunday, holidayOn, HOLIDAY_IDS, thanksgivingDay, windowFor } from './holidays';
 import type { HolidayId } from './holidays';
 
 // Local-time dates, the way a visitor's device would report them.
@@ -72,7 +72,7 @@ describe('the window around each holiday', () => {
   for (const year of [2026, 2027, 2028, 2031]) {
     for (const id of HOLIDAY_IDS) {
       it(`${id} ${year}: on from its first day through 1 day after, off outside`, () => {
-        const { daysBefore, daysAfter } = WINDOWS[id];
+        const { daysBefore, daysAfter } = windowFor(id, year);
         expect(activeHoliday(shift(year, id, -daysBefore - 1))).toBeNull();
         expect(activeHoliday(shift(year, id, -daysBefore))).toBe(id);
         expect(activeHoliday(shift(year, id, -1))).toBe(id);
@@ -91,8 +91,9 @@ describe('the window around each holiday', () => {
     // Christmas runs from December 1st through December 26th.
     expect(activeHoliday(at(2026, 11, 30))).toBeNull();
     expect(activeHoliday(at(2026, 12, 1))).toBe('christmas');
-    // Thanksgiving 2026 is November 26, so the theme runs November 19 to 27.
-    expect(activeHoliday(at(2026, 11, 18))).toBeNull();
+    // Thanksgiving runs from November 10th through the day after the holiday (Nov 26, 2026).
+    expect(activeHoliday(at(2026, 11, 9))).toBeNull();
+    expect(activeHoliday(at(2026, 11, 10))).toBe('thanksgiving');
     expect(activeHoliday(at(2026, 11, 19))).toBe('thanksgiving');
     expect(activeHoliday(at(2026, 11, 27))).toBe('thanksgiving');
     expect(activeHoliday(at(2026, 11, 28))).toBeNull();
@@ -132,18 +133,35 @@ describe('the window around each holiday', () => {
     }
   });
 
+  it('starts Thanksgiving on November 10th in every year, whichever Thursday it falls on', () => {
+    for (let y = 2026; y <= 2040; y++) {
+      expect(activeHoliday(at(y, 11, 9))).toBeNull();
+      expect(activeHoliday(at(y, 11, 10))).toBe('thanksgiving');
+      const { day } = thanksgivingDay(y);
+      expect(activeHoliday(at(y, 11, day))).toBe('thanksgiving');
+      expect(activeHoliday(at(y, 11, day + 1))).toBe('thanksgiving');
+      expect(activeHoliday(at(y, 11, day + 2))).toBeNull();
+    }
+  });
+
   it('never has two themes at once, and is off most of the year', () => {
     let on = 0;
     for (let d = new Date(2027, 0, 1); d.getFullYear() === 2027; d.setDate(d.getDate() + 1)) {
       const hits = HOLIDAY_IDS.filter((id) => {
         const { month, day } = holidayOn(id, 2027);
         const diff = Math.round((Date.UTC(2027, month - 1, day) - Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
-        return diff <= WINDOWS[id].daysBefore && diff >= -WINDOWS[id].daysAfter;
+        const w = windowFor(id, 2027);
+        return diff <= w.daysBefore && diff >= -w.daysAfter;
       });
       expect(hits.length).toBeLessThanOrEqual(1);
       if (hits.length) on++;
     }
-    expect(on).toBe(HOLIDAY_IDS.reduce((sum, id) => sum + WINDOWS[id].daysBefore + WINDOWS[id].daysAfter + 1, 0));
+    expect(on).toBe(
+      HOLIDAY_IDS.reduce((sum, id) => {
+        const w = windowFor(id, 2027);
+        return sum + w.daysBefore + w.daysAfter + 1;
+      }, 0),
+    );
   });
 
   it('is off on an ordinary day', () => {

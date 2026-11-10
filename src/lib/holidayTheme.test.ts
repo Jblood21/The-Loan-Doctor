@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyHoliday,
   currentHoliday,
-  currentVariant,
   getHolidayPreference,
   isBorrowerFacingPath,
   isPreviewing,
@@ -104,35 +103,6 @@ describe('what is showing', () => {
     expect(getHolidayPreference()).toBe('auto');
     expect(() => setHolidayPreference('off')).not.toThrow();
     expect(currentHoliday(halloweenDay)).toBe('halloween');
-  });
-});
-
-describe('the two Thanksgiving designs under review', () => {
-  it('shows design A unless a preview link asks for B', () => {
-    expect(currentVariant()).toBe('a');
-    previewLink('?holiday=thanksgiving&variant=b');
-    expect(currentHoliday(ordinaryDay)).toBe('thanksgiving');
-    expect(currentVariant()).toBe('b');
-    previewLink('?variant=a');
-    expect(currentVariant()).toBe('a');
-  });
-
-  it('ignores a variant it does not know', () => {
-    previewLink('?variant=zzz');
-    expect(currentVariant()).toBe('a');
-    previewLink('?variant=b');
-    previewLink('?variant=zzz');
-    expect(currentVariant()).toBe('b');
-  });
-
-  it('marks the page with the design only while Thanksgiving is showing', () => {
-    previewLink('?variant=b');
-    applyHoliday('thanksgiving');
-    expect(document.documentElement.getAttribute('data-variant')).toBe('b');
-    applyHoliday('easter');
-    expect(document.documentElement.getAttribute('data-variant')).toBeNull();
-    applyHoliday(null);
-    expect(document.documentElement.getAttribute('data-holiday')).toBeNull();
   });
 });
 

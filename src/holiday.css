@@ -44,44 +44,8 @@
   --hd-web: rgba(238, 228, 252, 0.62);
 }
 
-/* ---------- Thanksgiving: two designs to choose from (data-variant a | b) ---------- */
-/* A: harvest leaves, rust and amber */
-:root[data-holiday='thanksgiving'][data-variant='a'][data-mode='light'] {
-  --brand: #9c4a1a;
-  --brand-hover: #7c3a14;
-  --brand-pressed: #5e2c0f;
-  --on-brand: #ffffff;
-  --surface-sunken: #f8f1e6;
-  --surface-tint: #f7e8d6;
-  --surface-tint-strong: #eed3b3;
-  --border: #e8dac6;
-  --focus-ring: #9c4a1a;
-  --ring-shadow: rgba(156, 74, 26, 0.32);
-  --nav-active-bg: rgba(156, 74, 26, 0.13);
-  --app-scene-scrim: linear-gradient(180deg, rgba(255, 226, 180, 0.82) 0%, rgba(250, 206, 160, 0.5) 38%, rgba(240, 190, 130, 0.34) 74%, rgba(230, 170, 110, 0.22) 100%);
-  --login-scrim: linear-gradient(90deg, rgba(255, 232, 192, 0.94) 0%, rgba(250, 210, 165, 0.7) 38%, rgba(240, 190, 130, 0.28) 68%, rgba(240, 190, 130, 0) 100%);
-}
-:root[data-holiday='thanksgiving'][data-variant='a'][data-mode='dark'] {
-  --brand: #f0a04b;
-  --brand-hover: #f5b873;
-  --brand-pressed: #dd8a32;
-  --on-brand: #241106;
-  --surface: #2a1d14;
-  --surface-sunken: #1a110b;
-  --surface-tint: #3a2819;
-  --surface-tint-strong: #4d3620;
-  --border: #4a3523;
-  --border-control: #6b5238;
-  --ink-muted: #cdb89f;
-  --focus-ring: #f5b873;
-  --ring-shadow: rgba(240, 160, 75, 0.3);
-  --nav-active-bg: rgba(240, 160, 75, 0.17);
-  --app-scene-scrim: linear-gradient(180deg, rgba(34, 20, 10, 0.86) 0%, rgba(74, 40, 16, 0.56) 36%, rgba(120, 60, 20, 0.3) 74%, rgba(50, 24, 10, 0.22) 100%);
-  --login-scrim: linear-gradient(90deg, rgba(28, 16, 8, 0.94) 0%, rgba(62, 34, 14, 0.76) 38%, rgba(100, 50, 18, 0.3) 68%, rgba(0, 0, 0, 0) 100%);
-}
-
-/* B: the table, sage green and mustard */
-:root[data-holiday='thanksgiving'][data-variant='b'][data-mode='light'] {
+/* ---------- Thanksgiving: sage green and mustard ---------- */
+:root[data-holiday='thanksgiving'][data-mode='light'] {
   --brand: #486b2c;
   --brand-hover: #3a5623;
   --brand-pressed: #2c421a;
@@ -96,7 +60,7 @@
   --app-scene-scrim: linear-gradient(180deg, rgba(232, 240, 214, 0.84) 0%, rgba(255, 240, 200, 0.5) 38%, rgba(250, 222, 170, 0.34) 74%, rgba(250, 222, 170, 0.2) 100%);
   --login-scrim: linear-gradient(90deg, rgba(236, 244, 220, 0.94) 0%, rgba(255, 242, 206, 0.72) 38%, rgba(250, 222, 170, 0.28) 68%, rgba(250, 222, 170, 0) 100%);
 }
-:root[data-holiday='thanksgiving'][data-variant='b'][data-mode='dark'] {
+:root[data-holiday='thanksgiving'][data-mode='dark'] {
   --brand: #a4d27c;
   --brand-hover: #b9e093;
   --brand-pressed: #8cbc62;
@@ -625,32 +589,6 @@
   animation: hd-fall var(--dur) linear infinite;
   animation-delay: var(--delay);
 }
-/* Design A */
-.hd-tg-litter {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: calc(34px * var(--k));
-}
-.hd-tg-patch {
-  position: absolute;
-  left: calc(-2px * var(--k));
-  bottom: calc(6px * var(--k));
-  width: calc(92px * var(--k));
-  height: auto;
-  filter: drop-shadow(0 3px 5px rgba(60, 25, 5, 0.3));
-}
-.hd-tg-sun {
-  position: absolute;
-  right: calc(4px * var(--k));
-  bottom: calc(6px * var(--k));
-  width: calc(80px * var(--k));
-  height: auto;
-  filter: drop-shadow(0 3px 5px rgba(60, 25, 5, 0.25));
-}
-/* Design B */
 .hd-tg-banner {
   position: absolute;
   top: -2px;

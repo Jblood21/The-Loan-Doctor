@@ -1,26 +1,21 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import { applyHoliday, currentVariant, isBorrowerFacingPath } from '@/lib/holidayTheme';
+import { applyHoliday, isBorrowerFacingPath } from '@/lib/holidayTheme';
 import { useHoliday } from '@/lib/useHoliday';
 import type { HolidayId } from '@/lib/holidays';
 import { ChristmasBack, ChristmasFront } from './Christmas';
 import { EasterBack, EasterFront } from './Easter';
 import { HalloweenBack, HalloweenFront } from './Halloween';
 import { July4Back, July4Front } from './July4';
-import { ThanksgivingABack, ThanksgivingAFront } from './ThanksgivingA';
-import { ThanksgivingBBack, ThanksgivingBFront } from './ThanksgivingB';
+import { ThanksgivingBack, ThanksgivingFront } from './Thanksgiving';
 import '@/holiday.css';
 
 // Each look has two layers: pieces BEHIND the page (cobwebs, fireworks) that show wherever
 // the page is clear, and pieces IN FRONT, hugging the edges.
 const ART: Record<HolidayId, { back: () => ReactNode; front: () => ReactNode }> = {
   halloween: { back: () => <HalloweenBack />, front: () => <HalloweenFront /> },
-  // Two designs while they are being compared (see currentVariant); one will remain.
-  thanksgiving: {
-    back: () => (currentVariant() === 'b' ? <ThanksgivingBBack /> : <ThanksgivingABack />),
-    front: () => (currentVariant() === 'b' ? <ThanksgivingBFront /> : <ThanksgivingAFront />),
-  },
+  thanksgiving: { back: () => <ThanksgivingBack />, front: () => <ThanksgivingFront /> },
   christmas: { back: () => <ChristmasBack />, front: () => <ChristmasFront /> },
   easter: { back: () => <EasterBack />, front: () => <EasterFront /> },
   july4: { back: () => <July4Back />, front: () => <July4Front /> },

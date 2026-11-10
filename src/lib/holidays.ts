@@ -1,10 +1,9 @@
 // Which holiday theme (if any) is showing today.
 //
-// A theme turns on a set number of days before its holiday (a week for most; Christmas
-// starts on December 1st) and stays on through the day after, then the normal look
-// comes back. Dates are the visitor's own
-// calendar day (their device clock and time zone), so the change happens at their
-// local midnight.
+// A theme turns on a set number of days before its holiday (a week for most) or on a fixed
+// date (Thanksgiving starts November 10th, Christmas December 1st), and stays on through
+// the day after, then the normal look comes back. Dates are the visitor's own calendar
+// day (their device clock and time zone), so the change happens at their local midnight.
 
 export type HolidayId = 'halloween' | 'thanksgiving' | 'christmas' | 'easter' | 'july4';
 
@@ -18,11 +17,17 @@ export const HOLIDAYS: Record<HolidayId, { name: string; short: string }> = {
 
 export const HOLIDAY_IDS = Object.keys(HOLIDAYS) as HolidayId[];
 
-/** How long each theme runs around its holiday, in whole days. */
-export const WINDOWS: Record<HolidayId, { daysBefore: number; daysAfter: number }> = {
+/** How long each theme runs around its holiday: it starts either a number of days before
+ *  the holiday or on a fixed calendar date, and ends a number of days after. */
+export type HolidayWindow = { daysAfter: number } & (
+  | { daysBefore: number }
+  | { startsOn: { month: number; day: number } }
+);
+
+export const WINDOWS: Record<HolidayId, HolidayWindow> = {
   halloween: { daysBefore: 7, daysAfter: 1 },
-  thanksgiving: { daysBefore: 7, daysAfter: 1 }, // through the day after (Black Friday)
-  christmas: { daysBefore: 24, daysAfter: 1 }, // December 1st through December 26th
+  thanksgiving: { startsOn: { month: 11, day: 10 }, daysAfter: 1 }, // November 10th through the day after (Black Friday)
+  christmas: { startsOn: { month: 12, day: 1 }, daysAfter: 1 }, // December 1st through December 26th
   easter: { daysBefore: 7, daysAfter: 1 },
   july4: { daysBefore: 7, daysAfter: 1 },
 };
@@ -71,6 +76,16 @@ export function holidayOn(id: HolidayId, year: number): { month: number; day: nu
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** The whole days before and after a holiday that its theme shows, for a given year. */
+export function windowFor(id: HolidayId, year: number): { daysBefore: number; daysAfter: number } {
+  const w = WINDOWS[id];
+  if ('daysBefore' in w) return { daysBefore: w.daysBefore, daysAfter: w.daysAfter };
+  const { month, day } = holidayOn(id, year);
+  const start = Date.UTC(year, w.startsOn.month - 1, w.startsOn.day);
+  const holiday = Date.UTC(year, month - 1, day);
+  return { daysBefore: Math.round((holiday - start) / DAY_MS), daysAfter: w.daysAfter };
+}
+
 /** Whole calendar days from `from` to the holiday (negative once it has passed). */
 function daysUntil(from: Date, month: number, day: number): number {
   // Compare calendar days in UTC so a daylight-saving change can't shift the count.
@@ -84,7 +99,7 @@ export function activeHoliday(now: Date = new Date()): HolidayId | null {
   for (const id of HOLIDAY_IDS) {
     const { month, day } = holidayOn(id, now.getFullYear());
     const left = daysUntil(now, month, day);
-    const { daysBefore, daysAfter } = WINDOWS[id];
+    const { daysBefore, daysAfter } = windowFor(id, now.getFullYear());
     if (left <= daysBefore && left >= -daysAfter) return id;
   }
   return null;
