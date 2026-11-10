@@ -97,6 +97,9 @@ const EMPTY = {
   agents: [], assignments: [], agentShares: [], resetTokens: {}, counters: { preApprovals: 0 },
   // Billing: teams, their invitations, access codes, and a few deployment-level facts.
   orgs: [], invites: [], accessCodes: [], billingMeta: {}, stripeEvents: [],
+  // Integrations: per-account GoHighLevel webhook + email preference, API keys, and the
+  // invitations a loan officer sends to real-estate agents.
+  integrations: {}, apiKeys: [], agentInvites: [],
 };
 
 let db = structuredClone(EMPTY);
@@ -613,6 +616,108 @@ export function deleteAssignment(id) {
   db.assignments.splice(i, 1);
   persist();
   return true;
+}
+
+// ---- integrations ------------------------------------------------------
+// One small record per account (loan-officer user id or agent id): the GoHighLevel
+// webhook address, whether it is on, and whether activity emails are wanted.
+export function getIntegrations(accountId) {
+  return db.integrations[accountId] || {};
+}
+export function setIntegrations(accountId, patch) {
+  db.integrations[accountId] = { ...(db.integrations[accountId] || {}), ...patch };
+  persist();
+  return db.integrations[accountId];
+}
+
+// ---- API keys ----------------------------------------------------------
+// Only a SHA-256 of each key is stored; the key itself is shown once, when created.
+export function hashApiKey(key) {
+  return createHash('sha256').update(String(key || '')).digest('hex');
+}
+export function addApiKey({ kind, ownerId, name }) {
+  const key = `lbc_live_${randomBytes(24).toString('base64url')}`;
+  const rec = {
+    id: `key_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
+    kind, // 'user' (loan officer) or 'agent'
+    ownerId,
+    name: String(name || 'API key').slice(0, 60),
+    hash: hashApiKey(key),
+    last4: key.slice(-4),
+    createdAt: new Date().toISOString(),
+    lastUsedAt: null,
+    revokedAt: null,
+  };
+  db.apiKeys.push(rec);
+  persist();
+  return { key, record: rec };
+}
+export function findApiKeyByRaw(raw) {
+  const h = hashApiKey(raw);
+  return db.apiKeys.find((k) => !k.revokedAt && timingSafeEqualStr(k.hash, h));
+}
+export function listApiKeys(kind, ownerId) {
+  return db.apiKeys.filter((k) => k.kind === kind && k.ownerId === ownerId && !k.revokedAt);
+}
+export function revokeApiKey(id, kind, ownerId) {
+  const k = db.apiKeys.find((x) => x.id === id && x.kind === kind && x.ownerId === ownerId && !x.revokedAt);
+  if (!k) return false;
+  k.revokedAt = new Date().toISOString();
+  persist();
+  return true;
+}
+/** Remember when a key was last used (written at most once a minute). */
+export function touchApiKey(k) {
+  const now = Date.now();
+  if (k.lastUsedAt && now - Date.parse(k.lastUsedAt) < 60_000) return;
+  k.lastUsedAt = new Date(now).toISOString();
+  persist();
+}
+
+// ---- agent invitations (loan officer → agent) ---------------------------
+export function addAgentInvite({ ownerId, ownerName, email, name = '' }) {
+  const inv = {
+    id: `inv_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
+    token: randomBytes(24).toString('base64url'),
+    ownerId,
+    ownerName: String(ownerName || ''),
+    email: normalizeEmail(email),
+    name: String(name || '').slice(0, 120),
+    createdAt: new Date().toISOString(),
+    acceptedAt: null,
+    agentId: null,
+  };
+  db.agentInvites.push(inv);
+  persist();
+  return inv;
+}
+export function findAgentInviteByToken(token) {
+  const t = String(token || '');
+  return t ? db.agentInvites.find((i) => timingSafeEqualStr(i.token, t)) : undefined;
+}
+export function getAgentInvitesByOwner(ownerId) {
+  return db.agentInvites.filter((i) => i.ownerId === ownerId);
+}
+export function getAgentInvitesByEmail(email) {
+  const e = normalizeEmail(email);
+  return db.agentInvites.filter((i) => i.email === e);
+}
+export function updateAgentInvite(id, patch) {
+  const i = db.agentInvites.find((x) => x.id === id);
+  if (!i) return null;
+  Object.assign(i, patch);
+  persist();
+  return i;
+}
+export function removeAgentInvite(id, ownerId) {
+  const idx = db.agentInvites.findIndex((i) => i.id === id && i.ownerId === ownerId);
+  if (idx < 0) return false;
+  db.agentInvites.splice(idx, 1);
+  persist();
+  return true;
+}
+export function getAssignments() {
+  return db.assignments;
 }
 
 // ---- counters ----------------------------------------------------------

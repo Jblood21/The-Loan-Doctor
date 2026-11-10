@@ -130,6 +130,29 @@ matters even more once people are paying.
 
 ---
 
+## GoHighLevel, agents and the API
+
+Loan officers and real estate agents each get an **Integrations** screen (sidebar for loan officers, a tab in the agent portal). Nothing needs turning on for the site owner.
+
+**What people can do**
+- **GoHighLevel → Basecamp** (loan officers): in a GoHighLevel workflow add a *Custom Webhook* action (POST) pointed at the address shown on the Integrations screen. GoHighLevel's standard contact fields (name, email, phone, address) are understood, and the contact appears in the borrower search.
+- **Basecamp → GoHighLevel** (loan officers and agents): paste the address from a workflow's *Inbound Webhook* trigger. Basecamp then sends a small JSON update when a pre-approval is assigned, a loan changes stage, an agent edits or shares a letter, asks for a refresh, joins, or a letter is about to expire. The other person's `first_name`, `last_name`, `email` and `phone` are at the top of every update, so a workflow can create or update a contact with no mapping.
+- **API keys**: made on the same screen, shown once, deletable. A key reaches only `/api/v1` (never the rest of the app). Loan officer keys can list pre-approvals, move a loan to a new stage (by id, or by buyer name when exactly one loan matches) and invite agents; agent keys can list their pre-approvals, update the address/price (when allowed) and ask for a refresh.
+
+**Agents**
+- Loan officers can invite an agent by email (Agents page); the agent's sign-up opens already connected, and works even when `ALLOW_SIGNUP=false`. The Agents page shows who has joined, how many pre-approvals each has, and when they were last active.
+- Each pre-approval has a loan stage (pre-approved → under contract → appraisal → clear to close → closed, or cancelled) that the loan officer sets and the agent sees. Only the stage is shared, never numbers.
+- If the letter states a validity period, both people are reminded a week before it lapses (a third of the way from the end for short ones), once.
+- The agent Marketing tab (open-house flyer and buyer page) is on. An agent may add a loan officer who sent them a pre-approval; that officer's name, NMLS numbers and contact details come from the letter they issued, plus an Equal Housing line.
+
+**Emails** (assigned, stage changed, agent edits, refresh requests, expiring, invitations) need Resend: set `RESEND_API_KEY` and `MAIL_FROM`. Without them those emails are skipped (the screens and GoHighLevel updates still work), and the Integrations screen says so. Everyone can turn their own emails off there.
+
+**Good to know**
+- Webhook addresses must be https and on a GoHighLevel host. For a white-label domain add it to `WEBHOOK_ALLOWED_HOSTS`.
+- Failed deliveries retry twice (network errors, 429, 5xx). The "Recent activity" list on the Integrations screen shows what happened; it is kept in memory and resets when the server restarts.
+- Pending retries and the hourly expiry check run inside the server. If the server restarts mid-retry that one update is lost; nothing else is.
+- Not tested against a live GoHighLevel account, only against a stand-in that behaves like its webhook. Use *Send a test* after connecting.
+
 ## Showing up on Google
 
 The site has a public home page at `/` that search engines can read, plus `/robots.txt` and

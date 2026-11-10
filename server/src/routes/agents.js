@@ -13,17 +13,22 @@ import {
   normalizeEmail,
   getAssignmentsByAgentEmail,
   findAssignmentById,
-  updateAssignment,
   addAgentShare,
   findLetterShareForAssignment,
+  findAgentInviteByToken,
 } from '../store.js';
 import { requireAgent, signAgentToken } from '../auth.js';
 import { requestPasswordReset, performPasswordReset } from '../passwordReset.js';
 import { streamLetterPdf } from '../lib/letterPdfRender.js';
-import { assignmentLetterPayload, cappedPrice } from '../lib/assignmentLetter.js';
+import { assignmentLetterPayload } from '../lib/assignmentLetter.js';
 import { publicAssignment } from './preapproval.js';
 import { parseReportSections, streamReportPdf } from './report.js';
 import { streamFlyerPdf } from '../lib/flyerPdf.js';
+import { applyAgentEdit, requestRefresh } from '../lib/lifecycle.js';
+import { agentArrived } from '../lib/roster.js';
+import { lenderFromAssignment } from '../lib/lenderBlock.js';
+import { emitPreapproval } from '../integrations/events.js';
+import { integrationsRouter } from './integrations.js';
 
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,17 +36,30 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Open registration — agents self-serve, exactly like loan officers. Set
 // ALLOW_SIGNUP=false to close both surfaces for abuse.
 const SIGNUPS_OPEN = process.env.ALLOW_SIGNUP !== 'false';
+const baseUrl = (req) => process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
 
 router.post('/auth/register', (req, res) => {
   const { password, name = '', phone = '' } = req.body || {};
   const email = normalizeEmail(req.body?.email);
-  if (!SIGNUPS_OPEN) return res.status(403).json({ error: 'Sign-up is temporarily closed. Please try again later.' });
+  // A real invitation from a loan officer gets through even while public sign-up is closed.
+  const invite = findAgentInviteByToken(req.body?.invite);
+  const invited = !!invite && invite.email === email && !invite.acceptedAt;
+  if (!SIGNUPS_OPEN && !invited) return res.status(403).json({ error: 'Sign-up is temporarily closed. Please try again later.' });
   if (!EMAIL_RE.test(email || '')) return res.status(400).json({ error: 'A valid email is required' });
   if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
   if (findAgentByEmail(email)) return res.status(409).json({ error: 'An account with that email already exists' });
 
   const agent = addAgent({ email, password, name: String(name).slice(0, 120), phone: String(phone).slice(0, 40) });
+  updateAgent(agent.id, { lastLoginAt: new Date().toISOString() });
+  agentArrived(agent, { firstTime: true, base: baseUrl(req) });
   res.status(201).json({ token: signAgentToken(agent), agent: publicAgent(agent) });
+});
+
+// What the sign-up screen needs to greet someone who followed an invitation link.
+router.get('/auth/invite-info', (req, res) => {
+  const inv = findAgentInviteByToken(req.query.token);
+  if (!inv || inv.acceptedAt) return res.status(404).json({ error: 'This invitation is no longer available.' });
+  res.json({ email: inv.email, name: inv.name, invitedBy: inv.ownerName });
 });
 
 router.post('/auth/login', (req, res) => {
@@ -51,6 +69,8 @@ router.post('/auth/login', (req, res) => {
     return res.status(401).json({ error: 'Incorrect email or password' });
   }
   if (agent.status && agent.status !== 'Active') return res.status(403).json({ error: 'This account is inactive.' });
+  updateAgent(agent.id, { lastLoginAt: new Date().toISOString() });
+  agentArrived(agent, { base: baseUrl(req) });
   res.json({ token: signAgentToken(agent), agent: publicAgent(agent) });
 });
 
@@ -122,18 +142,18 @@ router.get('/assignments/:id', requireAgent, (req, res) => {
 router.patch('/assignments/:id', requireAgent, (req, res) => {
   const a = ownedAssignment(req);
   if (!a) return res.status(404).json({ error: 'Assignment not found' });
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const patch = { editedByAgentAt: new Date().toISOString() };
-  if (body.propertyAddress !== undefined) {
-    const addr = String(body.propertyAddress || '').trim();
-    if (!addr) return res.status(400).json({ error: 'A property address is required' });
-    patch.propertyAddress = addr.slice(0, 300);
-  }
-  if (body.price !== undefined) {
-    if (!a.allowPriceChange) return res.status(403).json({ error: 'Price changes are not enabled for this pre-approval.' });
-    patch.price = cappedPrice(body.price, a.approvedPrice);
-  }
-  res.json({ assignment: publicAssignment(updateAssignment(a.id, patch)) });
+  const r = applyAgentEdit(a, req.body, { base: baseUrl(req) });
+  if (!r.ok) return res.status(r.status).json({ error: r.error });
+  res.json({ assignment: publicAssignment(r.assignment) });
+});
+
+// Ask the loan officer for a refreshed letter (e.g. it is about to expire).
+router.post('/assignments/:id/refresh-request', requireAgent, (req, res) => {
+  const a = ownedAssignment(req);
+  if (!a) return res.status(404).json({ error: 'Assignment not found' });
+  const r = requestRefresh(a, { base: baseUrl(req) });
+  if (!r.ok) return res.status(r.status).json({ error: r.error });
+  res.json({ assignment: publicAssignment(r.assignment) });
 });
 
 // Render the assignment's letter (server rebuilds it from the stored snapshot + the
@@ -160,9 +180,21 @@ router.post('/report/pdf', requireAgent, (req, res) => {
 
 // Open-house / listing payment flyer — client computes the payment scenarios; this
 // renders a branded one-pager.
+/** The loan officer an agent chose to co-brand with, taken from a pre-approval assigned to them. */
+function chosenLender(req) {
+  const id = req.body && typeof req.body === 'object' ? req.body.loanOfficerFrom : null;
+  if (!id) return { lender: null };
+  const a = findAssignmentById(String(id));
+  if (!a || a.agentEmail !== req.agent.email) return { error: 'That loan officer is not one of yours.' };
+  return { lender: lenderFromAssignment(a) };
+}
+
 router.post('/flyer/pdf', requireAgent, (req, res) => {
   const b = req.body && typeof req.body === 'object' ? req.body : {};
+  const picked = chosenLender(req);
+  if (picked.error) return res.status(404).json({ error: picked.error });
   streamFlyerPdf(res, {
+    lender: picked.lender,
     agent: agentBranding(req.agent),
     listing: b.listing,
     terms: b.terms,
@@ -175,7 +207,11 @@ router.post('/assignments/:id/share', requireAgent, (req, res) => {
   const a = ownedAssignment(req);
   if (!a) return res.status(404).json({ error: 'Assignment not found' });
   let share = findLetterShareForAssignment(a.id);
-  if (!share) share = addAgentShare({ kind: 'letter', agentId: req.agent.id, assignmentId: a.id });
+  if (!share) {
+    share = addAgentShare({ kind: 'letter', agentId: req.agent.id, assignmentId: a.id });
+    // The loan officer hears about it the first time the link is made.
+    emitPreapproval('preapproval.shared', a, { base: baseUrl(req), source: 'agent' });
+  }
   res.status(201).json({ token: share.token });
 });
 
@@ -190,8 +226,13 @@ router.post('/share/afford', requireAgent, (req, res) => {
     headline: s(b.headline, 120),
     rows,
   };
-  const share = addAgentShare({ kind: 'afford', agentId: req.agent.id, agent: agentBranding(req.agent), data });
+  const picked = chosenLender(req);
+  if (picked.error) return res.status(404).json({ error: picked.error });
+  const share = addAgentShare({ kind: 'afford', agentId: req.agent.id, agent: agentBranding(req.agent), data, lender: picked.lender });
   res.status(201).json({ token: share.token });
 });
+
+// The agent's GoHighLevel connection, email preference and API keys.
+router.use('/integrations', integrationsRouter('agent'));
 
 export default router;

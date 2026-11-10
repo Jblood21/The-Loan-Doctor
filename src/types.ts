@@ -326,6 +326,9 @@ export interface LoanOfficerContact {
   company: string;
 }
 
+/** Where a buyer's loan stands. Only a stage name is ever shared with the agent. */
+export type LoanStatus = 'preapproved' | 'under_contract' | 'appraisal' | 'clear_to_close' | 'closed' | 'cancelled';
+
 /** A pre-approval a loan officer assigned to an agent for light editing. */
 export interface Assignment {
   id: string;
@@ -340,11 +343,83 @@ export interface Assignment {
   createdAt: string;
   updatedAt: string;
   editedByAgentAt: string | null;
+  status: LoanStatus;
+  statusUpdatedAt: string | null;
+  statusHistory: { status: LoanStatus; at: string }[];
+  /** When the letter lapses (only tracked when the letter states a validity period). */
+  expiresAt: string | null;
+  refreshRequestedAt: string | null;
+  /** Loan-officer view only: has the agent created their account yet? */
+  agentActive?: boolean;
+}
+
+/** One agent in a loan officer's roster. */
+export interface RosterAgent {
+  email: string;
+  name: string;
+  brokerage: string;
+  phone: string;
+  /** active = has an account; invited = invitation sent; no_account = assigned work, no account yet */
+  status: 'active' | 'invited' | 'no_account';
+  invitedAt: string | null;
+  inviteId: string | null;
+  joinedAt: string | null;
+  lastLoginAt: string | null;
+  assignments: number;
+  open: number;
+  lastActivityAt: string | null;
+}
+
+/** An API key as listed (the secret itself is shown only once, when it is made). */
+export interface ApiKeyInfo {
+  id: string;
+  name: string;
+  last4: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface DeliveryEntry {
+  at: string;
+  event: string;
+  channel: 'ghl' | 'email';
+  ok: boolean;
+  status?: number;
+  error?: string;
+  skipped?: string;
+}
+
+/** Everything the Integrations screen shows, for a loan officer or an agent. */
+export interface IntegrationsView {
+  kind: 'lo' | 'agent';
+  ghl: { connected: boolean; enabled: boolean; url: string };
+  notifyEmail: boolean;
+  emailConfigured: boolean;
+  events: { event: string; label: string; about: string; email: boolean; ghl: boolean }[];
+  apiKeys: ApiKeyInfo[];
+  deliveries: DeliveryEntry[];
+  apiBase: string;
+  /** Loan officers only: the address GoHighLevel can send contacts to. */
+  inboundUrl: string | null;
+}
+
+/** The loan officer details printed on an agent's flyer or buyer page (copied from their letter). */
+export interface ShareLender {
+  officerName: string;
+  officerTitle: string;
+  officerNmls: string;
+  company: string;
+  companyNmls: string;
+  phone: string;
+  email: string;
+  website: string;
 }
 
 /** A public share (buyer-facing) — a pre-approval letter or an affordability snapshot. */
 export interface ShareView {
   kind: 'letter' | 'afford';
+  /** Affordability pages only: the loan officer the agent chose to co-brand with. */
+  lender?: ShareLender | null;
   createdAt?: string;
   // letter
   borrowerName?: string;

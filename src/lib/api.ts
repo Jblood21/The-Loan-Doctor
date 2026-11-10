@@ -3,7 +3,7 @@
 // In development the Vite dev server proxies /api to the Express backend, so
 // API_BASE can stay empty. In production set VITE_API_BASE to the API origin.
 
-import type { AccessCode, AdminBilling, AdminUser, Assignment, BillingStatus, CodeKind, PreApprovalRecord, Scenario, Settings, User } from '@/types';
+import type { AccessCode, AdminBilling, AdminUser, ApiKeyInfo, Assignment, BillingStatus, CodeKind, DeliveryEntry, IntegrationsView, PreApprovalRecord, RosterAgent, Scenario, Settings, User } from '@/types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
 const TOKEN_KEY = 'loandr.token';
@@ -172,6 +172,19 @@ export const api = {
   createAssignment: (payload: unknown) => request<{ assignment: Assignment }>('POST', '/preapproval/assignments', payload),
   updateAssignment: (id: string, patch: unknown) => request<{ assignment: Assignment }>('PATCH', `/preapproval/assignments/${id}`, patch),
   deleteAssignment: (id: string) => request<{ ok: boolean }>('DELETE', `/preapproval/assignments/${id}`),
+  listRoster: () => request<{ agents: RosterAgent[] }>('GET', '/preapproval/agents'),
+  inviteAgent: (data: { email: string; name?: string }) =>
+    request<{ emailed: boolean; link: string; agents: RosterAgent[] }>('POST', '/preapproval/agents/invite', data),
+  cancelAgentInvite: (id: string) => request<{ agents: RosterAgent[] }>('DELETE', `/preapproval/agents/invites/${id}`),
+
+  // Integrations (GoHighLevel webhook, activity emails, API keys)
+  integrations: () => request<IntegrationsView>('GET', '/integrations'),
+  saveGhl: (body: { url?: string; enabled?: boolean }) => request<IntegrationsView>('PUT', '/integrations/ghl', body),
+  disconnectGhl: () => request<IntegrationsView>('DELETE', '/integrations/ghl'),
+  testGhl: () => request<{ ok: boolean; status: number; error: string | null; deliveries: DeliveryEntry[] }>('POST', '/integrations/ghl/test'),
+  setNotifyEmail: (notifyEmail: boolean) => request<IntegrationsView>('PUT', '/integrations/preferences', { notifyEmail }),
+  createApiKey: (name: string) => request<{ key: string; apiKeys: ApiKeyInfo[] }>('POST', '/integrations/keys', { name }),
+  deleteApiKey: (id: string) => request<{ apiKeys: ApiKeyInfo[] }>('DELETE', `/integrations/keys/${id}`),
 
   // AI assistant (Claude, server-side) for the loan comparison
   aiCompare: (question: string, context: string) => request<{ answer: string }>('POST', '/ai/compare', { question, context }),

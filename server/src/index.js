@@ -24,6 +24,10 @@ import shareRoutes from './routes/share.js';
 import aiRoutes from './routes/ai.js';
 import censusRoutes from './routes/census.js';
 import reportRoutes from './routes/report.js';
+import v1Routes from './routes/v1.js';
+import { integrationsRouter } from './routes/integrations.js';
+import { getAssignments } from './store.js';
+import { runExpiryReminders } from './lib/lifecycle.js';
 import billingRoutes, { stripeWebhook } from './routes/billing.js';
 import { landingHtml, noindexExceptHome, robotsTxt, siteBase, sitemapXml } from './seo.js';
 import { billingEnabled } from './billing/config.js';
@@ -73,11 +77,15 @@ const webhookLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeader
 // The AI assistant costs money per call — cap it; Census is a courtesy limit.
 const aiLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 const billingLimiter = rateLimit({ windowMs: 60 * 1000, max: 90, standardHeaders: true, legacyHeaders: false });
+// The public API is called by automation tools, so it gets a more generous ceiling.
+const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 240, standardHeaders: true, legacyHeaders: false });
 const censusLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, ...BUILD }));
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/billing', billingLimiter, billingRoutes);
+app.use('/api/v1', apiLimiter, v1Routes);
+app.use('/api/integrations', billingLimiter, integrationsRouter('user'));
 app.use('/api/settings', settingsRoutes);
 app.use('/api/scenarios', scenarioRoutes);
 app.use('/api/admin', adminRoutes);
@@ -142,6 +150,20 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
 }
 
 seed();
+
+// Remind people before a pre-approval letter lapses. Runs shortly after start and then on a
+// timer (REMINDER_CHECK_MS, default hourly); each letter is only ever reminded once.
+const REMINDER_EVERY_MS = Number(process.env.REMINDER_CHECK_MS) > 0 ? Number(process.env.REMINDER_CHECK_MS) : 60 * 60 * 1000;
+const sweepReminders = () => {
+  try {
+    runExpiryReminders(getAssignments(), Date.now(), process.env.PUBLIC_BASE_URL);
+  } catch (err) {
+    console.error('[reminders]', err && err.message ? err.message : err);
+  }
+};
+setTimeout(sweepReminders, 30 * 1000).unref();
+setInterval(sweepReminders, REMINDER_EVERY_MS).unref();
+
 // Pin down the moment billing was switched on, so accounts that already exist get the
 // longer "existing account" trial counted from today rather than from their sign-up date.
 if (billingEnabled()) noteBillingEnabled();
