@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WINDOWS, activeHoliday, easterSunday, holidayOn, HOLIDAY_IDS } from './holidays';
+import { WINDOWS, activeHoliday, easterSunday, holidayOn, HOLIDAY_IDS, thanksgivingDay } from './holidays';
 import type { HolidayId } from './holidays';
 
 // Local-time dates, the way a visitor's device would report them.
@@ -34,6 +34,35 @@ describe('easterSunday', () => {
   });
 });
 
+describe('thanksgivingDay', () => {
+  // Published dates of U.S. Thanksgiving.
+  const known: [number, number][] = [
+    [2023, 23],
+    [2024, 28],
+    [2025, 27],
+    [2026, 26],
+    [2027, 25],
+    [2028, 23],
+    [2029, 22],
+    [2030, 28],
+    [2031, 27],
+    [2032, 25],
+  ];
+  it.each(known)('%i is November %i', (year, day) => {
+    expect(thanksgivingDay(year)).toEqual({ month: 11, day });
+  });
+
+  it('is always the fourth Thursday of November', () => {
+    for (let y = 1990; y <= 2100; y++) {
+      const { month, day } = thanksgivingDay(y);
+      expect(month).toBe(11);
+      expect(new Date(y, 10, day).getDay()).toBe(4);
+      expect(day).toBeGreaterThanOrEqual(22);
+      expect(day).toBeLessThanOrEqual(28);
+    }
+  });
+});
+
 describe('the window around each holiday', () => {
   const shift = (y: number, id: HolidayId, deltaDays: number, h = 12) => {
     const { month, day } = holidayOn(id, y);
@@ -62,6 +91,11 @@ describe('the window around each holiday', () => {
     // Christmas runs from December 1st through December 26th.
     expect(activeHoliday(at(2026, 11, 30))).toBeNull();
     expect(activeHoliday(at(2026, 12, 1))).toBe('christmas');
+    // Thanksgiving 2026 is November 26, so the theme runs November 19 to 27.
+    expect(activeHoliday(at(2026, 11, 18))).toBeNull();
+    expect(activeHoliday(at(2026, 11, 19))).toBe('thanksgiving');
+    expect(activeHoliday(at(2026, 11, 27))).toBe('thanksgiving');
+    expect(activeHoliday(at(2026, 11, 28))).toBeNull();
     expect(activeHoliday(at(2026, 12, 18))).toBe('christmas');
     expect(activeHoliday(at(2026, 12, 26))).toBe('christmas');
     expect(activeHoliday(at(2026, 12, 27))).toBeNull();

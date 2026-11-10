@@ -6,10 +6,11 @@
 // calendar day (their device clock and time zone), so the change happens at their
 // local midnight.
 
-export type HolidayId = 'halloween' | 'christmas' | 'easter' | 'july4';
+export type HolidayId = 'halloween' | 'thanksgiving' | 'christmas' | 'easter' | 'july4';
 
 export const HOLIDAYS: Record<HolidayId, { name: string; short: string }> = {
   halloween: { name: 'Halloween', short: 'Halloween' },
+  thanksgiving: { name: 'Thanksgiving', short: 'Thanksgiving' },
   christmas: { name: 'Christmas', short: 'Christmas' },
   easter: { name: 'Easter', short: 'Easter' },
   july4: { name: 'Fourth of July', short: 'July 4th' },
@@ -20,6 +21,7 @@ export const HOLIDAY_IDS = Object.keys(HOLIDAYS) as HolidayId[];
 /** How long each theme runs around its holiday, in whole days. */
 export const WINDOWS: Record<HolidayId, { daysBefore: number; daysAfter: number }> = {
   halloween: { daysBefore: 7, daysAfter: 1 },
+  thanksgiving: { daysBefore: 7, daysAfter: 1 }, // through the day after (Black Friday)
   christmas: { daysBefore: 24, daysAfter: 1 }, // December 1st through December 26th
   easter: { daysBefore: 7, daysAfter: 1 },
   july4: { daysBefore: 7, daysAfter: 1 },
@@ -44,11 +46,20 @@ export function easterSunday(year: number): { month: number; day: number } {
   return { month, day };
 }
 
+/** U.S. Thanksgiving: the fourth Thursday of November. */
+export function thanksgivingDay(year: number): { month: number; day: number } {
+  const firstOfNovember = new Date(year, 10, 1).getDay(); // 0 = Sunday … 4 = Thursday
+  const firstThursday = 1 + ((4 - firstOfNovember + 7) % 7);
+  return { month: 11, day: firstThursday + 21 };
+}
+
 /** Month (1-12) and day of a holiday in a given year. */
 export function holidayOn(id: HolidayId, year: number): { month: number; day: number } {
   switch (id) {
     case 'halloween':
       return { month: 10, day: 31 };
+    case 'thanksgiving':
+      return thanksgivingDay(year);
     case 'christmas':
       return { month: 12, day: 25 };
     case 'july4':

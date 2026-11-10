@@ -22,7 +22,8 @@ export function HolidayToggle() {
     >
       <span className="flex items-center gap-2.5 whitespace-nowrap">
         <Sparkles size={18} />
-        {short} theme
+        {/* Long names drop the word "theme" so the switch still fits the sidebar. */}
+        {short.length > 10 ? short : `${short} theme`}
       </span>
       <span
         aria-hidden

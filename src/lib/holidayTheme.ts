@@ -14,6 +14,7 @@ import type { HolidayId } from './holidays';
 
 const PREF_KEY = 'lbc-holiday';
 const PREVIEW_KEY = 'lbc-holiday-preview';
+const VARIANT_KEY = 'lbc-holiday-variant';
 const CHANGE_EVENT = 'lbc-holiday-change';
 
 export type HolidayPreference = 'auto' | 'off';
@@ -35,11 +36,29 @@ export function setHolidayPreference(pref: HolidayPreference): void {
   notifyHolidayChange();
 }
 
-/** Read ?holiday= from the address once and remember it for this tab. */
+// TEMPORARY, while the two Thanksgiving designs are being compared: ?variant=a or b
+// picks which one a preview shows. Once one is chosen this goes away.
+export type HolidayVariant = 'a' | 'b';
+const DEFAULT_VARIANT: HolidayVariant = 'a';
+
+export function currentVariant(): HolidayVariant {
+  try {
+    const v = sessionStorage.getItem(VARIANT_KEY);
+    if (v === 'a' || v === 'b') return v;
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_VARIANT;
+}
+
+/** Read ?holiday= (and ?variant=) from the address once and remember it for this tab. */
 export function readPreviewFromUrl(): void {
   try {
-    const value = new URLSearchParams(window.location.search).get('holiday');
+    const params = new URLSearchParams(window.location.search);
+    const value = params.get('holiday');
     if (value === 'off' || isHolidayId(value)) sessionStorage.setItem(PREVIEW_KEY, value);
+    const variant = params.get('variant');
+    if (variant === 'a' || variant === 'b') sessionStorage.setItem(VARIANT_KEY, variant);
   } catch {
     /* ignore */
   }
@@ -85,6 +104,9 @@ export function applyHoliday(id: HolidayId | null): void {
   const root = document.documentElement;
   if (id) root.setAttribute('data-holiday', id);
   else root.removeAttribute('data-holiday');
+  // Only Thanksgiving has two designs to choose between for now.
+  if (id === 'thanksgiving') root.setAttribute('data-variant', currentVariant());
+  else root.removeAttribute('data-variant');
 }
 
 /** Tell every part of the page that the holiday (or the switch) changed. */
