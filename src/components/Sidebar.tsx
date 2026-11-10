@@ -11,6 +11,7 @@ import {
   LogOut,
   MonitorDown,
   CreditCard,
+  Plug,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { Logo } from './Logo';
@@ -32,6 +33,7 @@ const WORKSPACE: NavItem[] = [
   { to: '/hecm', label: 'Reverse (HECM)', icon: Building2 },
   { to: '/pre-approval', label: 'Pre-Approval', icon: FileText },
   { to: '/agents', label: 'Agents', icon: Users },
+  { to: '/integrations', label: 'Integrations', icon: Plug },
   { to: '/tools', label: 'Tools', icon: Wrench },
   { to: '/help', label: 'Help Center', icon: HelpCircle },
 ];

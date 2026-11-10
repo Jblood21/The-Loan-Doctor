@@ -12,6 +12,7 @@ import Tools from '@/pages/Tools';
 import Help from '@/pages/Help';
 import Admin from '@/pages/Admin';
 import Agents from '@/pages/Agents';
+import Integrations from '@/pages/Integrations';
 import SharedQuote from '@/pages/SharedQuote';
 import AgentPortal from '@/pages/AgentPortal';
 import AgentShare from '@/pages/AgentShare';
@@ -25,6 +26,7 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/hecm', 'Reverse (HECM)'],
   ['/pre-approval', 'Pre-Approval'],
   ['/agents', 'Agents'],
+  ['/integrations', 'Integrations'],
   ['/tools', 'Tools'],
   ['/help', 'Help Center'],
   ['/admin', 'Admin'],
@@ -95,6 +97,7 @@ function AppRoutes() {
         <Route path="/tools" element={<Tools />} />
         <Route path="/help" element={<Help />} />
         <Route path="/agents" element={<Agents />} />
+        <Route path="/integrations" element={<Integrations />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/" element={<Navigate to="/compare" replace />} />

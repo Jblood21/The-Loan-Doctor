@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/Button';
@@ -12,6 +12,10 @@ import { affordability } from '@/lib/affordability';
 import { ReportProvider } from '@/context/ReportContext';
 import { ToolsWorkspace } from '@/components/ToolsWorkspace';
 import { Modal } from '@/components/ui/Modal';
+import { StatusTracker } from '@/components/StatusTracker';
+import { IntegrationsPanel } from '@/components/IntegrationsPanel';
+import type { IntegrationsClient } from '@/components/IntegrationsPanel';
+import { expiryState } from '@/lib/loanStatus';
 import type { AgentUser, Assignment } from '@/types';
 
 /**
@@ -83,6 +87,26 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [devLink, setDevLink] = useState('');
+  // A loan officer's invitation link (/agent?invite=…) opens straight to sign-up with the
+  // address filled in, and connects the new account to that loan officer.
+  const [invite, setInvite] = useState('');
+  const [invitedBy, setInvitedBy] = useState('');
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('invite');
+    if (!token) return;
+    agentApi
+      .inviteInfo(token)
+      .then((info) => {
+        setInvite(token);
+        setInvitedBy(info.invitedBy);
+        setEmail(info.email);
+        setName(info.name || '');
+        setMode('register');
+      })
+      .catch(() => {
+        /* an old or used link: just show the normal sign-in */
+      });
+  }, []);
 
   // Switch between sign-in / register / forgot-password, clearing transient messages.
   const switchMode = (next: 'login' | 'register' | 'forgot') => {
@@ -107,7 +131,7 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
       const res =
         mode === 'login'
           ? await agentApi.login({ email: cleanEmail, password })
-          : await agentApi.register({ email: cleanEmail, password, name: name.trim(), phone: phone.trim() });
+          : await agentApi.register({ email: cleanEmail, password, name: name.trim(), phone: phone.trim(), invite: invite || undefined });
       setAgentToken(res.token, remember);
       onAuthed(res.agent);
     } catch (err) {
@@ -128,7 +152,9 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
               {mode === 'login'
                 ? 'Sign in to your assigned pre-approvals.'
                 : mode === 'register'
-                  ? 'Create your agent account to get started.'
+                  ? invitedBy
+                    ? `${invitedBy} invited you. Create your free agent account to get started.`
+                    : 'Create your agent account to get started.'
                   : 'Enter your email and we’ll send you a link to set a new password.'}
             </p>
           </div>
@@ -244,41 +270,37 @@ function AgentAuth({ onAuthed }: { onAuthed: (a: AgentUser) => void }) {
   );
 }
 
-type AgentTab = 'preapprovals' | 'tools' | 'marketing';
+type AgentTab = 'preapprovals' | 'tools' | 'marketing' | 'integrations';
 
-/** The signed-in agent shell: switches between Pre-Approvals, Tools, and Marketing. */
+/** The signed-in agent shell: switches between Pre-Approvals, Tools, Marketing, and Integrations. */
 function AgentDashboard({ agent, onSignOut, onAgentUpdate }: { agent: AgentUser; onSignOut: () => void; onAgentUpdate: (a: AgentUser) => void }) {
   const [tab, setTab] = useState<AgentTab>('preapprovals');
   const [profileOpen, setProfileOpen] = useState(false);
   const { canInstall, installed, promptInstall } = useInstallPrompt();
-  const navBtn = (key: AgentTab, label: string, soon = false) => (
+  const navBtn = (key: AgentTab, label: string) => (
     <button
       onClick={() => setTab(key)}
-      className={`flex items-center gap-1.5 rounded-[9px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+      className={`flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
         tab === key ? 'bg-[rgba(47,128,237,0.14)] text-brand-blue-nav' : 'text-text-soft hover:text-text-primary'
       }`}
     >
       {label}
-      {soon && (
-        <span className="rounded-full bg-[rgba(140,165,195,0.16)] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.04em] text-text-dim">
-          Soon
-        </span>
-      )}
     </button>
   );
 
   return (
     <div className="min-h-screen bg-app">
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border bg-sidebar/95 px-5 py-3 backdrop-blur">
-        <div className="flex items-center gap-4">
-          <Logo size={28} wordmark={17} />
-          <nav className="flex items-center gap-1">
-            {navBtn('preapprovals', 'Pre-Approvals')}
-            {navBtn('tools', 'Tools')}
-            {navBtn('marketing', 'Marketing', true)}
-          </nav>
-        </div>
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-20 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-sidebar/95 px-5 py-3 backdrop-blur">
+        <Logo size={28} wordmark={17} />
+        {/* The tabs sit on their own row, so a seasonal banner across the top never hides one and
+            a narrow phone scrolls them sideways instead of pushing the page wider. */}
+        <nav aria-label="Agent portal" className="order-last -mx-2 flex w-[calc(100%+1rem)] items-center gap-1 overflow-x-auto px-2">
+          {navBtn('preapprovals', 'Pre-Approvals')}
+          {navBtn('tools', 'Tools')}
+          {navBtn('marketing', 'Marketing')}
+          {navBtn('integrations', 'Integrations')}
+        </nav>
+        <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setProfileOpen(true)}
             className="hidden rounded-[9px] px-2.5 py-1.5 text-[13px] font-medium text-text-soft transition-colors hover:text-text-primary sm:inline"
@@ -288,6 +310,7 @@ function AgentDashboard({ agent, onSignOut, onAgentUpdate }: { agent: AgentUser;
           {canInstall && !installed && (
             <Button variant="secondary" size="sm" onClick={() => { promptInstall(); }}>Install app</Button>
           )}
+          <Button variant="ghost" size="sm" onClick={() => setProfileOpen(true)} className="sm:hidden">Profile</Button>
           <Button variant="ghost" size="sm" onClick={onSignOut}>Sign out</Button>
         </div>
       </header>
@@ -296,10 +319,38 @@ function AgentDashboard({ agent, onSignOut, onAgentUpdate }: { agent: AgentUser;
         {tab === 'preapprovals' && <PreApprovalsView agent={agent} />}
         {tab === 'tools' && <ToolsView />}
         {tab === 'marketing' && <MarketingView />}
+        {tab === 'integrations' && <AgentIntegrations />}
       </div>
 
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} agent={agent} onSaved={onAgentUpdate} />
     </div>
+  );
+}
+
+/** Agent: connect GoHighLevel, choose activity emails, make API keys. */
+function AgentIntegrations() {
+  const client = useMemo<IntegrationsClient>(
+    () => ({
+      get: agentApi.integrations,
+      saveGhl: agentApi.saveGhl,
+      disconnectGhl: agentApi.disconnectGhl,
+      testGhl: agentApi.testGhl,
+      setNotifyEmail: agentApi.setNotifyEmail,
+      createKey: agentApi.createApiKey,
+      deleteKey: agentApi.deleteApiKey,
+    }),
+    [],
+  );
+  return (
+    <>
+      <div className="mb-5">
+        <h1 className="m-0 font-display text-[22px] font-semibold tracking-[-0.5px] text-text-heading">Integrations</h1>
+        <p className="mt-1 text-[13.5px] text-text-muted">Connect GoHighLevel, choose which emails you get, and let other tools see your pre-approvals.</p>
+      </div>
+      <div className="max-w-[860px]">
+        <IntegrationsPanel client={client} audience="agent" />
+      </div>
+    </>
   );
 }
 
@@ -375,8 +426,26 @@ function AssignmentCard({ assignment, onSaved }: { assignment: Assignment; onSav
   const [shareUrl, setShareUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const cap = assignment.approvedPrice || 0;
+  const expiry = expiryState(assignment.expiresAt);
+  const finished = assignment.status === 'closed' || assignment.status === 'cancelled';
+  const refreshAsked = !!assignment.refreshRequestedAt && Date.now() - Date.parse(assignment.refreshRequestedAt) < 86400000;
+
+  const askRefresh = async () => {
+    setRefreshing(true);
+    setMsg(null);
+    try {
+      const { assignment: next } = await agentApi.requestRefresh(assignment.id);
+      onSaved(next);
+      setMsg({ tone: 'ok', text: 'Asked your loan officer for a refreshed letter.' });
+    } catch (err) {
+      setMsg({ tone: 'error', text: err instanceof ApiError ? err.message : 'Could not send the request. Try again.' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const priceNum = Math.min(Math.max(0, parseFloat(price) || 0), cap);
   const dirty = address.trim() !== assignment.propertyAddress || (assignment.allowPriceChange && priceNum !== assignment.price);
   const addressValid = address.trim().length > 0;
@@ -458,6 +527,22 @@ function AssignmentCard({ assignment, onSaved }: { assignment: Assignment; onSav
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div className="text-[15px] font-semibold text-text-heading">{assignment.borrowerName || 'Borrower'}</div>
         <div className="text-[12px] text-text-dim">From {assignment.ownerName || 'your loan officer'}</div>
+      </div>
+
+      <div className="mb-4 rounded-[10px] border border-border bg-[rgba(140,165,195,0.04)] px-3.5 pb-3 pt-3.5">
+        <StatusTracker status={assignment.status} updatedAt={assignment.statusUpdatedAt} />
+        {!finished && expiry.kind !== 'none' && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2.5">
+            <span className={`text-[12.5px] font-semibold ${expiry.kind === 'expired' ? 'text-danger' : expiry.kind === 'soon' ? 'text-warn-text' : 'text-text-muted'}`}>
+              Letter: {expiry.label.toLowerCase().replace(/^./, (c) => c.toUpperCase())}
+            </span>
+            {(expiry.kind === 'soon' || expiry.kind === 'expired') && (
+              <Button variant="secondary" size="sm" onClick={askRefresh} disabled={refreshing || refreshAsked}>
+                {refreshAsked ? 'Refresh requested' : refreshing ? 'Sending…' : 'Request a refreshed letter'}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       <Label>Property address</Label>
@@ -628,47 +713,71 @@ function ProfileModal({ open, onClose, agent, onSaved }: { open: boolean; onClos
   );
 }
 
-/** Marketing tab — buyer-facing materials the agent can hand out.
- *  Shipping soon: the tools below are shown as a preview but covered by a
- *  "Coming soon" overlay so they can't be used yet. */
+/** The loan officers an agent works with (one entry each), for co-branding marketing. */
+type OfficerChoice = { id: string; label: string };
+
+/** Marketing tab — buyer-facing materials the agent can hand out, co-branded with their
+ *  profile and, if they like, a loan officer who has sent them a pre-approval. */
 function MarketingView() {
+  const [officers, setOfficers] = useState<OfficerChoice[]>([]);
+  useEffect(() => {
+    agentApi
+      .listAssignments()
+      .then(({ assignments }) => {
+        const seen = new Map<string, OfficerChoice>();
+        // Newest first, so each loan officer is represented by their most recent assignment.
+        for (const a of assignments) {
+          const lo = a.loanOfficer;
+          const key = (lo?.email || lo?.name || a.ownerName || '').toLowerCase();
+          if (!key || seen.has(key)) continue;
+          seen.set(key, { id: a.id, label: [lo?.name || a.ownerName, lo?.company].filter(Boolean).join(' · ') });
+        }
+        setOfficers([...seen.values()]);
+      })
+      .catch(() => setOfficers([]));
+  }, []);
+
   return (
     <>
       <div className="mb-5">
         <h1 className="m-0 font-display text-[22px] font-semibold tracking-[-0.5px] text-text-heading">Marketing</h1>
         <p className="mt-1 text-[13.5px] text-text-muted">Create buyer-facing materials, co-branded with your profile.</p>
       </div>
-
-      <div className="relative overflow-hidden rounded-2xl">
-        {/* Preview of what's coming — dimmed, blurred, and non-interactive. */}
-        <div aria-hidden className="pointer-events-none select-none opacity-60 blur-[2px]">
-          <div className="grid gap-5 lg:grid-cols-2">
-            <OpenHouseFlyer />
-            <BuyerAffordability />
-          </div>
-        </div>
-
-        {/* Coming-soon cover */}
-        <div className="absolute inset-0 flex items-center justify-center bg-app/40 backdrop-blur-[1px]">
-          <div className="mx-4 max-w-[360px] rounded-2xl border border-border bg-card/95 px-6 py-7 text-center shadow-letter">
-            <span className="inline-block rounded-full bg-[rgba(47,128,237,0.14)] px-3 py-1 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-brand-blue-light">
-              Coming soon
-            </span>
-            <div className="mt-3 text-[16px] font-semibold text-text-heading">Marketing tools are on the way</div>
-            <p className="mt-1.5 text-[13px] leading-[1.6] text-text-muted">
-              Open-house payment flyers and shareable buyer-affordability pages, co-branded with your profile. We're
-              putting the finishing touches on them — check back shortly.
-            </p>
-          </div>
-        </div>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <OpenHouseFlyer officers={officers} />
+        <BuyerAffordability officers={officers} />
       </div>
     </>
   );
 }
 
+/** Pick a loan officer to show on a flyer or buyer page. Their name and license numbers come
+ *  from the letter they issued you, so the details are always the real ones. */
+function OfficerPicker({ officers, value, onChange }: { officers: OfficerChoice[]; value: string; onChange: (v: string) => void }) {
+  if (!officers.length) return null;
+  return (
+    <div className="sm:col-span-2">
+      <Label>Show a loan officer (optional)</Label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-[46px] w-full rounded-[10px] border border-border-input bg-input px-3 text-[14px] text-text-primary outline-none focus:border-brand-blue"
+        aria-label="Show a loan officer"
+      >
+        <option value="">No loan officer</option>
+        {officers.map((o) => (
+          <option key={o.id} value={o.id}>{o.label}</option>
+        ))}
+      </select>
+      <div className="mt-1 text-[11.5px] text-text-dim">Adds their name, license numbers and contact details, plus the Equal Housing line.</div>
+    </div>
+  );
+}
+
 /** Open-house payment flyer — the agent enters a listing and gets a branded one-pager
  *  of monthly-payment scenarios at several down-payment levels. */
-function OpenHouseFlyer() {
+function OpenHouseFlyer({ officers }: { officers: OfficerChoice[] }) {
+  const [lender, setLender] = useState('');
   const [address, setAddress] = useState('');
   const [priceStr, setPriceStr] = useState('500000');
   const [rateStr, setRateStr] = useState('7.25');
@@ -702,6 +811,7 @@ function OpenHouseFlyer() {
         listing: { address: address.trim(), price: fmt(price) },
         terms: `${rate}% · ${termN}-yr fixed`,
         scenarios,
+        loanOfficerFrom: lender || undefined,
       });
       downloadBlob(blob, 'payment-flyer.pdf');
     } catch (e) {
@@ -723,6 +833,7 @@ function OpenHouseFlyer() {
         <MiniField label="Property tax /yr" suffix="%" value={taxStr} onChange={setTaxStr} />
         <MiniField label="Insurance /yr" suffix="%" value={insStr} onChange={setInsStr} />
         <div><Label>Down payments</Label><TextField value={downStr} onChange={(e) => setDownStr(e.target.value)} placeholder="3.5, 5, 10, 20" /></div>
+        <OfficerPicker officers={officers} value={lender} onChange={setLender} />
       </div>
       {err && <div className="mt-3 text-[12.5px] text-danger">{err}</div>}
       <div className="mt-4">
@@ -734,7 +845,8 @@ function OpenHouseFlyer() {
 
 /** Buyer affordability — the agent computes a buyer's range and publishes a clean,
  *  buyer-facing page at a public link. */
-function BuyerAffordability() {
+function BuyerAffordability({ officers }: { officers: OfficerChoice[] }) {
+  const [lender, setLender] = useState('');
   const [buyerName, setBuyerName] = useState('');
   const [income, setIncome] = useState('120000');
   const [debts, setDebts] = useState('600');
@@ -764,7 +876,7 @@ function BuyerAffordability() {
         { label: 'Down payment', value: fmt(n(down)) },
         { label: 'Assumed rate / term', value: `${n(rate)}% · ${parseInt(term, 10) || 30} yr` },
       ];
-      const { token } = await agentApi.shareAfford({ buyerName: buyerName.trim(), maxPrice: fmt(res.maxPrice), headline: 'Estimated home-buying power', rows });
+      const { token } = await agentApi.shareAfford({ buyerName: buyerName.trim(), maxPrice: fmt(res.maxPrice), headline: 'Estimated home-buying power', rows, loanOfficerFrom: lender || undefined });
       const url = `${window.location.origin}/s/${token}`;
       setLink(url);
       try {
@@ -799,6 +911,7 @@ function BuyerAffordability() {
         <MiniField label="Interest rate" suffix="%" value={rate} onChange={setRate} />
         <MiniField label="Term (years)" value={term} onChange={setTerm} />
         <MiniField label="Max DTI" suffix="%" value={dti} onChange={setDti} />
+        <OfficerPicker officers={officers} value={lender} onChange={setLender} />
       </div>
       <div className="mt-3 rounded-[10px] border border-[rgba(45,212,191,0.22)] bg-result-card px-4 py-3">
         <div className="text-[11.5px] font-semibold text-[#8fb8c9]">Estimated max home price</div>

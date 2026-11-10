@@ -3,7 +3,7 @@
 // session in the same browser.
 
 import { ApiError } from './api';
-import type { AgentUser, Assignment, ShareView } from '@/types';
+import type { AgentUser, ApiKeyInfo, Assignment, DeliveryEntry, IntegrationsView, ShareView } from '@/types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
 const AGENT_TOKEN_KEY = 'loandr.agent.token';
@@ -48,8 +48,10 @@ export interface AgentAuthResponse {
 }
 
 export const agentApi = {
-  register: (data: { email: string; password: string; name?: string; phone?: string }) =>
+  register: (data: { email: string; password: string; name?: string; phone?: string; invite?: string }) =>
     agentRequest<AgentAuthResponse>('POST', '/auth/register', data),
+  inviteInfo: (token: string) =>
+    agentRequest<{ email: string; name: string; invitedBy: string }>('GET', `/auth/invite-info?token=${encodeURIComponent(token)}`),
   login: (data: { email: string; password: string }) => agentRequest<AgentAuthResponse>('POST', '/auth/login', data),
   me: () => agentRequest<{ agent: AgentUser }>('GET', '/auth/me'),
   updateProfile: (data: Partial<Pick<AgentUser, 'name' | 'phone' | 'brokerage' | 'license' | 'photo'>>) =>
@@ -65,6 +67,16 @@ export const agentApi = {
     agentRequest<{ assignment: Assignment }>('PATCH', `/assignments/${id}`, patch),
   assignmentPdf: (id: string) => agentRequest<Blob>('POST', `/assignments/${id}/pdf`),
   shareAssignment: (id: string) => agentRequest<{ token: string }>('POST', `/assignments/${id}/share`),
+  requestRefresh: (id: string) => agentRequest<{ assignment: Assignment }>('POST', `/assignments/${id}/refresh-request`),
+
+  // Integrations (GoHighLevel webhook, activity emails, API keys)
+  integrations: () => agentRequest<IntegrationsView>('GET', '/integrations'),
+  saveGhl: (body: { url?: string; enabled?: boolean }) => agentRequest<IntegrationsView>('PUT', '/integrations/ghl', body),
+  disconnectGhl: () => agentRequest<IntegrationsView>('DELETE', '/integrations/ghl'),
+  testGhl: () => agentRequest<{ ok: boolean; status: number; error: string | null; deliveries: DeliveryEntry[] }>('POST', '/integrations/ghl/test'),
+  setNotifyEmail: (notifyEmail: boolean) => agentRequest<IntegrationsView>('PUT', '/integrations/preferences', { notifyEmail }),
+  createApiKey: (name: string) => agentRequest<{ key: string; apiKeys: ApiKeyInfo[] }>('POST', '/integrations/keys', { name }),
+  deleteApiKey: (id: string) => agentRequest<{ apiKeys: ApiKeyInfo[] }>('DELETE', `/integrations/keys/${id}`),
 
   reportPdf: (payload: unknown) => agentRequest<Blob>('POST', '/report/pdf', payload),
   flyerPdf: (payload: unknown) => agentRequest<Blob>('POST', '/flyer/pdf', payload),

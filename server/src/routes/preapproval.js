@@ -9,15 +9,21 @@ import {
   updateAssignment,
   deleteAssignment,
   findAgentByEmail,
+  removeAgentInvite,
 } from '../store.js';
 import { requireAccess } from '../billing/access.js';
 import { streamLetterPdf } from '../lib/letterPdfRender.js';
 import { cappedPrice } from '../lib/assignmentLetter.js';
+import { applyStatus } from '../lib/lifecycle.js';
+import { buildRoster, inviteAgent } from '../lib/roster.js';
+import { emitPreapproval } from '../integrations/events.js';
 
 const router = Router();
 const str = (v, fallback = '') => (v == null ? fallback : String(v));
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const baseUrl = (req) => process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
 
 // Keep only the keys the letter renderer understands, so an assignment never stores
 // arbitrary caller data. streamLetterPdf re-coerces each field, so loose typing is safe.
@@ -55,6 +61,12 @@ export function publicAssignment(a) {
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
     editedByAgentAt: a.editedByAgentAt || null,
+    // Where the loan stands (a stage name only) and when the letter lapses.
+    status: a.status || 'preapproved',
+    statusUpdatedAt: a.statusUpdatedAt || null,
+    statusHistory: (Array.isArray(a.statusHistory) ? a.statusHistory : []).map((h) => ({ status: h.status, at: h.at })),
+    expiresAt: a.expiresAt || null,
+    refreshRequestedAt: a.refreshRequestedAt || null,
   };
 }
 
@@ -113,7 +125,10 @@ router.get('/history', requireAccess, (req, res) => {
 // ---- Agent assignments (loan-officer side) -----------------------------
 // List the assignments this loan officer created.
 router.get('/assignments', requireAccess, (req, res) => {
-  res.json({ assignments: getAssignmentsByOwner(req.user.id).map(publicAssignment) });
+  // The loan officer also sees whether each agent has set up their account yet.
+  res.json({
+    assignments: getAssignmentsByOwner(req.user.id).map((a) => ({ ...publicAssignment(a), agentActive: !!findAgentByEmail(a.agentEmail) })),
+  });
 });
 
 // Create an assignment from an already-built letter (the client sends the letter
@@ -130,7 +145,13 @@ router.post('/assignments', requireAccess, (req, res) => {
   // The starting price can't exceed the approved ceiling.
   const price = cappedPrice(num(body.price) || approvedPrice, approvedPrice);
 
+  // How long the letter is good for, so we can remind everyone before it lapses.
+  const days = Math.floor(num(body.validityDays));
+  const expiresAt = days >= 1 && days <= 365 ? new Date(Date.now() + days * DAY_MS).toISOString() : null;
+
   const assignment = addAssignment({
+    status: 'preapproved',
+    expiresAt,
     ownerId: req.user.id,
     ownerName: req.user.name || '',
     agentEmail,
@@ -142,6 +163,7 @@ router.post('/assignments', requireAccess, (req, res) => {
     letter: pick(body.letter, LETTER_KEYS),
     ctx: pick(body.ctx, CTX_KEYS),
   });
+  emitPreapproval('preapproval.assigned', assignment, { base: baseUrl(req), source: 'app' });
   res.status(201).json({ assignment: publicAssignment(assignment) });
 });
 
@@ -151,6 +173,10 @@ router.patch('/assignments/:id', requireAccess, (req, res) => {
   const a = findAssignmentById(req.params.id);
   if (!a || a.ownerId !== req.user.id) return res.status(404).json({ error: 'Assignment not found' });
   const body = req.body && typeof req.body === 'object' ? req.body : {};
+  if (body.status !== undefined) {
+    const r = applyStatus(a, body.status, { base: baseUrl(req), source: 'app' });
+    if (!r.ok) return res.status(r.status).json({ error: r.error });
+  }
   const patch = {};
   if (body.agentEmail !== undefined) {
     const e = String(body.agentEmail || '').trim().toLowerCase();
@@ -165,7 +191,8 @@ router.patch('/assignments/:id', requireAccess, (req, res) => {
   if (body.price !== undefined) patch.price = cappedPrice(num(body.price), nextApproved);
   else if (patch.approvedPrice !== undefined) patch.price = cappedPrice(a.price, nextApproved);
 
-  res.json({ assignment: publicAssignment(updateAssignment(a.id, patch)) });
+  const saved = Object.keys(patch).length ? updateAssignment(a.id, patch) : findAssignmentById(a.id);
+  res.json({ assignment: { ...publicAssignment(saved), agentActive: !!findAgentByEmail(saved.agentEmail) } });
 });
 
 router.delete('/assignments/:id', requireAccess, (req, res) => {
@@ -173,6 +200,22 @@ router.delete('/assignments/:id', requireAccess, (req, res) => {
   if (!a || a.ownerId !== req.user.id) return res.status(404).json({ error: 'Assignment not found' });
   deleteAssignment(a.id);
   res.json({ ok: true });
+});
+
+// ---- Agent roster + invitations ----------------------------------------
+router.get('/agents', requireAccess, (req, res) => {
+  res.json({ agents: buildRoster(req.user.id) });
+});
+
+router.post('/agents/invite', requireAccess, async (req, res) => {
+  const r = await inviteAgent(req.user, { email: req.body?.email, name: String(req.body?.name || '').trim() }, baseUrl(req));
+  if (!r.ok) return res.status(r.status).json({ error: r.error });
+  res.status(201).json({ emailed: r.emailed, link: r.link, agents: buildRoster(req.user.id) });
+});
+
+router.delete('/agents/invites/:id', requireAccess, (req, res) => {
+  if (!removeAgentInvite(req.params.id, req.user.id)) return res.status(404).json({ error: 'Invitation not found' });
+  res.json({ agents: buildRoster(req.user.id) });
 });
 
 export default router;

@@ -106,6 +106,23 @@ function LetterShare({ token, share }: { token: string; share: ShareView }) {
   );
 }
 
+/** Mortgage financing contact shown on a buyer page, with license numbers and the Equal Housing line. */
+function LenderBlock({ lender }: { lender: NonNullable<ShareView['lender']> }) {
+  const nmls = (label: string, n: string) => (n ? `${label} · NMLS# ${n}` : label);
+  return (
+    <div className="border-t border-border bg-[rgba(140,165,195,0.04)] px-6 py-4">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-text-dim">Mortgage financing</div>
+      {lender.officerName && <div className="mt-1 text-[13.5px] font-semibold text-text-soft">{nmls(lender.officerName, lender.officerNmls)}</div>}
+      {lender.company && <div className="text-[12.5px] text-text-muted">{nmls(lender.company, lender.companyNmls)}</div>}
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px]">
+        {lender.phone && <a href={`tel:${lender.phone.replace(/[^0-9+]/g, '')}`} className="text-brand-blue-light hover:underline">{lender.phone}</a>}
+        {lender.email && <a href={`mailto:${lender.email}`} className="text-brand-blue-light hover:underline">{lender.email}</a>}
+      </div>
+      <div className="mt-2 text-[11px] text-text-dim">Equal Housing Opportunity</div>
+    </div>
+  );
+}
+
 function AffordShare({ share }: { share: ShareView }) {
   const d = share.data || {};
   return (
@@ -126,6 +143,7 @@ function AffordShare({ share }: { share: ShareView }) {
           ))}
         </div>
       )}
+      {share.lender && <LenderBlock lender={share.lender} />}
       <div className="px-6 pb-4 text-[11px] leading-[1.5] text-text-dim">
         Estimates only — not a loan pre-approval, commitment, or offer to lend. Actual amounts depend on full underwriting, credit, program, and property. Contact the agent or a licensed loan officer to get pre-approved.
       </div>

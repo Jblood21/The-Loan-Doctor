@@ -29,7 +29,7 @@ function shareView(share) {
     };
   }
   if (share.kind === 'afford') {
-    return { kind: 'afford', agent: share.agent || {}, data: share.data || {}, createdAt: share.createdAt };
+    return { kind: 'afford', agent: share.agent || {}, data: share.data || {}, lender: share.lender || null, createdAt: share.createdAt };
   }
   return null;
 }

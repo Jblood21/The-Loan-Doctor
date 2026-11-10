@@ -655,6 +655,8 @@ export default function PreApproval() {
         price: Math.round(srcScenario.homePrice || 0),
         approvedPrice: Math.max(0, Math.round(parseFloat(assignApprovedPrice) || srcScenario.homePrice || 0)),
         allowPriceChange: assignAllowPrice,
+        // Only track an expiry when the letter itself states one, so reminders match the paper.
+        validityDays: showValidity ? parseInt(expDays, 10) || 0 : 0,
         letter: letterSnapshot(),
         ctx: {
           p1Template,

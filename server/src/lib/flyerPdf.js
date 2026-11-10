@@ -31,6 +31,7 @@ export function streamFlyerPdf(res, d) {
   const agent = data.agent && typeof data.agent === 'object' ? data.agent : {};
   const listing = data.listing && typeof data.listing === 'object' ? data.listing : {};
   const terms = clean(data.terms || '');
+  const lender = data.lender && typeof data.lender === 'object' ? data.lender : null;
   const scenarios = (Array.isArray(data.scenarios) ? data.scenarios : []).slice(0, 6).map((s) => {
     const o = s && typeof s === 'object' ? s : {};
     return { down: clean(o.down), loan: clean(o.loan), pi: clean(o.pi), taxesIns: clean(o.taxesIns), total: clean(o.total) };
@@ -150,6 +151,34 @@ export function streamFlyerPdf(res, d) {
     y,
     { width: contentW, lineGap: 2 },
   );
+
+  // ---- Financing partner (only when the agent chose a loan officer to co-brand with) ----
+  if (lender) {
+    y = doc.y + 14;
+    const nm = (label, n) => (n ? `${label}  ·  NMLS# ${clean(n)}` : label);
+    const who = nm(clean(lender.officerName), lender.officerNmls);
+    const co = lender.company ? nm(clean(lender.company), lender.companyNmls) : '';
+    const reach = [clean(lender.phone), clean(lender.email), clean(lender.website)].filter(Boolean).join('   ·   ');
+    const boxH = 22 + (who ? 14 : 0) + (co ? 14 : 0) + (reach ? 14 : 0);
+    doc.save();
+    doc.roundedRect(LEFT, y, contentW, boxH, 6).fill('#f4f6f9');
+    doc.restore();
+    let ly = y + 9;
+    doc.fillColor(STEEL).font('Helvetica-Bold').fontSize(8).text('MORTGAGE FINANCING', LEFT + 14, ly, { lineBreak: false });
+    ly += 13;
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10);
+    if (who) {
+      doc.text(who, LEFT + 14, ly, { width: contentW - 28, lineBreak: false });
+      ly += 14;
+    }
+    doc.fillColor(INK).font('Helvetica').fontSize(9.5);
+    if (co) {
+      doc.text(co, LEFT + 14, ly, { width: contentW - 28, lineBreak: false });
+      ly += 14;
+    }
+    if (reach) doc.fillColor(MUTED).fontSize(9).text(reach, LEFT + 14, ly, { width: contentW - 28, lineBreak: false });
+    doc.fillColor(MUTED).font('Helvetica').fontSize(8).text('Equal Housing Opportunity', LEFT, y + boxH + 6, { width: contentW, align: 'right', lineBreak: false });
+  }
 
   // The footer sits in the bottom margin, so neutralize it to stop PDFKit from
   // paginating the last line onto a second page.
