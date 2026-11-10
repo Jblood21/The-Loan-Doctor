@@ -8,12 +8,14 @@ import { ChristmasBack, ChristmasFront } from './Christmas';
 import { EasterBack, EasterFront } from './Easter';
 import { HalloweenBack, HalloweenFront } from './Halloween';
 import { July4Back, July4Front } from './July4';
+import { ThanksgivingBack, ThanksgivingFront } from './Thanksgiving';
 import '@/holiday.css';
 
 // Each look has two layers: pieces BEHIND the page (cobwebs, fireworks) that show wherever
 // the page is clear, and pieces IN FRONT, hugging the edges.
 const ART: Record<HolidayId, { back: () => ReactNode; front: () => ReactNode }> = {
   halloween: { back: () => <HalloweenBack />, front: () => <HalloweenFront /> },
+  thanksgiving: { back: () => <ThanksgivingBack />, front: () => <ThanksgivingFront /> },
   christmas: { back: () => <ChristmasBack />, front: () => <ChristmasFront /> },
   easter: { back: () => <EasterBack />, front: () => <EasterFront /> },
   july4: { back: () => <July4Back />, front: () => <July4Front /> },
