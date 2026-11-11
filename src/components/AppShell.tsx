@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { BillingBanner } from './BillingBanner';
 import { BillingGate } from './BillingGate';
+import { SetupBanner } from './SetupBanner';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { SettingsDrawer } from './SettingsDrawer';
@@ -19,7 +20,7 @@ function MobileTopBar() {
       <button
         onClick={openNav}
         aria-label="Open menu"
-        className="flex h-[38px] w-[38px] items-center justify-center rounded-[9px] border border-border bg-transparent text-text-soft transition-colors hover:bg-[rgba(140,165,195,0.08)]"
+        className="flex h-11 w-11 items-center justify-center rounded-[9px] border border-border bg-transparent text-text-soft transition-colors hover:bg-[rgba(140,165,195,0.08)]"
       >
         <Menu size={20} />
       </button>
@@ -55,6 +56,7 @@ export function AppShell() {
               <MobileTopBar />
               <div className="mx-auto max-w-content px-4 pb-16 pt-5 sm:px-6 lg:px-10 lg:pb-20 lg:pt-[34px]">
                 <BillingBanner />
+                <SetupBanner />
                 <BillingGate>
                   <Outlet />
                 </BillingGate>

@@ -28,7 +28,7 @@ interface Tool {
 }
 
 export const TOOLS: Tool[] = [
-  { key: 'appraisal', title: 'Appraisal Prep', desc: 'Help buyers, sellers and refinancers get ready for the new (UAD 3.6) appraisal report — due Nov 2.', bg: 'rgba(47,100,156,.14)', fg: '#5fa8f5', icon: ClipboardCheck, Component: AppraisalPrep },
+  { key: 'appraisal', title: 'Appraisal Prep', desc: 'Help buyers, sellers and refinancers get ready for the appraisal, including the UAD 3.6 report.', bg: 'rgba(47,100,156,.14)', fg: '#5fa8f5', icon: ClipboardCheck, Component: AppraisalPrep },
   { key: 'afford', title: 'Affordability', desc: 'How much home a borrower can afford by income and DTI.', bg: 'rgba(47,128,237,.14)', fg: '#5fa8f5', icon: Home, Component: Affordability },
   { key: 'rentbuy', title: 'Rent vs. Buy', desc: 'Break-even timeline comparing renting to owning.', bg: 'rgba(45,212,191,.14)', fg: '#2dd4bf', icon: ArrowLeftRight, Component: RentVsBuy },
   { key: 'amort', title: 'Amortization', desc: 'Full payment schedule with principal and interest split.', bg: 'rgba(167,139,250,.14)', fg: '#a78bfa', icon: BarChart3, Component: Amortization },

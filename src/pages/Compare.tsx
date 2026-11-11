@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionLabel, Divider } from '@/components/ui/Card';
 import { Badge, StubNote } from '@/components/ui/Badge';
@@ -108,6 +109,17 @@ export default function Compare() {
 
   const [busy, setBusy] = useState<'pdf' | 'share' | null>(null);
   const [shareMsg, setShareMsg] = useState('');
+  // On a phone the answer sits below the whole form, so a bar at the bottom keeps the monthly
+  // payment in view until the result card itself scrolls on screen.
+  const resultRef = useRef<HTMLDivElement>(null);
+  const [resultVisible, setResultVisible] = useState(false);
+  useEffect(() => {
+    const el = resultRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([entry]) => setResultVisible(entry.isIntersecting), { threshold: 0.15 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const [savedOpen, setSavedOpen] = useState(false);
   // AI assistant state.
   const [aiQuestion, setAiQuestion] = useState('');
@@ -376,24 +388,30 @@ export default function Compare() {
   };
 
   return (
-    <div className="animate-lp-fade">
+    <div className="animate-lp-fade pb-16 lg:pb-0">
       <PageHeader
         title="Loan Comparison"
         subtitle="Model up to six scenarios and compare them side by side."
         actions={
           <>
-            <Button variant="secondary" onClick={() => setSavedOpen(true)}>
+            {/* On a phone the secondary actions fold into "More" so Save is the one button you see. */}
+            <Button variant="secondary" className="hidden sm:inline-flex" onClick={() => setSavedOpen(true)}>
               Saved Scenarios
             </Button>
-            <Button variant="secondary" onClick={shareQuote} disabled={busy !== null}>
+            <Button variant="secondary" className="hidden sm:inline-flex" onClick={shareQuote} disabled={busy !== null}>
               {busy === 'share' ? 'Sharing…' : 'Share'}
             </Button>
-            <Button variant="secondary" onClick={exportComparisonPdf} disabled={busy !== null}>
+            <Button variant="secondary" className="hidden sm:inline-flex" onClick={exportComparisonPdf} disabled={busy !== null}>
               {busy === 'pdf' ? 'Building…' : 'Export PDF'}
             </Button>
-            <Button variant="secondary" onClick={resetAll} disabled={saving || busy !== null}>
-              Reset
-            </Button>
+            <ActionMenu
+              items={[
+                { label: 'Saved Scenarios', onClick: () => setSavedOpen(true), className: 'sm:hidden' },
+                { label: busy === 'share' ? 'Sharing…' : 'Share', onClick: shareQuote, disabled: busy !== null, className: 'sm:hidden' },
+                { label: busy === 'pdf' ? 'Building…' : 'Export PDF', onClick: exportComparisonPdf, disabled: busy !== null, className: 'sm:hidden' },
+                { label: 'Reset to defaults', onClick: resetAll, disabled: saving || busy !== null, danger: true },
+              ]}
+            />
             <Button variant="primary" onClick={() => saveAll()} disabled={saving}>
               {saving ? 'Saving…' : dirty ? 'Save *' : 'Save'}
             </Button>
@@ -427,7 +445,7 @@ export default function Compare() {
                 <button
                   onClick={() => removeScenario(i)}
                   title="Remove scenario"
-                  className="mr-1 flex h-4 w-4 items-center justify-center rounded text-[14px] leading-none text-text-dim hover:text-danger"
+                  className="tap-ext mr-1 flex h-4 w-4 items-center justify-center rounded text-[14px] leading-none text-text-dim hover:text-danger"
                 >
                   ×
                 </button>
@@ -820,7 +838,7 @@ export default function Compare() {
 
         {/* RIGHT — results */}
         <div className="flex flex-col gap-4 lg:sticky lg:top-5">
-          <Card variant="result" className="relative overflow-hidden p-6">
+          <Card variant="result" className="relative overflow-hidden p-6" ref={resultRef}>
             <div
               className="pointer-events-none absolute -right-10 -top-10 h-[140px] w-[140px]"
               style={{ background: 'radial-gradient(circle,rgba(45,212,191,.18),transparent 70%)' }}
@@ -1076,6 +1094,27 @@ export default function Compare() {
       </Card>
 
       <SavedScenariosModal open={savedOpen} onClose={() => setSavedOpen(false)} />
+
+      {/* Phone-only: the monthly payment, always in view until the full result card is. */}
+      {!resultVisible && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-[36] flex items-center justify-between gap-3 border-t border-border bg-card/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(20,30,45,0.12)] backdrop-blur lg:hidden"
+          role="region"
+          aria-label="Estimated monthly payment"
+        >
+          <div className="min-w-0">
+            <div className="truncate text-[11.5px] font-semibold text-text-muted">{r.typeLabel} · Est. monthly payment</div>
+            <div className="num text-[22px] font-semibold leading-tight tracking-[-0.5px] text-text-heading">{fmt2(r.totalMonthly)}</div>
+          </div>
+          <Button
+            variant="secondary"
+            className="flex-shrink-0 !h-[44px]"
+            onClick={() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          >
+            See details
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

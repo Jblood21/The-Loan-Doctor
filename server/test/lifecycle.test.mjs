@@ -103,9 +103,13 @@ describe('what is sent', () => {
     expect(toAgent).toMatchObject({ first_name: 'Lou', email: 'lou@lender.test', account: { type: 'agent' } });
   });
   it('shares only a stage name, never rates or financial detail', () => {
-    const p = notes.webhookPayload('preapproval.status_changed', 'agent', { ...ctx, assignment: { ...ctx.assignment, creditScore: '780', rate: 6.5, letter: { secret: 1 } } });
+    // Distinctive markers, so nothing in a timestamp or an id can ever look like a leak.
+    const p = notes.webhookPayload('preapproval.status_changed', 'agent', {
+      ...ctx,
+      assignment: { ...ctx.assignment, creditScore: 'sentinel-credit', rate: 'sentinel-rate', letter: { secret: 'sentinel-letter' } },
+    });
     const text = JSON.stringify(p);
-    expect(text).not.toMatch(/780|6\.5|secret/);
+    expect(text).not.toContain('sentinel');
     expect(p.preapproval.statusLabel).toBe('Appraisal');
   });
   it('escapes what people typed before it goes into an email', () => {

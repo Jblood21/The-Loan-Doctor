@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { HTMLAttributes } from 'react';
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
@@ -5,13 +6,13 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: 'panel' | 'result';
 }
 
-export function Card({ variant = 'panel', className = '', ...props }: CardProps) {
+export const Card = forwardRef<HTMLDivElement, CardProps>(function Card({ variant = 'panel', className = '', ...props }, ref) {
   const base =
     variant === 'result'
       ? 'bg-result-card border border-[rgba(45,212,191,0.22)]'
       : 'bg-card border border-border';
-  return <div className={`rounded-2xl ${base} ${className}`} {...props} />;
-}
+  return <div ref={ref} className={`rounded-2xl ${base} ${className}`} {...props} />;
+});
 
 /** Uppercase section label used inside cards. */
 export function SectionLabel({ children, className = '' }: { children: React.ReactNode; className?: string }) {

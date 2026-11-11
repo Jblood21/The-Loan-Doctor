@@ -75,8 +75,9 @@ a{color:var(--brand)}
 .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
 header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0}
 header.top img{display:block;height:40px;width:auto}
-nav.top{display:flex;align-items:center;gap:18px;font-size:15px;font-weight:600}
-nav.top a{text-decoration:none}
+header.top>a{display:inline-flex;align-items:center;min-height:44px}
+nav.top{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600}
+nav.top a{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;text-decoration:none}
 .btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 24px;border-radius:12px;font-size:16px;font-weight:700;text-decoration:none;border:2px solid var(--brand)}
 .btn.primary{background:var(--brand);color:var(--on-brand)}
 .btn.primary:hover{background:var(--brand-hover);border-color:var(--brand-hover)}
@@ -88,7 +89,12 @@ nav.top a{text-decoration:none}
 h1{margin:0;font-size:clamp(34px,6vw,54px);line-height:1.08;letter-spacing:-1.2px}
 .lead{margin:20px 0 0;font-size:clamp(17px,2.4vw,20px);color:var(--muted);max-width:620px}
 .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
-.agent-line{margin:18px 0 0;font-size:15px;color:var(--muted)}
+.hero .cta .btn.secondary{background:var(--surface)}
+section.shot{padding:56px 0 8px}
+section.shot h2{margin-bottom:8px}
+section.shot p.sub{margin:0 0 24px;max-width:640px;color:var(--muted);font-size:17px}
+figure.shot{margin:0;border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:0 18px 50px rgba(20,30,45,.14)}
+figure.shot img{display:block;width:100%;height:auto}
 section.features{padding:64px 0 24px}
 h2{margin:0 0 28px;font-size:clamp(24px,3.4vw,32px);letter-spacing:-.6px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px}
@@ -171,12 +177,19 @@ try{if(localStorage.getItem('loandr.token')||sessionStorage.getItem('loandr.toke
       <p class="lead">${NAME} is a loan comparison workspace. Model Conventional, FHA, VA, USDA, ARM, DSCR and reverse mortgages, then hand your borrower a clean breakdown.</p>
       <div class="cta">
         ${cta}
+        <a class="btn secondary" href="/agent">I'm a real estate agent</a>
       </div>
-      <p class="agent-line">Real estate agent? <a href="/agent">Go to the agent portal</a>.</p>
     </div>
   </div>
 </div>
 <main>
+  <section class="shot">
+    <div class="wrap">
+      <h2>Your whole comparison on one screen</h2>
+      <p class="sub">Build up to six scenarios, watch the payment change as you type, then share a link or a PDF with your borrower.</p>
+      <figure class="shot"><img src="/brand/product-compare.jpg" alt="The loan comparison screen: loan details on the left and the estimated monthly payment with its breakdown on the right" width="1360" height="860" loading="lazy" decoding="async"></figure>
+    </div>
+  </section>
   <section class="features">
     <div class="wrap">
       <h2>What you can do with ${NAME}</h2>

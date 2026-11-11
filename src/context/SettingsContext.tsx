@@ -5,18 +5,20 @@ import { defaultClosingCosts } from '@/lib/finance';
 import type { Settings } from '@/types';
 import { useAuth } from './AuthContext';
 
+// A new account starts with a BLANK letterhead: their own name, license numbers and logo
+// are what go on letters, never anyone else's. (The owner login is filled in on the server.)
 export const DEFAULT_SETTINGS: Settings = {
   name: '',
-  company: 'Summit Home Loans',
-  phone: '801-706-2802',
-  nmls: '103895',
-  email: 'alanblood@summithomeloans.com',
-  officerTitle: 'Mortgage Specialist',
-  lenderName: 'Summit Home Loans',
-  lenderNmls: '1790749',
-  website: 'summithomeloans.com',
-  lenderAddress: '375 N Main Street, Suite 100, Kaysville, UT 84037',
-  lenderPhone: '801-706-2802',
+  company: '',
+  phone: '',
+  nmls: '',
+  email: '',
+  officerTitle: 'Loan Officer',
+  lenderName: '',
+  lenderNmls: '',
+  website: '',
+  lenderAddress: '',
+  lenderPhone: '',
   agentName: '',
   brokerage: '',
   agentPhone: '',
@@ -41,6 +43,9 @@ function accountSeed(user: { name?: string; company?: string; phone?: string; nm
 
 interface SettingsContextValue {
   settings: Settings;
+  /** True once the saved settings have been read (or the cached copy used), so screens can
+   *  avoid flashing "setup incomplete" while they are still loading. */
+  loaded: boolean;
   saving: boolean;
   update: (patch: Partial<Settings>) => void;
   save: (patch?: Partial<Settings>) => Promise<void>;
@@ -52,12 +57,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const cacheKey = user ? `loandr.settings.${user.id}` : null;
   const didLoad = useRef<string | null>(null);
 
   useEffect(() => {
     if (!user) {
       setSettings(DEFAULT_SETTINGS);
+      setLoaded(false);
       didLoad.current = null;
       return;
     }
@@ -80,6 +87,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             /* ignore */
           }
         }
+      } finally {
+        if (!cancelled) setLoaded(true);
       }
     })();
     return () => {
@@ -108,9 +117,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo<SettingsContextValue>(
-    () => ({ settings, saving, update, save }),
+    () => ({ settings, loaded, saving, update, save }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settings, saving],
+    [settings, loaded, saving],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

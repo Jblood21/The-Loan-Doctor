@@ -177,6 +177,12 @@ If you move to a new domain, add it as a new property in Search Console and veri
 
 ## Good to know
 
+- **Letterheads start blank.** A new account has no name, license number, company or logo on its
+  letters until the person adds their own (a short checklist at the top of the app walks them
+  through it, and letters wait until name, NMLS number and company are in). Only the
+  `OWNER_EMAIL` login is pre-filled, once, with the original Summit letterhead, logo and photo;
+  anything saved afterwards is never overwritten. If you also use another login of your own,
+  fill in its Settings once.
 - **⚠️ Your data resets on restart (free tier) — this breaks the LOS webhook.** The free
   plan's disk is *ephemeral*: every restart or redeploy wipes accounts, **your webhook
   token/URL**, and any loans Zapier has sent. So your webhook URL changes on each deploy and
