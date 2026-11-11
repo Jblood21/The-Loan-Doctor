@@ -2,16 +2,9 @@
 // HTTP response. Used by the loan-officer route (/api/preapproval/pdf) and the agent
 // assignment route (/api/agent/assignments/:id/pdf) so both produce identical letters.
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
 import { drawLetter, FOOTER_H } from './letterPdf.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ASSETS = path.join(__dirname, '..', 'assets');
-const LOGO = path.join(ASSETS, 'letterhead-logo.jpg');
-const HEADSHOT = path.join(ASSETS, 'officer-headshot.png');
 const LEFT = 64;
 
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -64,13 +57,12 @@ export function streamLetterPdf(res, body) {
     ? { name: str(agentObj.name), brokerage: str(agentObj.brokerage), phone: str(agentObj.phone), email: str(agentObj.email), photoSource: agentPhotoBuf }
     : null;
 
-  let logoSource = fs.existsSync(LOGO) ? LOGO : null;
-  const logoBuf = decodeDataUrl(b.logo);
-  if (logoBuf) logoSource = logoBuf;
+  // Only the sender's own logo and photo, never a stand-in: letters carry the sender's name.
+  const logoSource = decodeDataUrl(b.logo);
 
   const signatureBuf = decodeDataUrl(b.signature);
   const headshotBuf = decodeDataUrl(b.headshot);
-  const headshotSource = headshotBuf || (fs.existsSync(HEADSHOT) ? HEADSHOT : null);
+  const headshotSource = headshotBuf;
 
   const classic = style === 'classic';
   // Bottom text area reaches the footer band's top edge, so a tight one-page letter's

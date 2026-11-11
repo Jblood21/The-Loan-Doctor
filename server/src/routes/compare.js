@@ -1,13 +1,8 @@
 import { Router } from 'express';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
 import { requireAccess } from '../billing/access.js';
 
 const router = Router();
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LOGO = path.join(__dirname, '..', 'assets', 'letterhead-logo.jpg');
 
 // Summit Home Loans palette.
 const NAVY = '#13355f';
@@ -333,14 +328,15 @@ router.post('/pdf', requireAccess, (req, res) => {
     return res.status(400).json({ error: 'Nothing to render — refresh the Compare tab and try again.' });
   }
 
-  let logoSource = fs.existsSync(LOGO) ? LOGO : null;
+  // The sender's own logo only; with none, the header shows their company name instead.
+  let logoSource = null;
   if (typeof body.logo === 'string' && body.logo.startsWith('data:')) {
     const b64 = body.logo.split(',')[1];
     if (b64) {
       try {
         logoSource = Buffer.from(b64, 'base64');
       } catch {
-        /* keep default */
+        /* no logo */
       }
     }
   }

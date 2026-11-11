@@ -33,8 +33,13 @@ const WORKSPACE: NavItem[] = [
   { to: '/hecm', label: 'Reverse (HECM)', icon: Building2 },
   { to: '/pre-approval', label: 'Pre-Approval', icon: FileText },
   { to: '/agents', label: 'Agents', icon: Users },
-  { to: '/integrations', label: 'Integrations', icon: Plug },
   { to: '/tools', label: 'Tools', icon: Wrench },
+];
+
+// Set-up-once and get-help pages live with the account controls at the bottom, so the main
+// navigation stays at five items.
+const ACCOUNT: NavItem[] = [
+  { to: '/integrations', label: 'Integrations', icon: Plug },
   { to: '/help', label: 'Help Center', icon: HelpCircle },
 ];
 
@@ -75,7 +80,7 @@ export function Sidebar() {
       <aside
         className={[
           // On phones the sidebar is an off-canvas drawer; on lg+ it's a sticky column.
-          'fixed inset-y-0 left-0 z-50 flex h-screen w-[236px] flex-shrink-0 flex-col border-r border-border bg-sidebar p-4 pt-[22px]',
+          'fixed inset-y-0 left-0 z-50 flex h-screen w-[236px] flex-shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar p-4 pt-[22px]',
           'transform transition-transform duration-200 ease-out',
           navOpen ? 'translate-x-0' : '-translate-x-full',
           'lg:sticky lg:top-0 lg:z-auto lg:translate-x-0',
@@ -129,6 +134,12 @@ export function Sidebar() {
               Plan & billing
             </NavLink>
           )}
+          {ACCOUNT.map(({ to, label, icon: Icon }) => (
+            <NavLink key={to} to={to} onClick={closeNav} className={navClass}>
+              <Icon size={18} />
+              {label}
+            </NavLink>
+          ))}
           <button
             onClick={() => {
               closeNav();

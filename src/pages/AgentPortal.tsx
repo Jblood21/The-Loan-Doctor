@@ -316,7 +316,7 @@ function AgentDashboard({ agent, onSignOut, onAgentUpdate }: { agent: AgentUser;
       </header>
 
       <div className={`mx-auto px-5 py-8 ${tab === 'preapprovals' ? 'max-w-[760px]' : 'max-w-[1080px]'}`}>
-        {tab === 'preapprovals' && <PreApprovalsView agent={agent} />}
+        {tab === 'preapprovals' && <PreApprovalsView agent={agent} onOpen={setTab} />}
         {tab === 'tools' && <ToolsView />}
         {tab === 'marketing' && <MarketingView />}
         {tab === 'integrations' && <AgentIntegrations />}
@@ -355,7 +355,7 @@ function AgentIntegrations() {
 }
 
 /** The agent's list of assigned pre-approvals. */
-function PreApprovalsView({ agent }: { agent: AgentUser }) {
+function PreApprovalsView({ agent, onOpen }: { agent: AgentUser; onOpen: (tab: AgentTab) => void }) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -384,9 +384,16 @@ function PreApprovalsView({ agent }: { agent: AgentUser }) {
       {error && <div className="mb-4 rounded-[11px] border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] px-[15px] py-3 text-[13px] text-danger">{error}</div>}
 
       {!loading && !assignments.length && !error && (
-        <div className="rounded-2xl border border-border bg-card px-6 py-12 text-center text-[14px] text-text-muted">
-          No pre-approvals have been assigned to <span className="font-semibold text-text-soft">{agent.email}</span> yet.
-          <div className="mt-1 text-[12.5px]">When your loan officer assigns one, it will appear here.</div>
+        <div className="rounded-2xl border border-border bg-card px-6 py-10 text-center">
+          <div className="text-[16px] font-semibold text-text-heading">Nothing here yet</div>
+          <p className="mx-auto mt-1.5 max-w-[440px] text-[13.5px] leading-[1.6] text-text-muted">
+            When a loan officer sends a pre-approval to <span className="font-semibold text-text-soft">{agent.email}</span>, it shows up here.
+            Until then, these are ready to use:
+          </p>
+          <div className="mt-5 flex flex-col justify-center gap-2.5 sm:flex-row">
+            <Button variant="primary" onClick={() => onOpen('marketing')}>Make an open-house flyer</Button>
+            <Button variant="secondary" onClick={() => onOpen('tools')}>Try the calculators</Button>
+          </div>
         </div>
       )}
 

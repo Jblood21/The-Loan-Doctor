@@ -8,8 +8,11 @@ import { Select } from '@/components/ui/Select';
 import { TextField, Label } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
 import { SignaturePad } from '@/components/SignaturePad';
+import { LetterSteps } from '@/components/LetterSteps';
 import { useScenarios, blankScenario } from '@/context/ScenariosContext';
 import { useSettings } from '@/context/SettingsContext';
+import { useUI } from '@/context/UIContext';
+import { setupStatus } from '@/lib/setup';
 import { api, ApiError } from '@/lib/api';
 import { computeScenario } from '@/lib/finance';
 import {
@@ -119,10 +122,20 @@ function EqualHousingMark({ house, cut }: { house: string; cut: string }) {
   );
 }
 
+/** The four stops on the letter form, in page order. */
+const LETTER_STEPS = [
+  { id: 'step-borrower', label: 'Borrower' },
+  { id: 'step-wording', label: 'Wording' },
+  { id: 'step-options', label: 'Options' },
+  { id: 'step-create', label: 'Create' },
+];
+
 export default function PreApproval() {
   // Pre-Approval draws from the same saved bank of scenarios as Compare.
   const { bank } = useScenarios();
   const { settings, save: saveSettings, saving: savingSettings } = useSettings();
+  const { openSettings } = useUI();
+  const setup = setupStatus(settings);
   const [pa, setPa] = useState<PreApprovalState>({
     source: 'scenario',
     scenarioIdx: 0,
@@ -476,7 +489,17 @@ export default function PreApproval() {
     set({ losConnected: false });
   };
 
+  /** A letter prints the sender's name, NMLS number and company. Until those are filled in,
+   *  say so and open Settings instead of making a letter with blanks. */
+  const needsSetup = (): boolean => {
+    if (setup.complete) return false;
+    setActionMsg({ tone: 'error', text: `Add your ${setup.missingPhrase} in Settings first. They are printed on every letter.` });
+    openSettings();
+    return true;
+  };
+
   const downloadPdf = async () => {
+    if (needsSetup()) return;
     setActionMsg(null);
     const payload = {
       style: styleId,
@@ -543,6 +566,7 @@ export default function PreApproval() {
   };
 
   const emailLetter = () => {
+    if (needsSetup()) return;
     const subject = encodeURIComponent('Your Pre-Approval Letter');
     const body = encodeURIComponent(
       `Hi ${pa.borrowerName},\n\nAttached is your pre-approval letter for a ${computeScenario(srcScenario).typeLabel} loan of ${fmt(
@@ -617,6 +641,7 @@ export default function PreApproval() {
   };
 
   const openAssign = () => {
+    if (needsSetup()) return;
     setAssignMsg(null);
     setAssignApprovedPrice(String(Math.round(srcScenario.homePrice || 0)));
     setAssignAllowPrice(false);
@@ -754,18 +779,16 @@ export default function PreApproval() {
     </div>
   );
 
+  // Only lines that have something on them, so a new account's letter never shows a stray "·".
+  const footerName = andify(settings.lenderName || settings.company || '');
+  const footerPhoneEmail = [settings.lenderPhone || settings.phone, settings.email].filter(Boolean).join('   ·   ');
+  const footerNmls = [(settings.lenderNmls || settings.nmls) && `NMLS# ${settings.lenderNmls || settings.nmls}`, settings.website].filter(Boolean).join('   ·   ');
   const contactLines: ReactNode = (
     <>
-      <div className="font-semibold">{andify(settings.lenderName)}</div>
-      <div>{andify(settings.lenderAddress)}</div>
-      <div>
-        {settings.lenderPhone || settings.phone}
-        {settings.email ? `   ·   ${settings.email}` : ''}
-      </div>
-      <div style={{ color: GOLD }}>
-        NMLS# {settings.lenderNmls || settings.nmls}
-        {settings.website ? `   ·   ${settings.website}` : ''}
-      </div>
+      {footerName && <div className="font-semibold">{footerName}</div>}
+      {settings.lenderAddress && <div>{andify(settings.lenderAddress)}</div>}
+      {footerPhoneEmail && <div>{footerPhoneEmail}</div>}
+      {footerNmls && <div style={{ color: GOLD }}>{footerNmls}</div>}
     </>
   );
 
@@ -791,9 +814,11 @@ export default function PreApproval() {
         <IssuedPreApprovals history={history} loading={historyLoading} error={historyError} onRefresh={loadHistory} />
       )}
 
+      {view === 'create' && <LetterSteps steps={LETTER_STEPS} />}
+
       <div className={view === 'create' ? 'grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_1.05fr]' : 'hidden'}>
         {/* LEFT — form */}
-        <Card className="p-6">
+        <Card className="scroll-mt-32 p-6" id="step-borrower">
           <SectionLabel className="mb-3">DATA SOURCE</SectionLabel>
           <SegmentedControl
             className="mb-[22px]"
@@ -1126,7 +1151,7 @@ export default function PreApproval() {
           </div>
 
           {/* Approval level — sets the letter's verbiage */}
-          <div className="mb-5">
+          <div className="mb-5 scroll-mt-32" id="step-wording">
             <SectionLabel className="mb-2">APPROVAL LEVEL</SectionLabel>
             <Select
               value={letterKind}
@@ -1209,6 +1234,7 @@ export default function PreApproval() {
           </div>
 
           {/* Letter options */}
+          <div id="step-options" className="scroll-mt-32" />
           <Divider className="mb-5" />
           <SectionLabel className="mb-3">LETTER OPTIONS</SectionLabel>
           <div className="mb-4 grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
@@ -1309,13 +1335,19 @@ export default function PreApproval() {
               <Toggle checked={showHeadshot} onChange={setShowHeadshot} label="Show photo in footer" hint="Your loan-officer photo, bottom of the letter" />
               {showHeadshot && (
                 <div className="flex items-center gap-3 border-t border-border-input px-3.5 py-2.5">
-                  <img
-                    src={settings.headshotDataUrl || '/brand/officer-headshot.png'}
-                    alt="Footer photo"
-                    className="h-11 w-11 flex-shrink-0 rounded-full border border-border-input object-cover object-top"
-                  />
+                  {settings.headshotDataUrl ? (
+                    <img
+                      src={settings.headshotDataUrl}
+                      alt="Footer photo"
+                      className="h-11 w-11 flex-shrink-0 rounded-full border border-border-input object-cover object-top"
+                    />
+                  ) : (
+                    <span aria-hidden className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-border-input text-[11px] text-text-dim">
+                      Photo
+                    </span>
+                  )}
                   <div className="min-w-0 flex-1 text-[11.5px] text-text-muted">
-                    {settings.headshotDataUrl ? 'Custom photo' : 'Using the default photo'}
+                    {settings.headshotDataUrl ? 'Your photo' : 'No photo yet. Upload one to show it here.'}
                   </div>
                   <label className="inline-flex cursor-pointer">
                     <input
@@ -1439,6 +1471,7 @@ export default function PreApproval() {
             </div>
           </div>
 
+          <div id="step-create" className="scroll-mt-32" />
           {actionMsg && (
             <div
               className={`mb-3 rounded-[10px] border px-3.5 py-2.5 text-[12.5px] leading-[1.5] ${
@@ -1478,7 +1511,13 @@ export default function PreApproval() {
             <div className="flex min-h-[660px] flex-col overflow-hidden rounded-[11px] bg-white" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
               {/* Letterhead */}
               <div className={`px-5 pt-7 sm:px-10 sm:pt-9 ${isClassic ? 'flex flex-col items-center' : ''}`}>
-                <img src={settings.logoDataUrl || '/brand/letterhead-logo.jpg'} alt={settings.lenderName || settings.company || 'Company logo'} className="h-[58px] w-auto" />
+                {settings.logoDataUrl ? (
+                  <img src={settings.logoDataUrl} alt={settings.lenderName || settings.company || 'Company logo'} className="h-[58px] w-auto" />
+                ) : (
+                  <div className="flex h-[58px] items-center text-[22px] font-bold" style={{ color: GREEN }}>
+                    {settings.lenderName || settings.company || 'Your company name'}
+                  </div>
+                )}
                 <div className="mt-4 h-[3px] w-full rounded" style={{ background: GOLD }} />
               </div>
 
@@ -1487,8 +1526,8 @@ export default function PreApproval() {
               {/* Footer */}
               {isClassic ? (
                 <div className="mt-auto px-5 pb-6 pt-4 text-center sm:px-10 sm:pb-7" style={{ borderTop: `3px solid ${GOLD}` }}>
-                  {showHeadshot && (
-                    <img src={settings.headshotDataUrl || '/brand/officer-headshot.png'} alt={settings.name} className="mx-auto mb-2 h-[54px] w-[54px] rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
+                  {showHeadshot && settings.headshotDataUrl && (
+                    <img src={settings.headshotDataUrl} alt={settings.name} className="mx-auto mb-2 h-[54px] w-[54px] rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
                   )}
                   <div className="text-[11.5px] leading-[1.55]" style={{ color: GREEN }}>
                     {contactLines}
@@ -1500,8 +1539,8 @@ export default function PreApproval() {
               ) : (
                 <div className="mt-auto" style={{ background: GREEN, borderTop: `4px solid ${GOLD}` }}>
                   <div className="flex items-center gap-4 px-5 py-4 sm:px-9 sm:py-5">
-                    {showHeadshot && (
-                      <img src={settings.headshotDataUrl || '/brand/officer-headshot.png'} alt={settings.name} className="h-[62px] w-[62px] flex-shrink-0 rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
+                    {showHeadshot && settings.headshotDataUrl && (
+                      <img src={settings.headshotDataUrl} alt={settings.name} className="h-[62px] w-[62px] flex-shrink-0 rounded-full border-2 object-cover object-top" style={{ borderColor: GOLD }} />
                     )}
                     <div className="flex-1 text-[11.5px] leading-[1.5] text-white">{contactLines}</div>
                     <EqualHousingMark house="#ffffff" cut={GREEN} />

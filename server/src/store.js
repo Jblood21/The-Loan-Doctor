@@ -100,6 +100,8 @@ const EMPTY = {
   // Integrations: per-account GoHighLevel webhook + email preference, API keys, and the
   // invitations a loan officer sends to real-estate agents.
   integrations: {}, apiKeys: [], agentInvites: [],
+  // One-time data migrations that have already run (so they never run twice).
+  migrations: {},
 };
 
 let db = structuredClone(EMPTY);
@@ -763,6 +765,48 @@ function ensureSeedAccount({ id, email, password, role, updatePassword = true, .
   return addUser({ id, email, password, role, ...rest });
 }
 
+// The owner's own letterhead. New accounts start with a BLANK letterhead (their own name,
+// license numbers and logo must never default to someone else's), but the owner login keeps
+// the details this app was built around, so nothing changes for them.
+const ASSETS_DIR = path.join(__dirname, 'assets');
+function assetDataUrl(file, mime) {
+  try {
+    return `data:${mime};base64,${fs.readFileSync(path.join(ASSETS_DIR, file)).toString('base64')}`;
+  } catch {
+    return '';
+  }
+}
+const OWNER_LETTERHEAD = {
+  company: 'Summit Home Loans',
+  phone: '801-706-2802',
+  nmls: '103895',
+  email: 'alanblood@summithomeloans.com',
+  officerTitle: 'Mortgage Specialist',
+  lenderName: 'Summit Home Loans',
+  lenderNmls: '1790749',
+  website: 'summithomeloans.com',
+  lenderAddress: '375 N Main Street, Suite 100, Kaysville, UT 84037',
+  lenderPhone: '801-706-2802',
+};
+
+/** Fill the owner login's letterhead once. Anything they already saved wins. Does nothing
+ *  until an OWNER_EMAIL account exists, and never runs a second time. */
+export function applyOwnerLetterhead() {
+  if (db.migrations.ownerLetterhead) return false;
+  const email = normalizeEmail(process.env.OWNER_EMAIL);
+  const owner = email ? findUserByEmail(email) : null;
+  if (!owner) return false;
+  db.settings[owner.id] = {
+    ...OWNER_LETTERHEAD,
+    logoDataUrl: assetDataUrl('letterhead-logo.jpg', 'image/jpeg'),
+    headshotDataUrl: assetDataUrl('officer-headshot.png', 'image/png'),
+    ...(db.settings[owner.id] || {}),
+  };
+  db.migrations.ownerLetterhead = true;
+  persist();
+  return true;
+}
+
 /** Ensure the admin + owner logins match the environment on every boot, and seed
  *  demo data only on a fresh (empty) database. */
 export function seed() {
@@ -824,6 +868,8 @@ export function seed() {
       status: 'Active',
     });
   }
+
+  applyOwnerLetterhead();
 
   // --- Demo data (only on a fresh database) ---------------------------------
   const seedDemo = process.env.SEED_DEMO_USER === 'true' || (!isProd && process.env.SEED_DEMO_USER !== 'false');

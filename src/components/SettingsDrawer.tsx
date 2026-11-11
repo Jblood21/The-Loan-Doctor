@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useUI } from '@/context/UIContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useAuth } from '@/context/AuthContext';
@@ -30,12 +30,12 @@ const SECTIONS: Section[] = [
     note: 'Your info for documents and contact details.',
     cta: 'Save Loan Officer Info',
     fields: [
-      { key: 'name', label: 'Your Name', ph: 'Alan Blood' },
-      { key: 'officerTitle', label: 'Title', ph: 'Mortgage Specialist' },
-      { key: 'company', label: 'Company', ph: 'Summit Home Loans' },
-      { key: 'email', label: 'Email', ph: 'you@summithomeloans.com' },
-      { key: 'phone', label: 'Phone', ph: '801-855-8535' },
-      { key: 'nmls', label: 'NMLS #', ph: '103895' },
+      { key: 'name', label: 'Your Name', ph: 'Jane Smith' },
+      { key: 'officerTitle', label: 'Title', ph: 'Loan Officer' },
+      { key: 'company', label: 'Company', ph: 'Your company name' },
+      { key: 'email', label: 'Email', ph: 'you@yourcompany.com' },
+      { key: 'phone', label: 'Phone', ph: '(555) 123-4567' },
+      { key: 'nmls', label: 'NMLS #', ph: 'Your NMLS number' },
     ],
   },
   {
@@ -43,9 +43,9 @@ const SECTIONS: Section[] = [
     note: "Your institution's details for branding.",
     cta: 'Save Lender Info',
     fields: [
-      { key: 'lenderName', label: 'Lender Name', ph: 'Summit Home Loans' },
-      { key: 'lenderNmls', label: 'Lender NMLS #', ph: '1790749' },
-      { key: 'website', label: 'Website', ph: 'summithomeloans.com' },
+      { key: 'lenderName', label: 'Lender Name', ph: 'Your company name' },
+      { key: 'lenderNmls', label: 'Lender NMLS #', ph: 'Company NMLS number' },
+      { key: 'website', label: 'Website', ph: 'yourcompany.com' },
       { key: 'lenderAddress', label: 'Address', ph: '123 Main St, Suite 100 · City, ST' },
       { key: 'lenderPhone', label: 'Lender Phone', ph: '(800) 555-1234' },
     ],
@@ -54,6 +54,16 @@ const SECTIONS: Section[] = [
 
 export function SettingsDrawer() {
   const { settingsOpen, closeSettings } = useUI();
+
+  // Escape closes the drawer, like every other dialog in the app.
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeSettings();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [settingsOpen, closeSettings]);
   const { settings, update, save, saving } = useSettings();
   const { user } = useAuth();
 
@@ -152,15 +162,17 @@ export function SettingsDrawer() {
           <div className="mb-6">
             <div className="mb-1 text-[14px] font-bold text-text-primary">Letterhead Logo</div>
             <div className="mb-[14px] text-[12.5px] text-text-muted">
-              Upload your own logo for pre-approval letters. Leave empty to use the built-in letterhead.
+              Shown at the top of your letters and PDFs. With no logo, your company name is printed there instead.
             </div>
             <div className="flex items-center gap-4">
               <div className="flex h-[64px] w-[150px] items-center justify-center overflow-hidden rounded-[10px] border border-border bg-[#eef1f5] px-2">
-                <img
-                  src={settings.logoDataUrl || '/brand/letterhead-logo.jpg'}
-                  alt="Letterhead logo preview"
-                  className="max-h-[52px] max-w-full object-contain"
-                />
+                {settings.logoDataUrl ? (
+                  <img src={settings.logoDataUrl} alt="Letterhead logo preview" className="max-h-[52px] max-w-full object-contain" />
+                ) : (
+                  <span className="px-1 text-center text-[12px] font-semibold leading-tight text-[#5b6b7b]">
+                    {settings.lenderName || settings.company || 'Your logo here'}
+                  </span>
+                )}
               </div>
               <div className="flex flex-col gap-2">
                 <label className="cursor-pointer">

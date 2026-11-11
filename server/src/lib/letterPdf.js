@@ -128,6 +128,13 @@ export function drawLetter(doc, d) {
       const logoW = (58 * img.width) / img.height;
       const x = classic ? (PAGE_W - logoW) / 2 : LEFT;
       doc.image(logoSource, x, 48, { height: 58 });
+    } else if (lender.name) {
+      // No logo uploaded: the company name takes its place, so the top of the letter is never blank.
+      doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(22).text(String(lender.name), LEFT, 74, {
+        width: RIGHT - LEFT,
+        align: classic ? 'center' : 'left',
+        lineBreak: false,
+      });
     }
   } catch {
     /* logo optional */
